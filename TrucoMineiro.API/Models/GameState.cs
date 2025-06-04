@@ -188,6 +188,44 @@ namespace TrucoMineiro.API.Models
         }
 
         /// <summary>
+        /// Initialize the game with players
+        /// </summary>
+        /// <param name="playerName">Custom name for the player at seat 0</param>
+        public void InitializeGame(string playerName)
+        {
+            // Create players if they don't exist
+            if (Players.Count < MaxPlayers)
+            {
+                Players = new List<Player>
+                {
+                    new Player(playerName, "Player's Team", 0),
+                    new Player("AI 1", "Opponent Team", 1),
+                    new Player("Partner", "Player's Team", 2),
+                    new Player("AI 2", "Opponent Team", 3)
+                };
+            }
+            else
+            {
+                // Update the name of the player at seat 0
+                var player = Players.FirstOrDefault(p => p.Seat == 0);
+                if (player != null)
+                {
+                    player.Name = playerName;
+                }
+            }
+
+            // Set the dealer and first player
+            Players[DealerSeat].IsDealer = true;
+            Players[FirstPlayerSeat].IsActive = true;
+
+            // Initialize the played cards for each seat
+            PlayedCards = Players.Select(p => new PlayedCard(p.Id)).ToList();
+
+            // Reset the game state
+            ResetRound();
+        }
+
+        /// <summary>
         /// Reset the round state
         /// </summary>
         public void ResetRound()

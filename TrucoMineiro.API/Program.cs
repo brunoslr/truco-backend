@@ -56,11 +56,6 @@ app.UseHttpsRedirection();
 app.UseCors("AllowReactApp");
 app.UseAuthorization();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
 // Map controllers
 app.MapControllers();
 

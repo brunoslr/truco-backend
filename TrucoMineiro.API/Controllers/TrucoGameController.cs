@@ -279,7 +279,37 @@ namespace TrucoMineiro.API.Controllers
             var gameStateDto = MappingService.MapGameStateToDto(game);
             return Ok(gameStateDto);
         }
-    }    /// <summary>
+
+        /// <summary>
+        /// Starts a new Truco Mineiro game with player name
+        /// </summary>
+        /// <remarks>
+        /// Sample request:
+        /// 
+        ///     POST /api/game/start
+        ///     {
+        ///         "playerName": "John"
+        ///     }
+        ///     
+        /// This will create a new game with the specified player name and return the initial game state.
+        /// </remarks>
+        /// <param name="request">The start game request containing player name</param>
+        /// <response code="200">Returns the initial game state with player's cards</response>
+        /// <response code="400">If the request is invalid</response>
+        [HttpPost("start")]
+        [ProducesResponseType(typeof(StartGameResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public ActionResult<StartGameResponse> StartGame([FromBody] StartGameRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.PlayerName))
+            {
+                return BadRequest("Player name is required");
+            }
+
+            var game = _gameService.CreateGame(request.PlayerName);
+            var response = MappingService.MapGameStateToStartGameResponse(game, 0, _gameService.IsDevMode());
+            return Ok(response);
+        }    }    /// <summary>
     /// Request to play a card from a player's hand
     /// </summary>
     public class PlayCardRequest
@@ -308,4 +338,5 @@ namespace TrucoMineiro.API.Controllers
         /// <example>player1</example>
         public string PlayerId { get; set; } = string.Empty;
     }
+}
 }
