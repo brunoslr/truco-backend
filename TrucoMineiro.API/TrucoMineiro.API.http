@@ -1,0 +1,6 @@
+@TrucoMineiro.API_HostAddress = http://localhost:5084
+
+GET {{TrucoMineiro.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
