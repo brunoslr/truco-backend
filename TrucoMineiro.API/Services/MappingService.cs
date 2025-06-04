@@ -18,17 +18,15 @@ namespace TrucoMineiro.API.Services
                 Value = card.Value,
                 Suit = card.Suit
             };
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Map a CardDto to a Card model
         /// </summary>
         public static Card MapDtoToCard(CardDto dto)
         {
             return new Card
             {
-                Value = dto.Value,
-                Suit = dto.Suit
+                Value = dto.Value ?? string.Empty,
+                Suit = dto.Suit ?? string.Empty
             };
         }
 
@@ -142,26 +140,39 @@ namespace TrucoMineiro.API.Services
                 Name = p.Name,
                 Seat = p.Seat,
                 Team = p.Team
-            }).ToList();
-
-            // Add the player's hand
-            if (showAllHands)
+            }).ToList();            // Add the player's hand and all player hands
+            var requestingPlayer = gameState.Players.FirstOrDefault(p => p.Seat == playerSeat);
+            if (requestingPlayer != null)
             {
-                // In DevMode, return all player hands
-                var player = gameState.Players.FirstOrDefault(p => p.Seat == 0);
-                if (player != null)
-                {
-                    response.Hand = player.Hand.Select(MapCardToDto).ToList();
-                }
+                // Set the requesting player's hand in the Hand property
+                response.Hand = requestingPlayer.Hand.Select(MapCardToDto).ToList();
             }
-            else
+            
+            // Handle all player hands
+            response.PlayerHands = new List<PlayerHandDto>();
+            foreach (var player in gameState.Players)
             {
-                // Only show the requesting player's hand
-                var player = gameState.Players.FirstOrDefault(p => p.Seat == playerSeat);
-                if (player != null)
+                var playerHandDto = new PlayerHandDto
                 {
-                    response.Hand = player.Hand.Select(MapCardToDto).ToList();
+                    Seat = player.Seat,
+                    Cards = new List<CardDto>()
+                };
+                
+                if (showAllHands || player.Seat == playerSeat)
+                {
+                    // In DevMode or for the requesting player, show actual cards
+                    playerHandDto.Cards = player.Hand.Select(MapCardToDto).ToList();
                 }
+                else
+                {                    // For AI or other players, only show empty card objects
+                    // This follows the requirement to just show the number of cards but not their values/suits
+                    for (int i = 0; i < player.Hand.Count; i++)
+                    {
+                        playerHandDto.Cards.Add(new CardDto { Value = null, Suit = null });
+                    }
+                }
+                
+                response.PlayerHands.Add(playerHandDto);
             }
 
             return response;

@@ -336,7 +336,5 @@ namespace TrucoMineiro.API.Controllers
         /// The unique identifier of the player making the action
         /// </summary>
         /// <example>player1</example>
-        public string PlayerId { get; set; } = string.Empty;
-    }
-}
+        public string PlayerId { get; set; } = string.Empty;    }
 }

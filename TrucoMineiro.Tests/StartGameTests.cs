@@ -95,8 +95,17 @@ namespace TrucoMineiro.Tests
             Assert.Equal(4, response.Players.Count);
             Assert.Equal(playerName, response.Players.First(p => p.Seat == 0).Name);
             Assert.Equal("Player's Team", response.Players.First(p => p.Seat == 0).Team);
+              // Hand should have 3 cards for player at seat 0
+            Assert.Equal(3, response.Hand.Count);
             
-            // Hand should have 3 cards for player at seat 0            Assert.Equal(3, response.Hand.Count);
+            // PlayerHands should have entries for all 4 players
+            Assert.Equal(4, response.PlayerHands.Count);
+            
+            // Check that AI player hands have empty cards (no values/suits)
+            var aiPlayerHand = response.PlayerHands.First(h => h.Seat == 1);
+            Assert.Equal(3, aiPlayerHand.Cards.Count);
+            Assert.All(aiPlayerHand.Cards, card => Assert.Null(card.Value));
+            Assert.All(aiPlayerHand.Cards, card => Assert.Null(card.Suit));
         }
         
         [Fact]
@@ -115,11 +124,18 @@ namespace TrucoMineiro.Tests
             var game = gameService.CreateGame(playerName);
 
             // Act - Note we pass true for showAllHands param
-            var response = MappingService.MapGameStateToStartGameResponse(game, 0, true);
-
-            // Assert
+            var response = MappingService.MapGameStateToStartGameResponse(game, 0, true);            // Assert
             Assert.NotNull(response);
             Assert.Equal(3, response.Hand.Count); // Player's cards should be visible
+            
+            // In DevMode, all player hands should have visible cards
+            Assert.Equal(4, response.PlayerHands.Count);
+            
+            // Check that AI player hands have actual card values in DevMode
+            var aiPlayerHand = response.PlayerHands.First(h => h.Seat == 1);
+            Assert.Equal(3, aiPlayerHand.Cards.Count);
+            Assert.Contains(aiPlayerHand.Cards, card => card.Value != null);
+            Assert.Contains(aiPlayerHand.Cards, card => card.Suit != null);
         }
     }
 }

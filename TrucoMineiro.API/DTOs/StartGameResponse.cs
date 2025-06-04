@@ -25,12 +25,15 @@ namespace TrucoMineiro.API.DTOs
         /// <summary>
         /// All players in the game
         /// </summary>
-        public List<PlayerInfoDto> Players { get; set; } = new List<PlayerInfoDto>();
-
-        /// <summary>
+        public List<PlayerInfoDto> Players { get; set; } = new List<PlayerInfoDto>();        /// <summary>
         /// The player's current hand of cards
         /// </summary>
         public List<CardDto> Hand { get; set; } = new List<CardDto>();
+        
+        /// <summary>
+        /// All players' hands - for AI players, cards will have no values/suits unless in DevMode
+        /// </summary>
+        public List<PlayerHandDto> PlayerHands { get; set; } = new List<PlayerHandDto>();
 
         /// <summary>
         /// The seat of the current dealer
