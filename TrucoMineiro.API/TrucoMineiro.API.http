@@ -12,4 +12,33 @@ Content-Type: application/json
   "playerName": "Player1"
 }
 
-###
+### Play a card (new enhanced endpoint)
+POST {{TrucoMineiro.API_HostAddress}}/api/game/play-card
+Content-Type: application/json
+
+{
+  "gameId": "{{gameId}}",
+  "playerId": "{{playerId}}",
+  "cardIndex": 0,
+  "isFold": false
+}
+
+### Fold a hand (new enhanced endpoint)
+POST {{TrucoMineiro.API_HostAddress}}/api/game/play-card
+Content-Type: application/json
+
+{
+  "gameId": "{{gameId}}",
+  "playerId": "{{playerId}}",
+  "cardIndex": 0,
+  "isFold": true
+}
+
+### Play a card (original endpoint)
+POST {{TrucoMineiro.API_HostAddress}}/api/game/{{gameId}}/play-card
+Content-Type: application/json
+
+{
+  "playerId": "{{playerId}}",
+  "cardIndex": 0
+}

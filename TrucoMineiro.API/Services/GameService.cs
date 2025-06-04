@@ -1,4 +1,5 @@
 using TrucoMineiro.API.Models;
+using TrucoMineiro.API.DTOs;
 using Microsoft.Extensions.Configuration;
 
 namespace TrucoMineiro.API.Services
@@ -464,6 +465,81 @@ namespace TrucoMineiro.API.Services
                         pc.Card = null;
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Enhanced play card method that handles human players, AI players, and fold scenarios
+        /// </summary>
+        /// <param name="gameId">The unique identifier of the game</param>
+        /// <param name="playerId">The ID of the player making the move</param>
+        /// <param name="cardIndex">The index of the card in the player's hand</param>
+        /// <param name="isFold">Whether this is a fold action</param>
+        /// <param name="requestingPlayerSeat">The seat of the player making the request (for response visibility)</param>
+        /// <returns>PlayCardResponseDto with the updated game state</returns>
+        public PlayCardResponseDto PlayCardEnhanced(string gameId, string playerId, int cardIndex, bool isFold = false, int requestingPlayerSeat = 0)
+        {
+            var game = GetGame(gameId);
+            if (game == null)
+            {
+                return MappingService.MapGameStateToPlayCardResponse(new GameState(), requestingPlayerSeat, _devMode, false, "Game not found");
+            }
+
+            // Handle fold action
+            if (isFold)
+            {
+                var foldSuccess = Fold(gameId, playerId);
+                if (!foldSuccess)
+                {
+                    return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Cannot fold at this time");
+                }
+                return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, true, "Hand folded successfully");
+            }
+
+            // Handle card play for human player
+            var playSuccess = PlayCard(gameId, playerId, cardIndex);
+            if (!playSuccess)
+            {
+                return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Invalid card play");
+            }
+
+            // In DevMode, automatically handle AI player turns
+            if (_devMode)
+            {
+                HandleAIPlayerTurns(game);
+            }
+
+            return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, true, "Card played successfully");
+        }
+
+        /// <summary>
+        /// Handle AI player turns automatically in DevMode
+        /// </summary>
+        /// <param name="game">The game state</param>
+        private void HandleAIPlayerTurns(GameState game)
+        {
+            // Continue playing for AI players until it's a human player's turn or round is complete
+            var maxIterations = 10; // Prevent infinite loops
+            var iterations = 0;
+
+            while (iterations < maxIterations)
+            {
+                var activePlayer = game.Players.FirstOrDefault(p => p.IsActive);
+                if (activePlayer == null) break;
+
+                // Check if it's a human player (seat 0 typically) or if round is complete
+                if (activePlayer.Seat == 0 || game.PlayedCards.All(pc => pc.Card != null))
+                {
+                    break;
+                }
+
+                // AI player plays first available card
+                if (activePlayer.Hand.Count > 0)
+                {
+                    PlayCard(game.GameId, activePlayer.Id, 0);
+                }
+
+                iterations++;
             }
         }
     }

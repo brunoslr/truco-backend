@@ -309,7 +309,75 @@ namespace TrucoMineiro.API.Controllers
             var game = _gameService.CreateGame(request.PlayerName);
             var response = MappingService.MapGameStateToStartGameResponse(game, 0, _gameService.IsDevMode());
             return Ok(response);
-        }    }    /// <summary>
+        }        /// <summary>
+        /// Play a card from a player's hand (new endpoint with enhanced features)
+        /// </summary>
+        /// <remarks>
+        /// Sample request:
+        /// 
+        ///     POST /api/game/play-card
+        ///     {
+        ///         "gameId": "abc123",
+        ///         "playerId": "player1",
+        ///         "cardIndex": 0,
+        ///         "isFold": false
+        ///     }
+        ///     
+        /// This endpoint handles human players, AI players, and fold scenarios.
+        /// In DevMode, AI players will automatically play their turns after a human player's move.
+        /// Card visibility follows the same rules as the start game endpoint.
+        /// </remarks>
+        /// <param name="request">The play card request containing game ID, player ID, card index, and fold flag</param>
+        /// <response code="200">Returns the updated game state with proper card visibility</response>
+        /// <response code="400">If the request is invalid</response>
+        [HttpPost("play-card")]
+        [ProducesResponseType(typeof(PlayCardResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public ActionResult<PlayCardResponseDto> PlayCardEnhanced([FromBody] PlayCardRequestDto request)
+        {
+            if (string.IsNullOrWhiteSpace(request.GameId) || 
+                string.IsNullOrWhiteSpace(request.PlayerId) ||
+                (!request.IsFold && request.CardIndex < 0))
+            {
+                var errorResponse = new PlayCardResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid request parameters",
+                    GameState = new GameStateDto(),
+                    Hand = new List<CardDto>(),
+                    PlayerHands = new List<PlayerHandDto>()
+                };
+                return BadRequest(errorResponse);
+            }
+
+            // Determine requesting player seat (assuming seat 0 for human player)
+            var game = _gameService.GetGame(request.GameId);
+            int requestingPlayerSeat = 0;
+            if (game != null)
+            {
+                var requestingPlayer = game.Players.FirstOrDefault(p => p.Id == request.PlayerId);
+                if (requestingPlayer != null)
+                {
+                    requestingPlayerSeat = requestingPlayer.Seat;
+                }
+            }
+
+            var response = _gameService.PlayCardEnhanced(
+                request.GameId, 
+                request.PlayerId, 
+                request.CardIndex, 
+                request.IsFold, 
+                requestingPlayerSeat
+            );
+
+            if (!response.Success)
+            {
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+    }    /// <summary>
     /// Request to play a card from a player's hand
     /// </summary>
     public class PlayCardRequest
@@ -337,4 +405,65 @@ namespace TrucoMineiro.API.Controllers
         /// </summary>
         /// <example>player1</example>
         public string PlayerId { get; set; } = string.Empty;    }
+
+    /// <summary>
+    /// Request DTO for enhanced play card endpoint
+    /// </summary>
+    public class PlayCardRequestDto
+    {
+        /// <summary>
+        /// The unique identifier of the game
+        /// </summary>
+        /// <example>abc123</example>
+        public string GameId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The unique identifier of the player making the move
+        /// </summary>
+        /// <example>player1</example>
+        public string PlayerId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The index of the card in the player's hand to play (0-based)
+        /// </summary>
+        /// <example>0</example>
+        public int CardIndex { get; set; }
+
+        /// <summary>
+        /// Flag indicating if the player is folding
+        /// </summary>
+        /// <example>false</example>
+        public bool IsFold { get; set; }
+    }
+
+    /// <summary>
+    /// Response DTO for play card actions
+    /// </summary>
+    public class PlayCardResponseDto
+    {
+        /// <summary>
+        /// Indicates if the play card action was successful
+        /// </summary>
+        public bool Success { get; set; }
+
+        /// <summary>
+        /// Message providing additional information about the action result
+        /// </summary>
+        public string Message { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The current state of the game after the action
+        /// </summary>
+        public GameStateDto GameState { get; set; } = new GameStateDto();
+
+        /// <summary>
+        /// The updated hand of the player who played the card
+        /// </summary>
+        public List<CardDto> Hand { get; set; } = new List<CardDto>();
+
+        /// <summary>
+        /// The updated hands of all players in the game
+        /// </summary>
+        public List<PlayerHandDto> PlayerHands { get; set; } = new List<PlayerHandDto>();
+    }
 }
