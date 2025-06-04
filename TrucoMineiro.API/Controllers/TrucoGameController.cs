@@ -64,179 +64,82 @@ namespace TrucoMineiro.API.Controllers
 
             var gameStateDto = MappingService.MapGameStateToDto(game);
             return Ok(gameStateDto);
-        }
-
-        /// <summary>
-        /// Plays a card from a player's hand
+        }        /// <summary>
+        /// Unified endpoint for button press actions (Truco, Raise, Fold)
         /// </summary>
         /// <remarks>
-        /// Sample request:
+        /// Sample requests:
         /// 
-        ///     POST /api/game/{gameId}/play-card
+        ///     POST /api/game/press-button
         ///     {
+        ///         "gameId": "abc123",
         ///         "playerId": "player1",
-        ///         "cardIndex": 0
+        ///         "action": "truco"
         ///     }
         ///     
-        /// This will play the first card (index 0) from player1's hand.
+        ///     POST /api/game/press-button
+        ///     {
+        ///         "gameId": "abc123",
+        ///         "playerId": "player2",
+        ///         "action": "raise"
+        ///     }
+        ///     
+        ///     POST /api/game/press-button
+        ///     {
+        ///         "gameId": "abc123",
+        ///         "playerId": "player3",
+        ///         "action": "fold"
+        ///     }
+        ///     
+        /// This unified endpoint handles all button press actions:
+        /// - "truco": Calls Truco to raise the stakes
+        /// - "raise": Raises the stakes further after a Truco call
+        /// - "fold": Folds the current hand, giving points to the opposing team
         /// </remarks>
-        /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="request">The play card request containing player ID and card index</param>
-        /// <response code="200">Returns the updated game state after playing the card</response>
-        /// <response code="400">If the request is invalid or the move is not allowed</response>
+        /// <param name="request">The button press request containing game ID, player ID, and action</param>
+        /// <response code="200">Returns the updated game state after the action</response>
+        /// <response code="400">If the request is invalid or the action is not allowed</response>
         /// <response code="404">If the game with the specified ID doesn't exist</response>
-        [HttpPost("{gameId}/play-card")]
+        [HttpPost("press-button")]
         [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<GameStateDto> PlayCard(string gameId, [FromBody] PlayCardRequest request)
+        public ActionResult<GameStateDto> PressButton([FromBody] ButtonPressRequest request)
         {
-            if (string.IsNullOrEmpty(request.PlayerId) || request.CardIndex < 0)
+            if (string.IsNullOrEmpty(request.GameId) || 
+                string.IsNullOrEmpty(request.PlayerId) ||
+                string.IsNullOrEmpty(request.Action))
             {
                 return BadRequest("Invalid request parameters");
             }
 
-            var success = _gameService.PlayCard(gameId, request.PlayerId, request.CardIndex);
+            bool success;
+            string errorMessage;
+
+            switch (request.Action.ToLower())
+            {
+                case ButtonPressActions.Truco:
+                    success = _gameService.CallTruco(request.GameId, request.PlayerId);
+                    errorMessage = "Invalid Truco call";
+                    break;
+                case ButtonPressActions.Raise:
+                    success = _gameService.RaiseStakes(request.GameId, request.PlayerId);
+                    errorMessage = "Invalid raise";
+                    break;
+                case ButtonPressActions.Fold:
+                    success = _gameService.Fold(request.GameId, request.PlayerId);
+                    errorMessage = "Invalid fold";
+                    break;
+                default:
+                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.Truco}, {ButtonPressActions.Raise}, {ButtonPressActions.Fold}");
+            }
+
             if (!success)
             {
-                return BadRequest("Invalid move");
+                return BadRequest(errorMessage);
             }
 
-            var game = _gameService.GetGame(gameId);
-            if (game == null)
-            {
-                return NotFound("Game not found");
-            }
-
-            var gameStateDto = MappingService.MapGameStateToDto(game);
-            return Ok(gameStateDto);
-        }        /// <summary>
-        /// Calls Truco to raise the stakes
-        /// </summary>
-        /// <remarks>
-        /// Sample request:
-        /// 
-        ///     POST /api/game/{gameId}/truco
-        ///     {
-        ///         "playerId": "player1"
-        ///     }
-        ///     
-        /// This will call Truco, raising the stakes of the current hand.
-        /// The opposing team will need to accept, raise further, or fold.
-        /// </remarks>
-        /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="request">The Truco request containing player ID</param>
-        /// <response code="200">Returns the updated game state after calling Truco</response>
-        /// <response code="400">If the request is invalid or the Truco call is not allowed</response>
-        /// <response code="404">If the game with the specified ID doesn't exist</response>
-        [HttpPost("{gameId}/truco")]
-        [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<GameStateDto> CallTruco(string gameId, [FromBody] TrucoRequest request)
-        {
-            if (string.IsNullOrEmpty(request.PlayerId))
-            {
-                return BadRequest("Invalid player ID");
-            }
-
-            var success = _gameService.CallTruco(gameId, request.PlayerId);
-            if (!success)
-            {
-                return BadRequest("Invalid Truco call");
-            }
-
-            var game = _gameService.GetGame(gameId);
-            if (game == null)
-            {
-                return NotFound("Game not found");
-            }
-
-            var gameStateDto = MappingService.MapGameStateToDto(game);
-            return Ok(gameStateDto);
-        }
-        
-        /// <summary>
-        /// Raises the stakes after a Truco call
-        /// </summary>
-        /// <remarks>
-        /// Sample request:
-        /// 
-        ///     POST /api/game/{gameId}/raise
-        ///     {
-        ///         "playerId": "player1"
-        ///     }
-        ///     
-        /// This will raise the stakes further after a Truco call.
-        /// </remarks>
-        /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="request">The request containing player ID</param>
-        /// <response code="200">Returns the updated game state after raising</response>
-        /// <response code="400">If the request is invalid or raising is not allowed</response>
-        /// <response code="404">If the game with the specified ID doesn't exist</response>
-        [HttpPost("{gameId}/raise")]
-        [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<GameStateDto> RaiseStakes(string gameId, [FromBody] TrucoRequest request)
-        {
-            if (string.IsNullOrEmpty(request.PlayerId))
-            {
-                return BadRequest("Invalid player ID");
-            }
-
-            var success = _gameService.RaiseStakes(gameId, request.PlayerId);
-            if (!success)
-            {
-                return BadRequest("Invalid raise");
-            }
-
-            var game = _gameService.GetGame(gameId);
-            if (game == null)
-            {
-                return NotFound("Game not found");
-            }
-
-            var gameStateDto = MappingService.MapGameStateToDto(game);
-            return Ok(gameStateDto);
-        }
-        
-        /// <summary>
-        /// Folds a hand in response to Truco or other challenge
-        /// </summary>
-        /// <remarks>
-        /// Sample request:
-        /// 
-        ///     POST /api/game/{gameId}/fold
-        ///     {
-        ///         "playerId": "player1"
-        ///     }
-        ///     
-        /// This will fold the current hand, giving points to the opposing team.
-        /// </remarks>
-        /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="request">The request containing player ID</param>
-        /// <response code="200">Returns the updated game state after folding</response>
-        /// <response code="400">If the request is invalid or folding is not allowed</response>
-        /// <response code="404">If the game with the specified ID doesn't exist</response>
-        [HttpPost("{gameId}/fold")]
-        [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<GameStateDto> Fold(string gameId, [FromBody] TrucoRequest request)
-        {
-            if (string.IsNullOrEmpty(request.PlayerId))
-            {
-                return BadRequest("Invalid player ID");
-            }
-
-            var success = _gameService.Fold(gameId, request.PlayerId);
-            if (!success)
-            {
-                return BadRequest("Invalid fold");
-            }
-
-            var game = _gameService.GetGame(gameId);
+            var game = _gameService.GetGame(request.GameId);
             if (game == null)
             {
                 return NotFound("Game not found");
@@ -376,35 +279,7 @@ namespace TrucoMineiro.API.Controllers
             }
 
             return Ok(response);
-        }
-    }    /// <summary>
-    /// Request to play a card from a player's hand
-    /// </summary>
-    public class PlayCardRequest
-    {
-        /// <summary>
-        /// The unique identifier of the player making the move
-        /// </summary>
-        /// <example>player1</example>
-        public string PlayerId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The index of the card in the player's hand to play (0-based)
-        /// </summary>
-        /// <example>0</example>
-        public int CardIndex { get; set; }
-    }
-
-    /// <summary>
-    /// Request for actions like calling Truco, raising, or folding
-    /// </summary>
-    public class TrucoRequest
-    {
-        /// <summary>
-        /// The unique identifier of the player making the action
-        /// </summary>
-        /// <example>player1</example>
-        public string PlayerId { get; set; } = string.Empty;    }
+        }    }
 
     /// <summary>
     /// Request DTO for enhanced play card endpoint

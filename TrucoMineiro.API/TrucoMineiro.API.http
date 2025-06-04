@@ -42,3 +42,33 @@ Content-Type: application/json
   "playerId": "{{playerId}}",
   "cardIndex": 0
 }
+
+### Call Truco (unified button press endpoint)
+POST {{TrucoMineiro.API_HostAddress}}/api/game/press-button
+Content-Type: application/json
+
+{
+  "gameId": "{{gameId}}",
+  "playerId": "{{playerId}}",
+  "action": "truco"
+}
+
+### Raise stakes (unified button press endpoint)
+POST {{TrucoMineiro.API_HostAddress}}/api/game/press-button
+Content-Type: application/json
+
+{
+  "gameId": "{{gameId}}",
+  "playerId": "{{playerId}}",
+  "action": "raise"
+}
+
+### Fold hand (unified button press endpoint)
+POST {{TrucoMineiro.API_HostAddress}}/api/game/press-button
+Content-Type: application/json
+
+{
+  "gameId": "{{gameId}}",
+  "playerId": "{{playerId}}",
+  "action": "fold"
+}
