@@ -97,5 +97,74 @@ namespace TrucoMineiro.API.Services
                 ActionLog = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList()
             };
         }
+
+        /// <summary>
+        /// Map a GameState model to a StartGameResponse
+        /// </summary>
+        /// <param name="gameState">The game state to map</param>
+        /// <param name="playerSeat">The seat of the requesting player</param>
+        /// <param name="showAllHands">Whether to reveal all player hands (DevMode)</param>
+        public static StartGameResponse MapGameStateToStartGameResponse(GameState gameState, int playerSeat = 0, bool showAllHands = false)
+        {
+            var response = new StartGameResponse
+            {
+                GameId = gameState.GameId,
+                PlayerSeat = playerSeat,
+                DealerSeat = gameState.DealerSeat,
+                Stakes = gameState.Stakes,
+                CurrentHand = gameState.CurrentHand,
+                TeamScores = gameState.TeamScores,
+                Actions = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList()
+            };
+
+            // Create teams
+            response.Teams = new List<TeamDto>
+            {
+                new TeamDto 
+                { 
+                    Name = "Player's Team", 
+                    Seats = gameState.Players.Where(p => p.Team == "Player's Team")
+                                           .Select(p => p.Seat)
+                                           .ToList() 
+                },
+                new TeamDto 
+                { 
+                    Name = "Opponent Team", 
+                    Seats = gameState.Players.Where(p => p.Team == "Opponent Team")
+                                           .Select(p => p.Seat)
+                                           .ToList() 
+                }
+            };
+
+            // Add players
+            response.Players = gameState.Players.Select(p => new PlayerInfoDto
+            {
+                Name = p.Name,
+                Seat = p.Seat,
+                Team = p.Team
+            }).ToList();
+
+            // Add the player's hand
+            if (showAllHands)
+            {
+                // In DevMode, return all player hands
+                var player = gameState.Players.FirstOrDefault(p => p.Seat == 0);
+                if (player != null)
+                {
+                    response.Hand = player.Hand.Select(MapCardToDto).ToList();
+                }
+            }
+            else
+            {
+                // Only show the requesting player's hand
+                var player = gameState.Players.FirstOrDefault(p => p.Seat == playerSeat);
+                if (player != null)
+                {
+                    response.Hand = player.Hand.Select(MapCardToDto).ToList();
+                }
+            }
+
+            return response;
+        }
     }
 }

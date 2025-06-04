@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
 using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Services;
 using Xunit;
@@ -9,11 +11,25 @@ namespace TrucoMineiro.Tests
     /// </summary>
     public class GameServiceTests
     {
+        private readonly IConfiguration _configuration;
+
+    public GameServiceTests()
+    {
+        // Set up test configuration
+        var inMemorySettings = new Dictionary<string, string?> {
+            {"FeatureFlags:DevMode", "false"},
+        };
+
+        _configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings)
+            .Build();
+    }
+
         [Fact]
         public void CreateGame_ShouldInitializeGameState()
         {
             // Arrange
-            var gameService = new GameService();
+            var gameService = new GameService(_configuration);
 
             // Act
             var game = gameService.CreateGame();
@@ -34,19 +50,16 @@ namespace TrucoMineiro.Tests
             {
                 Assert.Equal(3, player.Hand.Count);
             }
-            
-            // One player should be active
-            Assert.Single(game.Players.Where(p => p.IsActive));
+              // One player should be active
+            Assert.Single(game.Players, p => p.IsActive);
             
             // One player should be the dealer
-            Assert.Single(game.Players.Where(p => p.IsDealer));
-        }
-
-        [Fact]
+            Assert.Single(game.Players, p => p.IsDealer);
+        }        [Fact]
         public void GetGame_ShouldReturnGame_WhenGameExists()
         {
             // Arrange
-            var gameService = new GameService();
+            var gameService = new GameService(_configuration);
             var game = gameService.CreateGame();
             var gameId = game.GameId;
 
@@ -62,7 +75,7 @@ namespace TrucoMineiro.Tests
         public void GetGame_ShouldReturnNull_WhenGameDoesNotExist()
         {
             // Arrange
-            var gameService = new GameService();
+            var gameService = new GameService(_configuration);
             var nonExistentGameId = "non-existent-id";
 
             // Act
@@ -76,7 +89,7 @@ namespace TrucoMineiro.Tests
         public void PlayCard_ShouldReturnTrue_WhenValidMove()
         {
             // Arrange
-            var gameService = new GameService();
+            var gameService = new GameService(_configuration);
             var game = gameService.CreateGame();
             
             // Find the active player

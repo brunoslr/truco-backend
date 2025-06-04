@@ -1,6 +1,15 @@
 @TrucoMineiro.API_HostAddress = http://localhost:5084
 
-GET {{TrucoMineiro.API_HostAddress}}/weatherforecast/
+### Create a new game
+POST {{TrucoMineiro.API_HostAddress}}/api/game
 Accept: application/json
+
+### Start a game with player name
+POST {{TrucoMineiro.API_HostAddress}}/api/game/start
+Content-Type: application/json
+
+{
+  "playerName": "Player1"
+}
 
 ###

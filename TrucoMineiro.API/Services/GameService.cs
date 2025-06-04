@@ -1,4 +1,5 @@
 using TrucoMineiro.API.Models;
+using Microsoft.Extensions.Configuration;
 
 namespace TrucoMineiro.API.Services
 {
@@ -8,6 +9,17 @@ namespace TrucoMineiro.API.Services
     public class GameService
     {
         private readonly Dictionary<string, GameState> _games = new();
+        private readonly bool _devMode;
+
+        /// <summary>
+        /// Constructor for GameService
+        /// </summary>
+        /// <param name="configuration">Application configuration</param>
+        public GameService(IConfiguration configuration)
+        {
+            // Read DevMode configuration from appsettings.json
+            _devMode = configuration.GetValue<bool>("FeatureFlags:DevMode", false);
+        }
 
         /// <summary>
         /// Creates a new game with 4 players and deals cards
@@ -18,7 +30,57 @@ namespace TrucoMineiro.API.Services
             var gameState = new GameState();
             gameState.InitializeGame();
             _games[gameState.GameId] = gameState;
+
+            // In dev mode, automatically play turns for demonstration
+            if (_devMode)
+            {
+                // Activate all players
+                foreach (var player in gameState.Players)
+                {
+                    player.IsActive = true;
+                }
+
+                // Play a few turns automatically
+                for (int i = 0; i < 3; i++)
+                {
+                    foreach (var player in gameState.Players)
+                    {
+                        // Each player plays the first card in their hand
+                        if (player.Hand.Count > 0)
+                        {
+                            PlayCard(gameState.GameId, player.Id, 0);
+                        }
+                    }
+                }
+            }
+
             return gameState;
+        }
+
+        /// <summary>
+        /// Creates a new game with a custom player name
+        /// </summary>
+        /// <param name="playerName">Name for the player at seat 0</param>
+        /// <returns>The newly created game state</returns>
+        public GameState CreateGame(string playerName)
+        {
+            var gameState = new GameState();
+            gameState.InitializeGame(playerName);
+            
+            // Update stakes to 2 as per requirements
+            gameState.Stakes = 2;
+            
+            _games[gameState.GameId] = gameState;
+            return gameState;
+        }
+
+        /// <summary>
+        /// Checks if the development mode is enabled
+        /// </summary>
+        /// <returns>True if DevMode is enabled, false otherwise</returns>
+        public bool IsDevMode()
+        {
+            return _devMode;
         }
 
         /// <summary>
