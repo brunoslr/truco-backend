@@ -1,3 +1,5 @@
+using TrucoMineiro.API.Constants;
+
 namespace TrucoMineiro.API.Models
 {
     /// <summary>
@@ -76,11 +78,64 @@ namespace TrucoMineiro.API.Models
     /// Represents the state of a Truco Mineiro game
     /// </summary>
     public class GameState
-    {
-        /// <summary>
+    {        /// <summary>
         /// Unique identifier for the game
         /// </summary>
         public string GameId { get; private set; } = Guid.NewGuid().ToString();
+
+        /// <summary>
+        /// Alternative ID property for domain services compatibility
+        /// </summary>
+        public string Id 
+        { 
+            get => GameId; 
+            set => GameId = value; 
+        }
+
+        /// <summary>
+        /// Current player index for turn tracking
+        /// </summary>
+        public int CurrentPlayerIndex { get; set; } = 0;        /// <summary>
+        /// Team 1 score (seats 0 and 2)
+        /// </summary>
+        public int Team1Score 
+        { 
+            get => TeamScores.ContainsKey(TrucoConstants.Teams.PlayerTeam) ? TeamScores[TrucoConstants.Teams.PlayerTeam] : 0;
+            set => TeamScores[TrucoConstants.Teams.PlayerTeam] = value;
+        }
+
+        /// <summary>
+        /// Team 2 score (seats 1 and 3)
+        /// </summary>
+        public int Team2Score 
+        { 
+            get => TeamScores.ContainsKey(TrucoConstants.Teams.OpponentTeam) ? TeamScores[TrucoConstants.Teams.OpponentTeam] : 0;
+            set => TeamScores[TrucoConstants.Teams.OpponentTeam] = value;
+        }
+
+        /// <summary>
+        /// Current stake for this hand
+        /// </summary>
+        public int CurrentStake 
+        { 
+            get => Stakes; 
+            set => Stakes = value; 
+        }
+
+        /// <summary>
+        /// Whether there's a pending Truco call
+        /// </summary>
+        public bool PendingTrucoCall { get; set; } = false;
+
+        /// <summary>
+        /// Seat of the player who called Truco
+        /// </summary>
+        public int? TrucoCallerSeat { get; set; }
+
+        /// <summary>
+        /// Last response to a Truco call
+        /// </summary>
+        public TrucoResponse? LastTrucoResponse { get; set; }
 
         /// <summary>
         /// All players in the game
@@ -90,12 +145,10 @@ namespace TrucoMineiro.API.Models
         /// <summary>
         /// Cards played in the current round
         /// </summary>
-        public List<PlayedCard> PlayedCards { get; set; } = new List<PlayedCard>();
-
-        /// <summary>
+        public List<PlayedCard> PlayedCards { get; set; } = new List<PlayedCard>();        /// <summary>
         /// Current points at stake in the round
         /// </summary>
-        public int Stakes { get; set; } = 1;
+        public int Stakes { get; set; } = TrucoConstants.Stakes.Initial;
 
         /// <summary>
         /// Whether Truco has been called in the current round
@@ -143,20 +196,42 @@ namespace TrucoMineiro.API.Models
         public Deck Deck { get; set; } = new Deck();
 
         /// <summary>
+        /// Timestamp of when the game was created
+        /// </summary>
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Timestamp of the last activity in the game
+        /// </summary>
+        public DateTime LastActivity { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Current round number within the hand (1, 2, or 3)
+        /// </summary>
+        public int CurrentRound { get; set; } = 1;        /// <summary>
+        /// Winners of each round in the current hand (by team number)
+        /// </summary>
+        public List<int> RoundWinners { get; set; } = new List<int>();
+
+        /// <summary>
+        /// Whether the game is completed (someone reached 12 points)
+        /// </summary>
+        public bool IsCompleted { get; set; } = false;        /// <summary>
+        /// The winning team if the game is completed (1 or 2)
+        /// </summary>
+        public int? WinningTeam { get; set; }        /// <summary>
         /// The maximum number of players (typically 4 for Truco)
         /// </summary>
-        public const int MaxPlayers = 4;
+        public const int MaxPlayers = TrucoConstants.Game.MaxPlayers;
 
         /// <summary>
         /// The winning score (typically 12 points)
         /// </summary>
-        public const int WinningScore = 12;
-
-        public GameState()
+        public const int WinningScore = TrucoConstants.Game.WinningScore;        public GameState()
         {
             // Initialize team scores
-            TeamScores["Player's Team"] = 0;
-            TeamScores["Opponent Team"] = 0;
+            TeamScores[TrucoConstants.Teams.PlayerTeam] = 0;
+            TeamScores[TrucoConstants.Teams.OpponentTeam] = 0;
         }
 
         /// <summary>
@@ -166,13 +241,12 @@ namespace TrucoMineiro.API.Models
         {
             // Create players if they don't exist
             if (Players.Count < MaxPlayers)
-            {
-                Players = new List<Player>
+            {                Players = new List<Player>
                 {
-                    new Player("You", "Player's Team", 0),
-                    new Player("AI 1", "Opponent Team", 1),
-                    new Player("Partner", "Player's Team", 2),
-                    new Player("AI 2", "Opponent Team", 3)
+                    new Player("You", TrucoConstants.Teams.PlayerTeam, 0),
+                    new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1),
+                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),
+                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
                 };
             }
 
@@ -195,13 +269,12 @@ namespace TrucoMineiro.API.Models
         {
             // Create players if they don't exist
             if (Players.Count < MaxPlayers)
-            {
-                Players = new List<Player>
+            {                Players = new List<Player>
                 {
-                    new Player(playerName, "Player's Team", 0),
-                    new Player("AI 1", "Opponent Team", 1),
-                    new Player("Partner", "Player's Team", 2),
-                    new Player("AI 2", "Opponent Team", 3)
+                    new Player(playerName, TrucoConstants.Teams.PlayerTeam, 0),
+                    new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1),
+                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),
+                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
                 };
             }
             else
@@ -247,10 +320,8 @@ namespace TrucoMineiro.API.Models
             Deck.Shuffle();
 
             // Deal cards to the players
-            DealCards();
-
-            // Reset the stakes and truco status
-            Stakes = 1;
+            DealCards();            // Reset the stakes and truco status
+            Stakes = TrucoConstants.Stakes.Initial;
             IsTrucoCalled = false;
             IsRaiseEnabled = true;
             TurnWinner = null;
@@ -260,11 +331,10 @@ namespace TrucoMineiro.API.Models
         /// Deal cards to all players
         /// </summary>
         public void DealCards()
-        {
-            // Deal 3 cards to each player
+        {            // Deal 3 cards to each player
             foreach (var player in Players)
             {
-                var cards = Deck.DrawCards(3);
+                var cards = Deck.DrawCards(TrucoConstants.Game.CardsPerPlayer);
                 foreach (var card in cards)
                 {
                     player.AddCard(card);

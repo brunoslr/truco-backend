@@ -40,6 +40,11 @@ namespace TrucoMineiro.API.Models
         /// </summary>
         public int Seat { get; set; }
 
+        /// <summary>
+        /// Whether this player is controlled by AI
+        /// </summary>
+        public bool IsAI { get; set; }
+
         public Player(string name, string team, int seat)
         {
             Name = name;

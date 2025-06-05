@@ -82,5 +82,13 @@ namespace TrucoMineiro.API.Models
         {
             return _cards.Count;
         }
+
+        /// <summary>
+        /// Deal a card from the deck (alias for DrawCard)
+        /// </summary>
+        public Card DealCard()
+        {
+            return DrawCard();
+        }
     }
 }

@@ -1,15 +1,17 @@
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Services;
+using TrucoMineiro.API.Domain.Interfaces;
+using TrucoMineiro.API.Domain.Services;
+using Moq;
 using Xunit;
 
 namespace TrucoMineiro.Tests
 {    public class StartGameTests
     {
-        private readonly IConfiguration _configuration;
-
-        public StartGameTests()
+        private readonly IConfiguration _configuration;        public StartGameTests()
         {
             // Set up test configuration
             var inMemorySettings = new Dictionary<string, string?> {
@@ -19,13 +21,73 @@ namespace TrucoMineiro.Tests
             _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(inMemorySettings)
                 .Build();
+        }        private GameService CreateGameService(IConfiguration? config = null)
+        {
+            var configuration = config ?? _configuration;
+              // Create a dictionary to store created games (simulating repository storage)
+            var gameStorage = new Dictionary<string, GameState>();
+            
+            // Create mock services
+            var mockGameStateManager = new Mock<IGameStateManager>();
+            var mockGameRepository = new Mock<IGameRepository>();
+            var mockHandResolutionService = new Mock<IHandResolutionService>();
+            var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
+            var mockAIPlayerService = new Mock<IAIPlayerService>();
+            var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+
+            // Configure mock GameStateManager to return a valid GameState and store it
+            mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
+                .ReturnsAsync((string playerName) => {
+                    var gameState = CreateValidGameState(playerName);
+                    gameStorage[gameState.GameId] = gameState;
+                    return gameState;
+                });
+            
+            mockGameStateManager.Setup(x => x.CreateGameAsync(null))
+                .ReturnsAsync(() => {
+                    var gameState = CreateValidGameState();
+                    gameStorage[gameState.GameId] = gameState;
+                    return gameState;
+                });
+
+            // Configure mock GameRepository to return games from storage
+            mockGameRepository.Setup(x => x.GetGameAsync(It.IsAny<string>()))
+                .ReturnsAsync((string gameId) => gameStorage.ContainsKey(gameId) ? gameStorage[gameId] : null);
+
+            mockGameRepository.Setup(x => x.SaveGameAsync(It.IsAny<GameState>()))
+                .ReturnsAsync((GameState gameState) => {
+                    gameStorage[gameState.GameId] = gameState;
+                    return true;
+                });
+
+            // Configure mock ScoreCalculationService
+            mockScoreCalculationService.Setup(x => x.IsGameComplete(It.IsAny<GameState>()))
+                .Returns(false);
+
+            // Configure mock TrucoRulesEngine
+            mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
+                .Returns(1);
+
+            return new GameService(
+                mockGameStateManager.Object,
+                mockGameRepository.Object,
+                mockHandResolutionService.Object,
+                mockTrucoRulesEngine.Object,
+                mockAIPlayerService.Object,
+                mockScoreCalculationService.Object,
+                configuration);
         }
 
-        [Fact]
+        private GameState CreateValidGameState(string? playerName = null)
+        {
+            var gameState = new GameState();
+            gameState.InitializeGame(playerName ?? "TestPlayer");
+            return gameState;
+        }[Fact]
         public void CreateGameWithCustomName_ShouldInitializeGameState()
         {
             // Arrange
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
             string playerName = "TestPlayer";
 
             // Act
@@ -34,7 +96,7 @@ namespace TrucoMineiro.Tests
             // Assert
             Assert.NotNull(game);
             Assert.Equal(4, game.Players.Count);
-            Assert.Equal(2, game.Stakes); // Stakes should be 2 as specified in requirements
+            Assert.Equal(TrucoConstants.Stakes.Initial, game.Stakes); // Stakes should start at 2 as per Truco Mineiro rules
             Assert.False(game.IsTrucoCalled);
             Assert.True(game.IsRaiseEnabled);
             Assert.Equal(1, game.CurrentHand);
@@ -55,13 +117,11 @@ namespace TrucoMineiro.Tests
             Assert.Equal("AI 1", game.Players.First(p => p.Seat == 1).Name);
             Assert.Equal("Partner", game.Players.First(p => p.Seat == 2).Name);
             Assert.Equal("AI 2", game.Players.First(p => p.Seat == 3).Name);
-        }
-
-        [Fact]
+        }        [Fact]
         public void MapGameStateToStartGameResponse_ShouldMapCorrectly()
         {
             // Arrange
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
             string playerName = "TestPlayer";
             var game = gameService.CreateGame(playerName);
 
@@ -73,7 +133,7 @@ namespace TrucoMineiro.Tests
             Assert.Equal(game.GameId, response.GameId);
             Assert.Equal(0, response.PlayerSeat); // Single player is always at seat 0
             Assert.Equal(game.DealerSeat, response.DealerSeat);
-            Assert.Equal(2, response.Stakes); // Stakes should be 2
+            Assert.Equal(TrucoConstants.Stakes.Initial, response.Stakes); // Stakes should start at 2
             Assert.Equal(1, response.CurrentHand);
             Assert.Equal(2, response.TeamScores.Count);
             Assert.Equal(0, response.TeamScores["Player's Team"]);
@@ -114,12 +174,11 @@ namespace TrucoMineiro.Tests
             // Arrange
             var devModeSettings = new Dictionary<string, string?> {
                 {"FeatureFlags:DevMode", "true"},
-            };
-            var devConfig = new ConfigurationBuilder()
+            };            var devConfig = new ConfigurationBuilder()
                 .AddInMemoryCollection(devModeSettings)
                 .Build();
 
-            var gameService = new GameService(devConfig);
+            var gameService = CreateGameService(devConfig);
             string playerName = "TestPlayer";
             var game = gameService.CreateGame(playerName);
 

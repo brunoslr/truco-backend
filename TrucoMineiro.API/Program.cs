@@ -25,8 +25,20 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(xmlPath);
 });
 
-// Register our application services
-builder.Services.AddSingleton<TrucoMineiro.API.Services.GameService>();
+// Register domain services
+builder.Services.AddSingleton<TrucoMineiro.API.Domain.Interfaces.IGameRepository, TrucoMineiro.API.Domain.Repositories.InMemoryGameRepository>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IHandResolutionService, TrucoMineiro.API.Domain.Services.HandResolutionService>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.ITrucoRulesEngine, TrucoMineiro.API.Domain.Services.TrucoRulesEngine>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IScoreCalculationService, TrucoMineiro.API.Domain.Services.ScoreCalculationService>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IAIPlayerService, TrucoMineiro.API.Domain.Services.AIPlayerService>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameStateManager, TrucoMineiro.API.Domain.Services.GameStateManager>();
+
+// Register application services
+builder.Services.AddScoped<TrucoMineiro.API.Services.GameService>();
+builder.Services.AddSingleton<TrucoMineiro.API.Services.MappingService>();
+
+// Register background services
+builder.Services.AddHostedService<TrucoMineiro.API.Services.GameCleanupService>();
 
 // Add CORS for the React frontend
 builder.Services.AddCors(options =>

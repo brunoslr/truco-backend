@@ -1,5 +1,6 @@
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Models;
+using TrucoMineiro.API.Constants;
 
 namespace TrucoMineiro.API.Services
 {
@@ -167,22 +168,20 @@ namespace TrucoMineiro.API.Services
                 CurrentHand = gameState.CurrentHand,
                 TeamScores = gameState.TeamScores,
                 Actions = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList()
-            };
-
-            // Create teams
+            };            // Create teams
             response.Teams = new List<TeamDto>
             {
                 new TeamDto 
                 { 
-                    Name = "Player's Team", 
-                    Seats = gameState.Players.Where(p => p.Team == "Player's Team")
+                    Name = TrucoConstants.Teams.PlayerTeam, 
+                    Seats = gameState.Players.Where(p => p.Team == TrucoConstants.Teams.PlayerTeam)
                                            .Select(p => p.Seat)
                                            .ToList() 
                 },
                 new TeamDto 
                 { 
-                    Name = "Opponent Team", 
-                    Seats = gameState.Players.Where(p => p.Team == "Opponent Team")
+                    Name = TrucoConstants.Teams.OpponentTeam, 
+                    Seats = gameState.Players.Where(p => p.Team == TrucoConstants.Teams.OpponentTeam)
                                            .Select(p => p.Seat)
                                            .ToList() 
                 }

@@ -2,6 +2,9 @@ using Microsoft.Extensions.Configuration;
 using TrucoMineiro.API.Services;
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Models;
+using TrucoMineiro.API.Domain.Interfaces;
+using TrucoMineiro.API.Domain.Services;
+using Moq;
 
 namespace TrucoMineiro.Tests
 {
@@ -10,9 +13,7 @@ namespace TrucoMineiro.Tests
     /// </summary>
     public class PlayCardEndpointTests
     {
-        private readonly IConfiguration _configuration;
-
-        public PlayCardEndpointTests()
+        private readonly IConfiguration _configuration;        public PlayCardEndpointTests()
         {
             var inMemorySettings = new Dictionary<string, string?> {
                 {"FeatureFlags:DevMode", "false"},
@@ -21,13 +22,73 @@ namespace TrucoMineiro.Tests
             _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(inMemorySettings)
                 .Build();
+        }        private GameService CreateGameService(IConfiguration? config = null)
+        {
+            var configuration = config ?? _configuration;
+              // Create a dictionary to store created games (simulating repository storage)
+            var gameStorage = new Dictionary<string, GameState>();
+            
+            // Create mock services
+            var mockGameStateManager = new Mock<IGameStateManager>();
+            var mockGameRepository = new Mock<IGameRepository>();
+            var mockHandResolutionService = new Mock<IHandResolutionService>();
+            var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
+            var mockAIPlayerService = new Mock<IAIPlayerService>();
+            var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+
+            // Configure mock GameStateManager to return a valid GameState and store it
+            mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
+                .ReturnsAsync((string playerName) => {
+                    var gameState = CreateValidGameState(playerName);
+                    gameStorage[gameState.GameId] = gameState;
+                    return gameState;
+                });
+            
+            mockGameStateManager.Setup(x => x.CreateGameAsync(null))
+                .ReturnsAsync(() => {
+                    var gameState = CreateValidGameState();
+                    gameStorage[gameState.GameId] = gameState;
+                    return gameState;
+                });
+
+            // Configure mock GameRepository to return games from storage
+            mockGameRepository.Setup(x => x.GetGameAsync(It.IsAny<string>()))
+                .ReturnsAsync((string gameId) => gameStorage.ContainsKey(gameId) ? gameStorage[gameId] : null);
+
+            mockGameRepository.Setup(x => x.SaveGameAsync(It.IsAny<GameState>()))
+                .ReturnsAsync((GameState gameState) => {
+                    gameStorage[gameState.GameId] = gameState;
+                    return true;
+                });
+
+            // Configure mock ScoreCalculationService
+            mockScoreCalculationService.Setup(x => x.IsGameComplete(It.IsAny<GameState>()))
+                .Returns(false);
+
+            // Configure mock TrucoRulesEngine
+            mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
+                .Returns(1);
+
+            return new GameService(
+                mockGameStateManager.Object,
+                mockGameRepository.Object,
+                mockHandResolutionService.Object,
+                mockTrucoRulesEngine.Object,
+                mockAIPlayerService.Object,
+                mockScoreCalculationService.Object,
+                configuration);
         }
 
-        [Fact]
+        private GameState CreateValidGameState(string? playerName = null)
+        {
+            var gameState = new GameState();
+            gameState.InitializeGame(playerName ?? "TestPlayer");
+            return gameState;
+        }[Fact]
         public void PlayCardEnhanced_ShouldReturnSuccess_WhenValidMove()
         {
             // Arrange
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 
@@ -40,12 +101,10 @@ namespace TrucoMineiro.Tests
             Assert.NotNull(response.GameState);
             Assert.Equal(2, response.Hand.Count); // Player should have 2 cards left
             Assert.Equal(4, response.PlayerHands.Count); // Should have all 4 player hands
-        }
-
-        [Fact]
+        }        [Fact]
         public void PlayCardEnhanced_ShouldHideAICards_WhenNotInDevMode()
         {            // Arrange
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 
@@ -78,7 +137,7 @@ namespace TrucoMineiro.Tests
                 .AddInMemoryCollection(devModeSettings)
                 .Build();
 
-            var gameService = new GameService(devConfig);
+            var gameService = CreateGameService(devConfig);
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 
@@ -96,13 +155,11 @@ namespace TrucoMineiro.Tests
                     Assert.All(playerHand.Cards, card => Assert.NotNull(card.Suit));
                 }
             }
-        }
-
-        [Fact]
+        }        [Fact]
         public void PlayCardEnhanced_ShouldHandleFold_WhenFoldRequested()
         {
             // Arrange
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 
@@ -113,13 +170,11 @@ namespace TrucoMineiro.Tests
             Assert.True(response.Success);
             Assert.Equal("Hand folded successfully", response.Message);
             Assert.NotNull(response.GameState);
-        }
-
-        [Fact]
+        }        [Fact]
         public void PlayCardEnhanced_ShouldReturnError_WhenGameNotFound()
         {
             // Arrange
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
 
             // Act
             var response = gameService.PlayCardEnhanced("invalid-game-id", "player1", 0, false, 0);
@@ -127,13 +182,11 @@ namespace TrucoMineiro.Tests
             // Assert
             Assert.False(response.Success);
             Assert.Equal("Game not found", response.Message);
-        }
-
-        [Fact]
+        }        [Fact]
         public void PlayCardEnhanced_ShouldReturnError_WhenInvalidCardIndex()
         {
             // Arrange
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 
@@ -151,10 +204,9 @@ namespace TrucoMineiro.Tests
             // Arrange
             var devModeSettings = new Dictionary<string, string?> {
                 {"FeatureFlags:DevMode", "true"},
-            };
-            var devConfig = new ConfigurationBuilder()
+            };            var devConfig = new ConfigurationBuilder()
                 .AddInMemoryCollection(devModeSettings)
-                .Build();            var gameService = new GameService(devConfig);
+                .Build();            var gameService = CreateGameService(devConfig);
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 
@@ -167,13 +219,11 @@ namespace TrucoMineiro.Tests
             // Check that AI players have played their cards
             var playedCards = response.GameState.PlayedCards.Where(pc => pc.Card != null).Count();
             Assert.True(playedCards > 1); // Should be more than just the active player's card
-        }
-
-        [Fact]
+        }        [Fact]
         public void MapGameStateToPlayCardResponse_ShouldMapCorrectly()
         {
             // Arrange
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
             
             // Act
@@ -196,7 +246,7 @@ namespace TrucoMineiro.Tests
         public void Debug_PlayCardEnhanced_CardVisibility()
         {
             // Arrange - Test without DevMode first
-            var gameService = new GameService(_configuration);
+            var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 

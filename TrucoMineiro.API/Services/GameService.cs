@@ -1,36 +1,60 @@
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Models;
 using TrucoMineiro.API.DTOs;
+using TrucoMineiro.API.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
 
 namespace TrucoMineiro.API.Services
 {
     /// <summary>
-    /// Service for managing Truco game logic
+    /// Service for managing Truco game logic (legacy wrapper around domain services)
     /// </summary>
     public class GameService
     {
-        private readonly Dictionary<string, GameState> _games = new();
+        private readonly IGameStateManager _gameStateManager;
+        private readonly IGameRepository _gameRepository;
+        private readonly IHandResolutionService _handResolutionService;
+        private readonly ITrucoRulesEngine _trucoRulesEngine;
+        private readonly IAIPlayerService _aiPlayerService;
+        private readonly IScoreCalculationService _scoreCalculationService;
         private readonly bool _devMode;
 
         /// <summary>
         /// Constructor for GameService
         /// </summary>
+        /// <param name="gameStateManager">Game state management service</param>
+        /// <param name="gameRepository">Game repository</param>
+        /// <param name="handResolutionService">Hand resolution service</param>
+        /// <param name="trucoRulesEngine">Truco rules engine</param>
+        /// <param name="aiPlayerService">AI player service</param>
+        /// <param name="scoreCalculationService">Score calculation service</param>
         /// <param name="configuration">Application configuration</param>
-        public GameService(IConfiguration configuration)
+        public GameService(
+            IGameStateManager gameStateManager,
+            IGameRepository gameRepository,
+            IHandResolutionService handResolutionService,
+            ITrucoRulesEngine trucoRulesEngine,
+            IAIPlayerService aiPlayerService,
+            IScoreCalculationService scoreCalculationService,
+            IConfiguration configuration)
         {
+            _gameStateManager = gameStateManager;
+            _gameRepository = gameRepository;
+            _handResolutionService = handResolutionService;
+            _trucoRulesEngine = trucoRulesEngine;
+            _aiPlayerService = aiPlayerService;
+            _scoreCalculationService = scoreCalculationService;
+            
             // Read DevMode configuration from appsettings.json
             _devMode = configuration.GetValue<bool>("FeatureFlags:DevMode", false);
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Creates a new game with 4 players and deals cards
         /// </summary>
         /// <returns>The newly created game state</returns>
         public GameState CreateGame()
         {
-            var gameState = new GameState();
-            gameState.InitializeGame();
-            _games[gameState.GameId] = gameState;
+            var gameTask = _gameStateManager.CreateGameAsync();
+            var gameState = gameTask.GetAwaiter().GetResult();
 
             // In dev mode, automatically play turns for demonstration
             if (_devMode)
@@ -41,7 +65,7 @@ namespace TrucoMineiro.API.Services
                     player.IsActive = true;
                 }
 
-                // Play a few turns automatically
+                // Play a few turns automatically (keeping legacy behavior for now)
                 for (int i = 0; i < 3; i++)
                 {
                     foreach (var player in gameState.Players)
@@ -49,7 +73,7 @@ namespace TrucoMineiro.API.Services
                         // Each player plays the first card in their hand
                         if (player.Hand.Count > 0)
                         {
-                            PlayCard(gameState.GameId, player.Id, 0);
+                            PlayCard(gameState.Id, player.Id, 0);
                         }
                     }
                 }
@@ -65,13 +89,16 @@ namespace TrucoMineiro.API.Services
         /// <returns>The newly created game state</returns>
         public GameState CreateGame(string playerName)
         {
-            var gameState = new GameState();
-            gameState.InitializeGame(playerName);
+            var gameTask = _gameStateManager.CreateGameAsync(playerName);
+            var gameState = gameTask.GetAwaiter().GetResult();
             
-            // Update stakes to 2 as per requirements
-            gameState.Stakes = 2;
+            // Update stakes to 2 as per legacy requirements
+            gameState.CurrentStake = 2;
             
-            _games[gameState.GameId] = gameState;
+            // Save the updated game state
+            var saveTask = _gameRepository.SaveGameAsync(gameState);
+            saveTask.GetAwaiter().GetResult();
+            
             return gameState;
         }
 
@@ -82,16 +109,15 @@ namespace TrucoMineiro.API.Services
         public bool IsDevMode()
         {
             return _devMode;
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Gets a game by ID
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
         /// <returns>The game state if found, null otherwise</returns>
         public GameState? GetGame(string gameId)
         {
-            return _games.TryGetValue(gameId, out var gameState) ? gameState : null;
+            var gameTask = _gameRepository.GetGameAsync(gameId);
+            return gameTask.GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -168,10 +194,8 @@ namespace TrucoMineiro.API.Services
             if (player == null)
             {
                 return false;
-            }
-
-            // Check if raising is allowed
-            if (!game.IsRaiseEnabled || game.Stakes >= 12)
+            }            // Check if raising is allowed
+            if (!game.IsRaiseEnabled || game.Stakes >= TrucoConstants.Stakes.Maximum)
             {
                 return false;
             }
@@ -181,18 +205,15 @@ namespace TrucoMineiro.API.Services
             if (!game.IsTrucoCalled)
             {
                 // First Truco call
-                newStakes = 3;
+                newStakes = TrucoConstants.Stakes.TrucoCall;
                 game.IsTrucoCalled = true;
-            }
-            else
+            }            else
             {
-                // Raise stakes: 3 -> 6 -> 9 -> 12
-                switch (game.Stakes)
+                // Raise stakes: 4 -> 8 -> 12 (each raise adds 4)
+                newStakes = game.Stakes + TrucoConstants.Stakes.RaiseAmount;
+                if (newStakes > TrucoConstants.Stakes.Maximum)
                 {
-                    case 3: newStakes = 6; break;  // Seis
-                    case 6: newStakes = 9; break;  // Nove
-                    case 9: newStakes = 12; break; // Doze
-                    default: return false;
+                    return false;
                 }
             }
 
@@ -226,22 +247,17 @@ namespace TrucoMineiro.API.Services
             if (player == null)
             {
                 return false;
-            }
-
-            // Check if we can raise (Truco must have been called)
-            if (!game.IsTrucoCalled || !game.IsRaiseEnabled || game.Stakes >= 12)
+            }            // Check if we can raise (Truco must have been called)
+            if (!game.IsTrucoCalled || !game.IsRaiseEnabled || game.Stakes >= TrucoConstants.Stakes.Maximum)
             {
                 return false;
             }
 
-            // Calculate the new stakes
-            int newStakes;
-            switch (game.Stakes)
+            // Calculate the new stakes (each raise adds 4)
+            int newStakes = game.Stakes + TrucoConstants.Stakes.RaiseAmount;
+            if (newStakes > TrucoConstants.Stakes.Maximum)
             {
-                case 3: newStakes = 6; break;  // Seis
-                case 6: newStakes = 9; break;  // Nove
-                case 9: newStakes = 12; break; // Doze
-                default: return false;
+                return false;
             }
 
             game.Stakes = newStakes;
@@ -336,9 +352,8 @@ namespace TrucoMineiro.API.Services
         {
             // Increment hand number
             game.CurrentHand++;
-            
-            // Reset stakes and flags
-            game.Stakes = 1;
+              // Reset stakes and flags
+            game.Stakes = TrucoConstants.Stakes.Initial;
             game.IsTrucoCalled = false;
             game.IsRaiseEnabled = true;
             

@@ -3,6 +3,10 @@ using TrucoMineiro.API.Services;
 using TrucoMineiro.API.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using TrucoMineiro.API.DTOs;
+using TrucoMineiro.API.Models;
+using TrucoMineiro.API.Domain.Interfaces;
+using TrucoMineiro.API.Domain.Services;
+using Moq;
 using System.Collections.Generic;
 using Xunit;
 
@@ -14,9 +18,7 @@ namespace TrucoMineiro.Tests
     public class GetGameStateEndpointTests
     {
         private readonly GameService _gameService;
-        private readonly TrucoGameController _controller;
-
-        public GetGameStateEndpointTests()
+        private readonly TrucoGameController _controller;        public GetGameStateEndpointTests()
         {
             // Set up test configuration with DevMode disabled
             var inMemorySettings = new Dictionary<string, string?> {
@@ -27,8 +29,66 @@ namespace TrucoMineiro.Tests
                 .AddInMemoryCollection(inMemorySettings)
                 .Build();
 
-            _gameService = new GameService(configuration);
+            // Create a dictionary to store created games (simulating repository storage)
+            var gameStorage = new Dictionary<string, GameState>();
+
+            // Create mock services
+            var mockGameStateManager = new Mock<IGameStateManager>();
+            var mockGameRepository = new Mock<IGameRepository>();
+            var mockHandResolutionService = new Mock<IHandResolutionService>();
+            var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
+            var mockAIPlayerService = new Mock<IAIPlayerService>();
+            var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+
+            // Configure mock GameStateManager to return a valid GameState and store it
+            mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
+                .ReturnsAsync((string playerName) => {
+                    var gameState = CreateValidGameState(playerName);
+                    gameStorage[gameState.GameId] = gameState;
+                    return gameState;
+                });
+            
+            mockGameStateManager.Setup(x => x.CreateGameAsync(null))
+                .ReturnsAsync(() => {
+                    var gameState = CreateValidGameState();
+                    gameStorage[gameState.GameId] = gameState;
+                    return gameState;
+                });
+
+            // Configure mock GameRepository to return games from storage
+            mockGameRepository.Setup(x => x.GetGameAsync(It.IsAny<string>()))
+                .ReturnsAsync((string gameId) => gameStorage.ContainsKey(gameId) ? gameStorage[gameId] : null);
+
+            mockGameRepository.Setup(x => x.SaveGameAsync(It.IsAny<GameState>()))
+                .ReturnsAsync((GameState gameState) => {
+                    gameStorage[gameState.GameId] = gameState;
+                    return true;
+                });
+
+            // Configure mock ScoreCalculationService
+            mockScoreCalculationService.Setup(x => x.IsGameComplete(It.IsAny<GameState>()))
+                .Returns(false);
+
+            // Configure mock TrucoRulesEngine
+            mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
+                .Returns(1);
+
+            _gameService = new GameService(
+                mockGameStateManager.Object,
+                mockGameRepository.Object,
+                mockHandResolutionService.Object,
+                mockTrucoRulesEngine.Object,
+                mockAIPlayerService.Object,
+                mockScoreCalculationService.Object,
+                configuration);
             _controller = new TrucoGameController(_gameService);
+        }
+
+        private GameState CreateValidGameState(string? playerName = null)
+        {
+            var gameState = new GameState();
+            gameState.InitializeGame(playerName ?? "TestPlayer");
+            return gameState;
         }
 
         [Fact]
@@ -126,9 +186,7 @@ namespace TrucoMineiro.Tests
             // Assert
             var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
             Assert.Equal("Game not found", notFoundResult.Value);
-        }
-
-        [Fact]
+        }        [Fact]
         public void GetGameState_WithDevMode_ShouldShowAllCards()
         {
             // Arrange - Set up configuration with DevMode enabled
@@ -139,7 +197,58 @@ namespace TrucoMineiro.Tests
                 .AddInMemoryCollection(devModeSettings)
                 .Build();
 
-            var devGameService = new GameService(devConfig);
+            // Create a dictionary to store created games (simulating repository storage)
+            var gameStorage = new Dictionary<string, GameState>();
+
+            // Create mock services for dev mode test
+            var mockGameStateManager = new Mock<IGameStateManager>();
+            var mockGameRepository = new Mock<IGameRepository>();
+            var mockHandResolutionService = new Mock<IHandResolutionService>();
+            var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
+            var mockAIPlayerService = new Mock<IAIPlayerService>();
+            var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+
+            // Configure mock GameStateManager to return a valid GameState and store it
+            mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
+                .ReturnsAsync((string playerName) => {
+                    var gameState = CreateValidGameState(playerName);
+                    gameStorage[gameState.GameId] = gameState;
+                    return gameState;
+                });
+            
+            mockGameStateManager.Setup(x => x.CreateGameAsync(null))
+                .ReturnsAsync(() => {
+                    var gameState = CreateValidGameState();
+                    gameStorage[gameState.GameId] = gameState;
+                    return gameState;
+                });
+
+            // Configure mock GameRepository to return games from storage
+            mockGameRepository.Setup(x => x.GetGameAsync(It.IsAny<string>()))
+                .ReturnsAsync((string gameId) => gameStorage.ContainsKey(gameId) ? gameStorage[gameId] : null);
+
+            mockGameRepository.Setup(x => x.SaveGameAsync(It.IsAny<GameState>()))
+                .ReturnsAsync((GameState gameState) => {
+                    gameStorage[gameState.GameId] = gameState;
+                    return true;
+                });
+
+            // Configure mock ScoreCalculationService
+            mockScoreCalculationService.Setup(x => x.IsGameComplete(It.IsAny<GameState>()))
+                .Returns(false);
+
+            // Configure mock TrucoRulesEngine
+            mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
+                .Returns(1);
+
+            var devGameService = new GameService(
+                mockGameStateManager.Object,
+                mockGameRepository.Object,
+                mockHandResolutionService.Object,
+                mockTrucoRulesEngine.Object,
+                mockAIPlayerService.Object,
+                mockScoreCalculationService.Object,
+                devConfig);
             var devController = new TrucoGameController(devGameService);
             var game = devGameService.CreateGame("TestPlayer");
             
