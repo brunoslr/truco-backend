@@ -4,12 +4,13 @@ namespace TrucoMineiro.API.DTOs
     /// Request for the new play card endpoint
     /// </summary>
     public class PlayCardRequestDto
-    {
-        /// <summary>
+    {        /// <summary>
         /// The unique identifier of the game
         /// </summary>
         /// <example>abc123</example>
-        public string GameId { get; set; } = string.Empty;        /// <summary>
+        public string GameId { get; set; } = string.Empty;
+        
+        /// <summary>
         /// The seat number of the player making the move (0-3)
         /// </summary>
         /// <example>0</example>
