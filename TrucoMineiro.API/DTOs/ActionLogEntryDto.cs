@@ -8,12 +8,10 @@ namespace TrucoMineiro.API.DTOs
         /// <summary>
         /// The type of action (e.g., "card-played", "button-pressed", "hand-result", "turn-result")
         /// </summary>
-        public string Type { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The ID of the player who performed the action (optional, depending on type)
+        public string Type { get; set; } = string.Empty;        /// <summary>
+        /// The seat number of the player who performed the action (optional, depending on type)
         /// </summary>
-        public string? PlayerId { get; set; }
+        public int? PlayerSeat { get; set; }
 
         /// <summary>
         /// The card that was played (optional, for "card-played" type)

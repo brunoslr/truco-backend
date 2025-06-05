@@ -59,11 +59,9 @@ namespace TrucoMineiro.API.Domain.Services
 
             Player? winner = null;
             int highestStrength = -1;
-            bool hasDraw = false;
-
-            foreach (var playedCard in playedCards.Where(pc => pc.Card != null))
+            bool hasDraw = false;            foreach (var playedCard in playedCards.Where(pc => pc.Card != null))
             {
-                var player = players.FirstOrDefault(p => p.Id == playedCard.PlayerId);
+                var player = players.FirstOrDefault(p => p.Seat == playedCard.PlayerSeat);
                 if (player != null && playedCard.Card != null)
                 {
                     var strength = GetCardStrength(playedCard.Card);

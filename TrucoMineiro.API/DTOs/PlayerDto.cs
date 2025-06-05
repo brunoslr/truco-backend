@@ -6,12 +6,7 @@ namespace TrucoMineiro.API.DTOs
     public class PlayerDto
     {
         /// <summary>
-        /// Unique identifier for the player
-        /// </summary>
-        public string PlayerId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Player's name (e.g., "You", "AI 1", "Partner", "AI 2")
+        /// Player's name and unique identifier (e.g., "You", "AI 1", "Partner", "AI 2")
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
@@ -36,13 +31,8 @@ namespace TrucoMineiro.API.DTOs
         public bool IsActive { get; set; }
 
         /// <summary>
-        /// Player's position at the table (0-3)
+        /// Player's position at the table (0-3) - serves as unique identifier
         /// </summary>
         public int Seat { get; set; }
-
-        /// <summary>
-        /// Seat number of the first player for the current hand
-        /// </summary>
-        public int FirstPlayerSeat { get; set; }
     }
 }

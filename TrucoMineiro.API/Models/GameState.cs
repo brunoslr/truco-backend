@@ -10,12 +10,10 @@ namespace TrucoMineiro.API.Models
         /// <summary>
         /// The type of action (e.g., "card-played", "button-pressed", "hand-result", "turn-result")
         /// </summary>
-        public string Type { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The ID of the player who performed the action (optional, depending on type)
+        public string Type { get; set; } = string.Empty;        /// <summary>
+        /// The seat of the player who performed the action (optional, depending on type)
         /// </summary>
-        public string? PlayerId { get; set; }
+        public int? PlayerSeat { get; set; }
 
         /// <summary>
         /// The card that was played (optional, for "card-played" type)
@@ -48,26 +46,24 @@ namespace TrucoMineiro.API.Models
         }
 
         public ActionLogEntry() { }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Represents a card played by a player during a round
     /// </summary>
     public class PlayedCard
     {
         /// <summary>
-        /// The player who played this card
+        /// The seat number of the player who played this card (0-3)
         /// </summary>
-        public string PlayerId { get; set; } = string.Empty;
+        public int PlayerSeat { get; set; }
 
         /// <summary>
         /// The card that was played
         /// </summary>
         public Card? Card { get; set; }
 
-        public PlayedCard(string playerId, Card? card = null)
+        public PlayedCard(int playerSeat, Card? card = null)
         {
-            PlayerId = playerId;
+            PlayerSeat = playerSeat;
             Card = card;
         }
 
@@ -248,14 +244,12 @@ namespace TrucoMineiro.API.Models
                     new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),
                     new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
                 };
-            }
-
-            // Set the dealer and first player
+            }            // Set the dealer and first player
             Players[DealerSeat].IsDealer = true;
             Players[FirstPlayerSeat].IsActive = true;
 
             // Initialize the played cards for each seat
-            PlayedCards = Players.Select(p => new PlayedCard(p.Id)).ToList();
+            PlayedCards = Players.Select(p => new PlayedCard(p.Seat)).ToList();
 
             // Reset the game state
             ResetRound();
@@ -285,14 +279,12 @@ namespace TrucoMineiro.API.Models
                 {
                     player.Name = playerName;
                 }
-            }
-
-            // Set the dealer and first player
+            }            // Set the dealer and first player
             Players[DealerSeat].IsDealer = true;
             Players[FirstPlayerSeat].IsActive = true;
 
             // Initialize the played cards for each seat
-            PlayedCards = Players.Select(p => new PlayedCard(p.Id)).ToList();
+            PlayedCards = Players.Select(p => new PlayedCard(p.Seat)).ToList();
 
             // Reset the game state
             ResetRound();
@@ -340,9 +332,7 @@ namespace TrucoMineiro.API.Models
                     player.AddCard(card);
                 }
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Move to the next hand
         /// </summary>
         public void NextHand()
@@ -350,8 +340,10 @@ namespace TrucoMineiro.API.Models
             CurrentHand++;
             
             // Update the dealer and first player for the next hand
-            DealerSeat = (DealerSeat + 1) % MaxPlayers;
-            FirstPlayerSeat = (DealerSeat + 1) % MaxPlayers;
+            // In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese)
+            // The dealer moves to the left at the end of each hand
+            DealerSeat = GameConfiguration.GetNextDealerSeat(DealerSeat);
+            FirstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(DealerSeat);
             
             // Reset player states
             foreach (var player in Players)
@@ -359,6 +351,9 @@ namespace TrucoMineiro.API.Models
                 player.IsDealer = player.Seat == DealerSeat;
                 player.IsActive = player.Seat == FirstPlayerSeat;
             }
+            
+            // Update current player index
+            CurrentPlayerIndex = FirstPlayerSeat;
             
             ResetRound();
             

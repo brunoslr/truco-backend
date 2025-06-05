@@ -56,28 +56,12 @@ namespace TrucoMineiro.API.Services
             var gameTask = _gameStateManager.CreateGameAsync();
             var gameState = gameTask.GetAwaiter().GetResult();
 
-            // In dev mode, automatically play turns for demonstration
-            if (_devMode)
-            {
-                // Activate all players
-                foreach (var player in gameState.Players)
-                {
-                    player.IsActive = true;
-                }
-
-                // Play a few turns automatically (keeping legacy behavior for now)
-                for (int i = 0; i < 3; i++)
-                {
-                    foreach (var player in gameState.Players)
-                    {
-                        // Each player plays the first card in their hand
-                        if (player.Hand.Count > 0)
-                        {
-                            PlayCard(gameState.Id, player.Id, 0);
-                        }
-                    }
-                }
-            }
+            // In dev mode, the game is properly initialized with one active player
+            // No need to override the proper active player logic
+            
+            // Save the updated game state
+            var saveTask = _gameRepository.SaveGameAsync(gameState);
+            saveTask.GetAwaiter().GetResult();
 
             return gameState;
         }
@@ -118,16 +102,14 @@ namespace TrucoMineiro.API.Services
         {
             var gameTask = _gameRepository.GetGameAsync(gameId);
             return gameTask.GetAwaiter().GetResult();
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Plays a card from a player's hand
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="playerId">The ID of the player making the move</param>
+        /// <param name="playerSeat">The seat of the player making the move (0-3)</param>
         /// <param name="cardIndex">The index of the card in the player's hand</param>
         /// <returns>True if the card was played successfully, false otherwise</returns>
-        public bool PlayCard(string gameId, string playerId, int cardIndex)
+        public bool PlayCard(string gameId, int playerSeat, int cardIndex)
         {
             var game = GetGame(gameId);
             if (game == null)
@@ -135,7 +117,7 @@ namespace TrucoMineiro.API.Services
                 return false;
             }
 
-            var player = game.Players.FirstOrDefault(p => p.Id == playerId);
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (player == null || !player.IsActive)
             {
                 return false;
@@ -148,22 +130,21 @@ namespace TrucoMineiro.API.Services
 
             // Play the card
             var card = player.PlayCard(cardIndex);
-            
-            // Find the player's played card slot
-            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerId == player.Id);
+              // Find the player's played card slot
+            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);
             if (playedCard != null)
             {
                 playedCard.Card = card;
             }
             else
             {
-                game.PlayedCards.Add(new PlayedCard(player.Id, card));
+                game.PlayedCards.Add(new PlayedCard(player.Seat, card));
             }
 
             // Add to the action log
             game.ActionLog.Add(new ActionLogEntry("card-played")
             {
-                PlayerId = player.Id,
+                PlayerSeat = player.Seat,
                 Card = $"{card.Value} of {card.Suit}"
             });
 
@@ -177,12 +158,13 @@ namespace TrucoMineiro.API.Services
             }
 
             return true;
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Call Truco to raise the stakes
         /// </summary>
-        public bool CallTruco(string gameId, string playerId)
+        /// <param name="gameId">The unique identifier of the game</param>
+        /// <param name="playerSeat">The seat of the player calling Truco (0-3)</param>
+        /// <returns>True if the call was successful, false otherwise</returns>
+        public bool CallTruco(string gameId, int playerSeat)
         {
             var game = GetGame(gameId);
             if (game == null)
@@ -190,7 +172,7 @@ namespace TrucoMineiro.API.Services
                 return false;
             }
 
-            var player = game.Players.FirstOrDefault(p => p.Id == playerId);
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (player == null)
             {
                 return false;
@@ -210,8 +192,7 @@ namespace TrucoMineiro.API.Services
             }            else
             {
                 // Raise stakes: 4 -> 8 -> 12 (each raise adds 4)
-                newStakes = game.Stakes + TrucoConstants.Stakes.RaiseAmount;
-                if (newStakes > TrucoConstants.Stakes.Maximum)
+                newStakes = game.Stakes + TrucoConstants.Stakes.RaiseAmount;            if (newStakes > TrucoConstants.Stakes.Maximum)
                 {
                     return false;
                 }
@@ -222,20 +203,18 @@ namespace TrucoMineiro.API.Services
             // Add to the action log
             game.ActionLog.Add(new ActionLogEntry("button-pressed")
             {
-                PlayerId = player.Id,
+                PlayerSeat = player.Seat,
                 Action = $"Raised stakes to {newStakes}"
             });
 
             return true;
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Raises the stakes after a Truco call
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="playerId">The ID of the player raising the stakes</param>
+        /// <param name="playerSeat">The seat of the player raising the stakes (0-3)</param>
         /// <returns>True if the stakes were raised successfully, false otherwise</returns>
-        public bool RaiseStakes(string gameId, string playerId)
+        public bool RaiseStakes(string gameId, int playerSeat)
         {
             var game = GetGame(gameId);
             if (game == null)
@@ -243,7 +222,7 @@ namespace TrucoMineiro.API.Services
                 return false;
             }
 
-            var player = game.Players.FirstOrDefault(p => p.Id == playerId);
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (player == null)
             {
                 return false;
@@ -258,27 +237,23 @@ namespace TrucoMineiro.API.Services
             if (newStakes > TrucoConstants.Stakes.Maximum)
             {
                 return false;
-            }
-
-            game.Stakes = newStakes;
+            }            game.Stakes = newStakes;
 
             // Add to the action log
             game.ActionLog.Add(new ActionLogEntry("button-pressed")
             {
-                PlayerId = player.Id,
+                PlayerSeat = player.Seat,
                 Action = $"Raised stakes to {newStakes}"
             });
 
             return true;
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Folds the hand in response to a Truco or other challenge
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="playerId">The ID of the player folding</param>
+        /// <param name="playerSeat">The seat of the player folding (0-3)</param>
         /// <returns>True if the fold was successful, false otherwise</returns>
-        public bool Fold(string gameId, string playerId)
+        public bool Fold(string gameId, int playerSeat)
         {
             var game = GetGame(gameId);
             if (game == null)
@@ -286,7 +261,7 @@ namespace TrucoMineiro.API.Services
                 return false;
             }
 
-            var player = game.Players.FirstOrDefault(p => p.Id == playerId);
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (player == null)
             {
                 return false;
@@ -296,12 +271,10 @@ namespace TrucoMineiro.API.Services
             string opposingTeam = player.Team == "Player's Team" ? "Opponent Team" : "Player's Team";
 
             // Award points to the opposing team
-            game.TeamScores[opposingTeam] += Math.Max(1, game.Stakes);
-
-            // Add to the action log
+            game.TeamScores[opposingTeam] += Math.Max(1, game.Stakes);            // Add to the action log
             game.ActionLog.Add(new ActionLogEntry("button-pressed")
             {
-                PlayerId = player.Id,
+                PlayerSeat = player.Seat,
                 Action = $"Folded, {opposingTeam} gains {game.Stakes} points"
             });
 
@@ -385,36 +358,44 @@ namespace TrucoMineiro.API.Services
                     player.Hand.Add(deck.DrawCard());
                 }
             }
-            
-            // Reset played cards
+              // Reset played cards
             game.PlayedCards.Clear();
             for (int i = 0; i < game.Players.Count; i++)
             {
-                game.PlayedCards.Add(new PlayedCard(game.Players[i].Id));
+                game.PlayedCards.Add(new PlayedCard(game.Players[i].Seat));
             }
-        }
-
-        /// <summary>
-        /// Move to the next player's turn
+        }        /// <summary>
+        /// Move to the next player's turn (player to the left)
         /// </summary>
         private void MoveToNextPlayer(GameState game)
         {
             // Find the current active player
-            var currentPlayerIndex = game.Players.FindIndex(p => p.IsActive);
-            if (currentPlayerIndex < 0)
+            var currentActivePlayer = game.Players.FirstOrDefault(p => p.IsActive);
+            if (currentActivePlayer == null)
             {
-                // If no active player, start with the first player after the dealer
-                currentPlayerIndex = game.FirstPlayerSeat - 1;
+                // If no active player, set the first player (left of dealer) as active
+                var firstPlayer = game.Players.FirstOrDefault(p => p.Seat == game.FirstPlayerSeat);
+                if (firstPlayer != null)
+                {
+                    firstPlayer.IsActive = true;
+                    game.CurrentPlayerIndex = firstPlayer.Seat;
+                }
+                return;
             }
 
             // Set the current player to inactive
-            game.Players[currentPlayerIndex].IsActive = false;
+            currentActivePlayer.IsActive = false;
 
-            // Find the next player
-            var nextPlayerIndex = (currentPlayerIndex + 1) % GameState.MaxPlayers;
+            // Find the next player (to the left, which is next seat in clockwise order)
+            var nextPlayerSeat = (currentActivePlayer.Seat + 1) % GameConfiguration.MaxPlayers;
+            var nextPlayer = game.Players.FirstOrDefault(p => p.Seat == nextPlayerSeat);
 
             // Set the next player to active
-            game.Players[nextPlayerIndex].IsActive = true;
+            if (nextPlayer != null)
+            {
+                nextPlayer.IsActive = true;
+                game.CurrentPlayerIndex = nextPlayer.Seat;
+            }
         }
 
         /// <summary>
@@ -434,13 +415,11 @@ namespace TrucoMineiro.API.Services
             };
 
             var strongestCard = -1;
-            Player? roundWinner = null;
-
-            foreach (var playedCard in game.PlayedCards)
+            Player? roundWinner = null;            foreach (var playedCard in game.PlayedCards)
             {
                 if (playedCard.Card != null)
                 {
-                    var player = game.Players.FirstOrDefault(p => p.Id == playedCard.PlayerId);
+                    var player = game.Players.FirstOrDefault(p => p.Seat == playedCard.PlayerSeat);
                     if (player != null)
                     {
                         var cardValue = cardStrength.GetValueOrDefault(playedCard.Card.Value, 0);
@@ -481,18 +460,16 @@ namespace TrucoMineiro.API.Services
                     }
                 }
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Enhanced play card method that handles human players, AI players, and fold scenarios
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="playerId">The ID of the player making the move</param>
+        /// <param name="playerSeat">The seat of the player making the move (0-3)</param>
         /// <param name="cardIndex">The index of the card in the player's hand</param>
         /// <param name="isFold">Whether this is a fold action</param>
         /// <param name="requestingPlayerSeat">The seat of the player making the request (for response visibility)</param>
         /// <returns>PlayCardResponseDto with the updated game state</returns>
-        public PlayCardResponseDto PlayCardEnhanced(string gameId, string playerId, int cardIndex, bool isFold = false, int requestingPlayerSeat = 0)
+        public PlayCardResponseDto PlayCardEnhanced(string gameId, int playerSeat, int cardIndex, bool isFold = false, int requestingPlayerSeat = 0)
         {
             var game = GetGame(gameId);
             if (game == null)
@@ -503,16 +480,14 @@ namespace TrucoMineiro.API.Services
             // Handle fold action
             if (isFold)
             {
-                var foldSuccess = Fold(gameId, playerId);
+                var foldSuccess = Fold(gameId, playerSeat);
                 if (!foldSuccess)
                 {
                     return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Cannot fold at this time");
                 }
                 return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, true, "Hand folded successfully");
-            }
-
-            // Handle card play for human player
-            var playSuccess = PlayCard(gameId, playerId, cardIndex);
+            }            // Handle card play for human player
+            var playSuccess = PlayCard(gameId, playerSeat, cardIndex);
             if (!playSuccess)
             {
                 return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Invalid card play");
@@ -546,12 +521,10 @@ namespace TrucoMineiro.API.Services
                 if (activePlayer.Seat == 0 || game.PlayedCards.All(pc => pc.Card != null))
                 {
                     break;
-                }
-
-                // AI player plays first available card
+                }                // AI player plays first available card
                 if (activePlayer.Hand.Count > 0)
                 {
-                    PlayCard(game.GameId, activePlayer.Id, 0);
+                    PlayCard(game.GameId, activePlayer.Seat, 0);
                 }
 
                 iterations++;

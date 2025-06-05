@@ -9,13 +9,11 @@ namespace TrucoMineiro.API.DTOs
         /// The unique identifier of the game
         /// </summary>
         /// <example>abc123</example>
-        public string GameId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The unique identifier of the player making the action
+        public string GameId { get; set; } = string.Empty;        /// <summary>
+        /// The seat number of the player making the action (0-3)
         /// </summary>
-        /// <example>player1</example>
-        public string PlayerId { get; set; } = string.Empty;
+        /// <example>0</example>
+        public int PlayerSeat { get; set; }
 
         /// <summary>
         /// The type of button press action

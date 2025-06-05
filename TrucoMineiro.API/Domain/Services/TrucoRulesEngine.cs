@@ -8,15 +8,14 @@ namespace TrucoMineiro.API.Domain.Services
     /// Implementation of Truco rules and special game mechanics
     /// </summary>
     public class TrucoRulesEngine : ITrucoRulesEngine
-    {
-        public bool ProcessTrucoCall(GameState game, string playerId)
+    {        public bool ProcessTrucoCall(GameState game, int playerSeat)
         {
-            if (!CanCallTruco(game, playerId))
+            if (!CanCallTruco(game, playerSeat))
                 return false;
 
-            var player = game.Players.FirstOrDefault(p => p.Id == playerId);
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (player == null)
-                return false;            // First Truco call raises stakes from 2 to 4 points
+                return false;// First Truco call raises stakes from 2 to 4 points
             if (!game.IsTrucoCalled)
             {
                 game.Stakes = TrucoConstants.Stakes.TrucoCall;
@@ -26,21 +25,22 @@ namespace TrucoMineiro.API.Domain.Services
             // Log the action
             game.ActionLog.Add(new ActionLogEntry("button-pressed")
             {
-                PlayerId = playerId,
+                PlayerSeat = player.Seat,
                 Action = $"{player.Name} called Truco (stakes now {game.Stakes})"
             });
 
             return true;
         }
 
-        public bool ProcessRaise(GameState game, string playerId)
+        public bool ProcessRaise(GameState game, int playerSeat)
         {
-            if (!CanRaise(game, playerId))
+            if (!CanRaise(game, playerSeat))
                 return false;
 
-            var player = game.Players.FirstOrDefault(p => p.Id == playerId);
-            if (player == null)
-                return false;            // Raise stakes by 4 points (4->8, 8->12)
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);            if (player == null)
+                return false;
+
+            // Raise stakes by 4 points (4->8, 8->12)
             var newStakes = game.Stakes + TrucoConstants.Stakes.RaiseAmount;
             if (newStakes <= TrucoConstants.Stakes.Maximum)
             {
@@ -49,7 +49,7 @@ namespace TrucoMineiro.API.Domain.Services
                 // Log the action
                 game.ActionLog.Add(new ActionLogEntry("button-pressed")
                 {
-                    PlayerId = playerId,
+                    PlayerSeat = player.Seat,
                     Action = $"{player.Name} raised stakes to {game.Stakes}"
                 });
 
@@ -57,25 +57,23 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return false;
-        }
-
-        public bool ProcessFold(GameState game, string playerId)
+        }        public bool ProcessFold(GameState game, int playerSeat)
         {
-            var player = game.Players.FirstOrDefault(p => p.Id == playerId);
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (player == null)
-                return false;            // Award points to opposing team
+                return false;
+
+            // Award points to opposing team
             string opposingTeam = player.Team == TrucoConstants.Teams.PlayerTeam ? TrucoConstants.Teams.OpponentTeam : TrucoConstants.Teams.PlayerTeam;
             int pointsToAward = Math.Max(1, game.Stakes);
             
             if (!game.TeamScores.ContainsKey(opposingTeam))
                 game.TeamScores[opposingTeam] = 0;
             
-            game.TeamScores[opposingTeam] += pointsToAward;
-
-            // Log the fold
+            game.TeamScores[opposingTeam] += pointsToAward;            // Log the fold
             game.ActionLog.Add(new ActionLogEntry("button-pressed")
             {
-                PlayerId = playerId,
+                PlayerSeat = player.Seat,
                 Action = $"{player.Name} folded, {opposingTeam} gains {pointsToAward} points"
             });
 
@@ -88,17 +86,16 @@ namespace TrucoMineiro.API.Domain.Services
             });
 
             return true;
-        }
-
-        public bool CanCallTruco(GameState game, string playerId)
-        {            // Can only call Truco if:
+        }        public bool CanCallTruco(GameState game, int playerSeat)
+        {
+            // Can only call Truco if:
             // 1. Truco hasn't been called yet, OR
             // 2. Player is responding to opponent's Truco/raise
             // 3. Stakes are not at maximum (12)
             return game.IsRaiseEnabled && game.Stakes < TrucoConstants.Stakes.Maximum;
         }
 
-        public bool CanRaise(GameState game, string playerId)
+        public bool CanRaise(GameState game, int playerSeat)
         {
             // Can raise if Truco has been called and stakes are below maximum
             return game.IsTrucoCalled && game.IsRaiseEnabled && game.Stakes < TrucoConstants.Stakes.Maximum;

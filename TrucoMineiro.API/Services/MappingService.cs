@@ -43,17 +43,14 @@ namespace TrucoMineiro.API.Services
         /// Map a Player model to a PlayerDto
         /// </summary>
         public static PlayerDto MapPlayerToDto(Player player, int firstPlayerSeat)
-        {
-            return new PlayerDto
+        {            return new PlayerDto
             {
-                PlayerId = player.Id,
                 Name = player.Name,
                 Team = player.Team,
                 Hand = player.Hand.Select(card => MapCardToDto(card, false)).ToList(),
                 IsDealer = player.IsDealer,
                 IsActive = player.IsActive,
-                Seat = player.Seat,
-                FirstPlayerSeat = firstPlayerSeat
+                Seat = player.Seat
             };
         }
 
@@ -61,10 +58,9 @@ namespace TrucoMineiro.API.Services
         /// Map a PlayedCard model to a PlayedCardDto
         /// </summary>
         public static PlayedCardDto MapPlayedCardToDto(PlayedCard playedCard)
-        {
-            return new PlayedCardDto
+        {            return new PlayedCardDto
             {
-                PlayerId = playedCard.PlayerId,
+                PlayerSeat = playedCard.PlayerSeat,
                 Card = playedCard.Card != null ? MapCardToDto(playedCard.Card) : null
             };
         }
@@ -73,11 +69,10 @@ namespace TrucoMineiro.API.Services
         /// Map an ActionLogEntry model to an ActionLogEntryDto
         /// </summary>
         public static ActionLogEntryDto MapActionLogEntryToDto(ActionLogEntry entry)
-        {
-            return new ActionLogEntryDto
+        {            return new ActionLogEntryDto
             {
                 Type = entry.Type,
-                PlayerId = entry.PlayerId,
+                PlayerSeat = entry.PlayerSeat,
                 Card = entry.Card,
                 Action = entry.Action,
                 HandNumber = entry.HandNumber,
@@ -137,17 +132,14 @@ namespace TrucoMineiro.API.Services
         public static PlayerDto MapPlayerToDto(Player player, int firstPlayerSeat, int requestingPlayerSeat, bool showAllHands = false)
         {
             bool shouldHideCards = !showAllHands && player.Seat != requestingPlayerSeat;
-            
-            return new PlayerDto
+              return new PlayerDto
             {
-                PlayerId = player.Id,
                 Name = player.Name,
                 Team = player.Team,
                 Hand = player.Hand.Select(card => MapCardToDto(card, shouldHideCards)).ToList(),
                 IsDealer = player.IsDealer,
                 IsActive = player.IsActive,
-                Seat = player.Seat,
-                FirstPlayerSeat = firstPlayerSeat
+                Seat = player.Seat
             };
         }
 

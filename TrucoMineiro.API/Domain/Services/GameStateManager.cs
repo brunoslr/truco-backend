@@ -1,5 +1,6 @@
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Models;
+using TrucoMineiro.API.Constants;
 
 namespace TrucoMineiro.API.Domain.Services
 {
@@ -21,11 +22,8 @@ namespace TrucoMineiro.API.Domain.Services
             _gameRepository = gameRepository;
             _scoreCalculationService = scoreCalculationService;
             _trucoRulesEngine = trucoRulesEngine;
-        }
-
-        public async Task<GameState> CreateGameAsync(string? playerName = null)
-        {
-            var game = new GameState
+        }        public async Task<GameState> CreateGameAsync(string? playerName = null)
+        {            var game = new GameState
             {
                 Id = Guid.NewGuid().ToString(),
                 CreatedAt = DateTime.UtcNow,
@@ -43,8 +41,15 @@ namespace TrucoMineiro.API.Domain.Services
                 CurrentStake = 1,
                 PendingTrucoCall = false,
                 TrucoCallerSeat = null,
-                LastTrucoResponse = null
+                LastTrucoResponse = null,
+                // Set initial dealer according to configuration
+                // In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese)
+                DealerSeat = GameConfiguration.InitialDealerSeat,
+                FirstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(GameConfiguration.InitialDealerSeat)
             };
+
+            // Initialize dealer and active player properly
+            SetupInitialPlayers(game);
 
             // Deal initial cards
             DealCards(game);
@@ -163,9 +168,7 @@ namespace TrucoMineiro.API.Domain.Services
 
             await _gameRepository.SaveGameAsync(game);
             return true;
-        }
-
-        public async Task<bool> StartNewHandAsync(string gameId)
+        }        public async Task<bool> StartNewHandAsync(string gameId)
         {
             var game = await _gameRepository.GetGameAsync(gameId);
             if (game == null || game.IsCompleted) return false;
@@ -178,14 +181,21 @@ namespace TrucoMineiro.API.Domain.Services
             game.PendingTrucoCall = false;
             game.TrucoCallerSeat = null;
             game.LastTrucoResponse = null;
-            game.LastActivity = DateTime.UtcNow;
+            game.LastActivity = DateTime.UtcNow;            // Rotate dealer to next seat (clockwise) - the dealer moves to the left at the end of each hand
+            // In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese)
+            game.DealerSeat = GameConfiguration.GetNextDealerSeat(game.DealerSeat);
+            game.FirstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(game.DealerSeat);
 
             // Clear player hands and deal new cards
             foreach (var player in game.Players)
             {
                 player.Hand.Clear();
+                player.IsActive = false;
+                player.IsDealer = false;
             }
 
+            // Set new dealer and active player
+            SetupInitialPlayers(game);
             DealCards(game);
 
             await _gameRepository.SaveGameAsync(game);
@@ -284,6 +294,41 @@ namespace TrucoMineiro.API.Domain.Services
                     }
                 }
             }
+        }        /// <summary>
+        /// Sets up initial dealer and active player according to Truco rules.
+        /// In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese).
+        /// The first player is always the one sitting to the left of the dealer.
+        /// </summary>
+        /// <param name="game">The game state to initialize</param>
+        private void SetupInitialPlayers(GameState game)
+        {
+            var dealerSeat = game.DealerSeat;
+            
+            // Ensure all players start as inactive
+            foreach (var player in game.Players)
+            {
+                player.IsActive = false;
+                player.IsDealer = false;
+            }
+            
+            // Set the dealer (Pé)
+            var dealer = game.Players.FirstOrDefault(p => p.Seat == dealerSeat);
+            if (dealer != null)
+            {
+                dealer.IsDealer = true;
+            }
+            
+            // Set the first active player (left of the dealer)
+            var firstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(dealerSeat);
+            var firstPlayer = game.Players.FirstOrDefault(p => p.Seat == firstPlayerSeat);
+            if (firstPlayer != null)
+            {
+                firstPlayer.IsActive = true;
+                game.CurrentPlayerIndex = firstPlayerSeat;
+            }
+            
+            // Update game state
+            game.FirstPlayerSeat = firstPlayerSeat;
         }
     }
 }

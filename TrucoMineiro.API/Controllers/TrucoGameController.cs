@@ -20,49 +20,53 @@ namespace TrucoMineiro.API.Controllers
         }
 
         /// <summary>
-        /// Creates a new Truco Mineiro game
+        /// Health check endpoint to verify API availability
         /// </summary>
         /// <remarks>
         /// Sample request:
         /// 
-        ///     POST /api/game
+        ///     GET /api/game/health
         ///     
-        /// This will create a new game with 4 players (2 teams) and deal the initial cards.
+        /// This endpoint returns a simple health status to verify the API is running.
         /// </remarks>
-        /// <response code="200">Returns the newly created game state</response>
-        [HttpPost]
-        [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
-        public ActionResult<GameStateDto> CreateNewGame()
+        /// <response code="200">Returns health status indicating the API is operational</response>
+        [HttpGet("health")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        public ActionResult<object> Health()
         {
-            var game = _gameService.CreateGame();
-            var gameStateDto = MappingService.MapGameStateToDto(game);
-            return Ok(gameStateDto);
+            return Ok(new 
+            { 
+                status = "healthy", 
+                timestamp = DateTime.UtcNow,
+                service = "TrucoMineiro.API",
+                version = "1.0.0"
+            });
         }        /// <summary>
         /// Gets the current state of a specific game with player-specific card visibility
         /// </summary>
         /// <remarks>
         /// Sample request:
         /// 
-        ///     GET /api/game/{gameId}?playerId=player1
+        ///     GET /api/game/{gameId}?playerSeat=0
         ///     
         /// This will return the current state of the specified game including cards,
         /// player information, scores, and game history. Card visibility is controlled
         /// based on the requesting player:
-        /// - If playerId is provided, only that player's cards are visible (others are hidden)
-        /// - If playerId is omitted, assumes single-player mode (human at seat 0)
+        /// - If playerSeat is provided, only that player's cards are visible (others are hidden)
+        /// - If playerSeat is omitted, assumes single-player mode (human at seat 0)
         /// - In DevMode, all cards may be visible for debugging purposes
         /// - AI/other player cards are hidden by setting Value=null, Suit=null in production
         /// </remarks>
         /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="playerId">Optional player ID for player-specific visibility. If omitted, assumes human player at seat 0</param>
+        /// <param name="playerSeat">Optional player seat number (0-3) for player-specific visibility. If omitted, assumes human player at seat 0</param>
         /// <response code="200">Returns the current game state with appropriate card visibility</response>
         /// <response code="404">If the game with the specified ID doesn't exist</response>
-        /// <response code="400">If the specified player is not found in the game</response>
+        /// <response code="400">If the specified player seat is invalid</response>
         [HttpGet("{gameId}")]
         [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<GameStateDto> GetGameState(string gameId, [FromQuery] string? playerId = null)
+        public ActionResult<GameStateDto> GetGameState(string gameId, [FromQuery] int? playerSeat = null)
         {
             var game = _gameService.GetGame(gameId);
             if (game == null)
@@ -71,17 +75,17 @@ namespace TrucoMineiro.API.Controllers
             }
 
             // Determine the requesting player's seat
-            int requestingPlayerSeat = 0; // Default to seat 0 (human player in single-player mode)
+            int requestingPlayerSeat = playerSeat ?? 0; // Default to seat 0 (human player)
             
-            if (!string.IsNullOrEmpty(playerId))
+            if (requestingPlayerSeat < 0 || requestingPlayerSeat > 3)
             {
-                // If playerId is provided, find the player and validate they exist in the game
-                var requestingPlayer = game.Players.FirstOrDefault(p => p.Id == playerId);
-                if (requestingPlayer == null)
-                {
-                    return BadRequest($"Player '{playerId}' not found in game '{gameId}'");
-                }
-                requestingPlayerSeat = requestingPlayer.Seat;
+                return BadRequest("Player seat must be between 0 and 3");
+            }
+
+            // Validate that the seat exists in the game
+            if (!game.Players.Any(p => p.Seat == requestingPlayerSeat))
+            {
+                return BadRequest($"Player at seat {requestingPlayerSeat} not found in game '{gameId}'");
             }
 
             // Check if DevMode is enabled to show all hands
@@ -90,7 +94,7 @@ namespace TrucoMineiro.API.Controllers
             // Map the game state with player-specific visibility
             var gameStateDto = MappingService.MapGameStateToDto(game, requestingPlayerSeat, showAllHands);
             return Ok(gameStateDto);
-        }/// <summary>
+        }        /// <summary>
         /// Unified endpoint for button press actions (Truco, Raise, Fold)
         /// </summary>
         /// <remarks>
@@ -99,21 +103,21 @@ namespace TrucoMineiro.API.Controllers
         ///     POST /api/game/press-button
         ///     {
         ///         "gameId": "abc123",
-        ///         "playerId": "player1",
+        ///         "playerSeat": 0,
         ///         "action": "truco"
         ///     }
         ///     
         ///     POST /api/game/press-button
         ///     {
         ///         "gameId": "abc123",
-        ///         "playerId": "player2",
+        ///         "playerSeat": 1,
         ///         "action": "raise"
         ///     }
         ///     
         ///     POST /api/game/press-button
         ///     {
         ///         "gameId": "abc123",
-        ///         "playerId": "player3",
+        ///         "playerSeat": 2,
         ///         "action": "fold"
         ///     }
         ///     
@@ -122,7 +126,7 @@ namespace TrucoMineiro.API.Controllers
         /// - "raise": Raises the stakes further after a Truco call
         /// - "fold": Folds the current hand, giving points to the opposing team
         /// </remarks>
-        /// <param name="request">The button press request containing game ID, player ID, and action</param>
+        /// <param name="request">The button press request containing game ID, player seat, and action</param>
         /// <response code="200">Returns the updated game state after the action</response>
         /// <response code="400">If the request is invalid or the action is not allowed</response>
         /// <response code="404">If the game with the specified ID doesn't exist</response>
@@ -133,10 +137,10 @@ namespace TrucoMineiro.API.Controllers
         public ActionResult<GameStateDto> PressButton([FromBody] ButtonPressRequest request)
         {
             if (string.IsNullOrEmpty(request.GameId) || 
-                string.IsNullOrEmpty(request.PlayerId) ||
+                request.PlayerSeat < 0 || request.PlayerSeat > 3 ||
                 string.IsNullOrEmpty(request.Action))
             {
-                return BadRequest("Invalid request parameters");
+                return BadRequest("Invalid request parameters. PlayerSeat must be 0-3.");
             }
 
             bool success;
@@ -145,15 +149,15 @@ namespace TrucoMineiro.API.Controllers
             switch (request.Action.ToLower())
             {
                 case ButtonPressActions.Truco:
-                    success = _gameService.CallTruco(request.GameId, request.PlayerId);
+                    success = _gameService.CallTruco(request.GameId, request.PlayerSeat);
                     errorMessage = "Invalid Truco call";
                     break;
                 case ButtonPressActions.Raise:
-                    success = _gameService.RaiseStakes(request.GameId, request.PlayerId);
+                    success = _gameService.RaiseStakes(request.GameId, request.PlayerSeat);
                     errorMessage = "Invalid raise";
                     break;
                 case ButtonPressActions.Fold:
-                    success = _gameService.Fold(request.GameId, request.PlayerId);
+                    success = _gameService.Fold(request.GameId, request.PlayerSeat);
                     errorMessage = "Invalid fold";
                     break;
                 default:
@@ -247,7 +251,7 @@ namespace TrucoMineiro.API.Controllers
         ///     POST /api/game/play-card
         ///     {
         ///         "gameId": "abc123",
-        ///         "playerId": "player1",
+        ///         "playerSeat": 0,
         ///         "cardIndex": 0,
         ///         "isFold": false
         ///     }
@@ -256,7 +260,7 @@ namespace TrucoMineiro.API.Controllers
         /// In DevMode, AI players will automatically play their turns after a human player's move.
         /// Card visibility follows the same rules as the start game endpoint.
         /// </remarks>
-        /// <param name="request">The play card request containing game ID, player ID, card index, and fold flag</param>
+        /// <param name="request">The play card request containing game ID, player seat, card index, and fold flag</param>
         /// <response code="200">Returns the updated game state with proper card visibility</response>
         /// <response code="400">If the request is invalid</response>
         [HttpPost("play-card")]
@@ -265,13 +269,13 @@ namespace TrucoMineiro.API.Controllers
         public ActionResult<PlayCardResponseDto> PlayCardEnhanced([FromBody] PlayCardRequestDto request)
         {
             if (string.IsNullOrWhiteSpace(request.GameId) || 
-                string.IsNullOrWhiteSpace(request.PlayerId) ||
+                request.PlayerSeat < 0 || request.PlayerSeat > 3 ||
                 (!request.IsFold && request.CardIndex < 0))
             {
                 var errorResponse = new PlayCardResponseDto
                 {
                     Success = false,
-                    Message = "Invalid request parameters",
+                    Message = "Invalid request parameters. PlayerSeat must be 0-3.",
                     GameState = new GameStateDto(),
                     Hand = new List<CardDto>(),
                     PlayerHands = new List<PlayerHandDto>()
@@ -279,92 +283,18 @@ namespace TrucoMineiro.API.Controllers
                 return BadRequest(errorResponse);
             }
 
-            // Determine requesting player seat (assuming seat 0 for human player)
-            var game = _gameService.GetGame(request.GameId);
-            int requestingPlayerSeat = 0;
-            if (game != null)
-            {
-                var requestingPlayer = game.Players.FirstOrDefault(p => p.Id == request.PlayerId);
-                if (requestingPlayer != null)
-                {
-                    requestingPlayerSeat = requestingPlayer.Seat;
-                }
-            }
-
             var response = _gameService.PlayCardEnhanced(
                 request.GameId, 
-                request.PlayerId, 
+                request.PlayerSeat, 
                 request.CardIndex, 
                 request.IsFold, 
-                requestingPlayerSeat
-            );
-
-            if (!response.Success)
+                request.PlayerSeat
+            );            if (!response.Success)
             {
                 return BadRequest(response);
             }
 
             return Ok(response);
-        }    }
-
-    /// <summary>
-    /// Request DTO for enhanced play card endpoint
-    /// </summary>
-    public class PlayCardRequestDto
-    {
-        /// <summary>
-        /// The unique identifier of the game
-        /// </summary>
-        /// <example>abc123</example>
-        public string GameId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The unique identifier of the player making the move
-        /// </summary>
-        /// <example>player1</example>
-        public string PlayerId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The index of the card in the player's hand to play (0-based)
-        /// </summary>
-        /// <example>0</example>
-        public int CardIndex { get; set; }
-
-        /// <summary>
-        /// Flag indicating if the player is folding
-        /// </summary>
-        /// <example>false</example>
-        public bool IsFold { get; set; }
-    }
-
-    /// <summary>
-    /// Response DTO for play card actions
-    /// </summary>
-    public class PlayCardResponseDto
-    {
-        /// <summary>
-        /// Indicates if the play card action was successful
-        /// </summary>
-        public bool Success { get; set; }
-
-        /// <summary>
-        /// Message providing additional information about the action result
-        /// </summary>
-        public string Message { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The current state of the game after the action
-        /// </summary>
-        public GameStateDto GameState { get; set; } = new GameStateDto();
-
-        /// <summary>
-        /// The updated hand of the player who played the card
-        /// </summary>
-        public List<CardDto> Hand { get; set; } = new List<CardDto>();
-
-        /// <summary>
-        /// The updated hands of all players in the game
-        /// </summary>
-        public List<PlayerHandDto> PlayerHands { get; set; } = new List<PlayerHandDto>();
+        }
     }
 }

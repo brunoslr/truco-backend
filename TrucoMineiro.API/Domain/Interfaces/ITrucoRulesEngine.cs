@@ -6,46 +6,45 @@ namespace TrucoMineiro.API.Domain.Interfaces
     /// Interface for handling Truco calls, stakes, and special rules
     /// </summary>
     public interface ITrucoRulesEngine
-    {
-        /// <summary>
+    {        /// <summary>
         /// Validates and processes a Truco call
         /// </summary>
         /// <param name="game">The current game state</param>
-        /// <param name="playerId">The player making the Truco call</param>
+        /// <param name="playerSeat">The seat of the player making the Truco call</param>
         /// <returns>True if the call is valid and processed, false otherwise</returns>
-        bool ProcessTrucoCall(GameState game, string playerId);
+        bool ProcessTrucoCall(GameState game, int playerSeat);
 
         /// <summary>
         /// Validates and processes a raise (after Truco)
         /// </summary>
         /// <param name="game">The current game state</param>
-        /// <param name="playerId">The player raising the stakes</param>
+        /// <param name="playerSeat">The seat of the player raising the stakes</param>
         /// <returns>True if the raise is valid and processed, false otherwise</returns>
-        bool ProcessRaise(GameState game, string playerId);
+        bool ProcessRaise(GameState game, int playerSeat);
 
         /// <summary>
         /// Validates and processes a fold
         /// </summary>
         /// <param name="game">The current game state</param>
-        /// <param name="playerId">The player folding</param>
+        /// <param name="playerSeat">The seat of the player folding</param>
         /// <returns>True if the fold is valid and processed, false otherwise</returns>
-        bool ProcessFold(GameState game, string playerId);
+        bool ProcessFold(GameState game, int playerSeat);
 
         /// <summary>
         /// Checks if a Truco call is allowed in the current game state
         /// </summary>
         /// <param name="game">The current game state</param>
-        /// <param name="playerId">The player wanting to call Truco</param>
+        /// <param name="playerSeat">The seat of the player wanting to call Truco</param>
         /// <returns>True if allowed, false otherwise</returns>
-        bool CanCallTruco(GameState game, string playerId);
+        bool CanCallTruco(GameState game, int playerSeat);
 
         /// <summary>
         /// Checks if raising stakes is allowed
         /// </summary>
         /// <param name="game">The current game state</param>
-        /// <param name="playerId">The player wanting to raise</param>
+        /// <param name="playerSeat">The seat of the player wanting to raise</param>
         /// <returns>True if allowed, false otherwise</returns>
-        bool CanRaise(GameState game, string playerId);
+        bool CanRaise(GameState game, int playerSeat);
 
         /// <summary>
         /// Checks if "Mão de 10" special rule applies
