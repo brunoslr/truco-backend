@@ -1,0 +1,46 @@
+### Test GetGameState endpoint with player-specific visibility
+
+# First, create a new game
+POST http://localhost:5000/api/game/start
+Content-Type: application/json
+
+{
+  "playerName": "TestPlayer"
+}
+
+###
+
+# Test 1: Get game state without playerId (should show only human player cards)
+GET http://localhost:5000/api/game/{{gameId}}
+
+###
+
+# Test 2: Get game state with specific playerId (should show only that player's cards)
+GET http://localhost:5000/api/game/{{gameId}}?playerId={{playerId}}
+
+###
+
+# Test 3: Get game state with invalid playerId (should return 400 Bad Request)
+GET http://localhost:5000/api/game/{{gameId}}?playerId=invalid-player-id
+
+###
+
+# Test 4: Get game state with invalid gameId (should return 404 Not Found)
+GET http://localhost:5000/api/game/invalid-game-id
+
+###
+
+# Variables to use in requests above:
+# Replace {{gameId}} with actual game ID from the POST response
+# Replace {{playerId}} with actual player ID from game state (e.g. AI player ID)
+
+# Example URLs (replace with actual IDs):
+# GET http://localhost:5000/api/game/12345678-1234-1234-1234-123456789abc
+# GET http://localhost:5000/api/game/12345678-1234-1234-1234-123456789abc?playerId=ai-player-1
+
+# Expected behavior:
+# - Without playerId: Only seat 0 (human) cards visible, others hidden (Value=null, Suit=null)
+# - With playerId: Only that player's cards visible, others hidden
+# - Invalid playerId: 400 Bad Request with error message
+# - Invalid gameId: 404 Not Found with "Game not found" message
+# - In DevMode: All cards visible regardless of playerId

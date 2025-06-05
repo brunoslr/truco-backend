@@ -1,0 +1,265 @@
+using Microsoft.Extensions.Configuration;
+using TrucoMineiro.API.Services;
+using TrucoMineiro.API.Controllers;
+using Microsoft.AspNetCore.Mvc;
+using TrucoMineiro.API.DTOs;
+using System.Collections.Generic;
+using Xunit;
+
+namespace TrucoMineiro.Tests
+{
+    /// <summary>
+    /// Tests for the GetGameState endpoint with player-specific visibility
+    /// </summary>
+    public class GetGameStateEndpointTests
+    {
+        private readonly GameService _gameService;
+        private readonly TrucoGameController _controller;
+
+        public GetGameStateEndpointTests()
+        {
+            // Set up test configuration with DevMode disabled
+            var inMemorySettings = new Dictionary<string, string?> {
+                {"FeatureFlags:DevMode", "false"},
+            };
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(inMemorySettings)
+                .Build();
+
+            _gameService = new GameService(configuration);
+            _controller = new TrucoGameController(_gameService);
+        }
+
+        [Fact]
+        public void GetGameState_WithoutPlayerId_ShouldShowOnlyHumanPlayerCards()
+        {
+            // Arrange
+            var game = _gameService.CreateGame("TestPlayer");
+            var humanPlayer = game.Players.First(p => p.Seat == 0);
+            
+            // Act
+            var result = _controller.GetGameState(game.GameId);
+            
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var gameState = Assert.IsType<GameStateDto>(okResult.Value);
+            
+            // Human player (seat 0) should have visible cards
+            var humanPlayerDto = gameState.Players.First(p => p.Seat == 0);
+            Assert.All(humanPlayerDto.Hand, card => 
+            {
+                Assert.NotNull(card.Value);
+                Assert.NotNull(card.Suit);
+            });
+            
+            // AI players (seats 1, 2, 3) should have hidden cards
+            var aiPlayers = gameState.Players.Where(p => p.Seat != 0);
+            foreach (var aiPlayer in aiPlayers)
+            {
+                Assert.All(aiPlayer.Hand, card => 
+                {
+                    Assert.Null(card.Value);
+                    Assert.Null(card.Suit);
+                });
+            }
+        }
+
+        [Fact]
+        public void GetGameState_WithPlayerId_ShouldShowOnlyRequestingPlayerCards()
+        {
+            // Arrange
+            var game = _gameService.CreateGame("TestPlayer");
+            var aiPlayer = game.Players.First(p => p.Seat == 1);
+            
+            // Act - Request as AI player at seat 1
+            var result = _controller.GetGameState(game.GameId, aiPlayer.Id);
+            
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var gameState = Assert.IsType<GameStateDto>(okResult.Value);
+            
+            // AI player at seat 1 should have visible cards
+            var requestingPlayerDto = gameState.Players.First(p => p.Seat == 1);
+            Assert.All(requestingPlayerDto.Hand, card => 
+            {
+                Assert.NotNull(card.Value);
+                Assert.NotNull(card.Suit);
+            });
+            
+            // All other players should have hidden cards
+            var otherPlayers = gameState.Players.Where(p => p.Seat != 1);
+            foreach (var otherPlayer in otherPlayers)
+            {
+                Assert.All(otherPlayer.Hand, card => 
+                {
+                    Assert.Null(card.Value);
+                    Assert.Null(card.Suit);
+                });
+            }
+        }
+
+        [Fact]
+        public void GetGameState_WithInvalidPlayerId_ShouldReturnBadRequest()
+        {
+            // Arrange
+            var game = _gameService.CreateGame("TestPlayer");
+            var invalidPlayerId = "non-existent-player";
+            
+            // Act
+            var result = _controller.GetGameState(game.GameId, invalidPlayerId);
+            
+            // Assert
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+            Assert.Contains("not found in game", badRequestResult.Value?.ToString());
+        }
+
+        [Fact]
+        public void GetGameState_WithInvalidGameId_ShouldReturnNotFound()
+        {
+            // Arrange
+            var invalidGameId = "non-existent-game";
+            
+            // Act
+            var result = _controller.GetGameState(invalidGameId);
+            
+            // Assert
+            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.Equal("Game not found", notFoundResult.Value);
+        }
+
+        [Fact]
+        public void GetGameState_WithDevMode_ShouldShowAllCards()
+        {
+            // Arrange - Set up configuration with DevMode enabled
+            var devModeSettings = new Dictionary<string, string?> {
+                {"FeatureFlags:DevMode", "true"},
+            };
+            var devConfig = new ConfigurationBuilder()
+                .AddInMemoryCollection(devModeSettings)
+                .Build();
+
+            var devGameService = new GameService(devConfig);
+            var devController = new TrucoGameController(devGameService);
+            var game = devGameService.CreateGame("TestPlayer");
+            
+            // Act
+            var result = devController.GetGameState(game.GameId);
+            
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var gameState = Assert.IsType<GameStateDto>(okResult.Value);
+            
+            // All players should have visible cards in DevMode
+            foreach (var player in gameState.Players)
+            {
+                Assert.All(player.Hand, card => 
+                {
+                    Assert.NotNull(card.Value);
+                    Assert.NotNull(card.Suit);
+                });
+            }
+        }
+
+        [Fact]
+        public void GetGameState_CardCount_ShouldAlwaysBeCorrect()
+        {
+            // Arrange
+            var game = _gameService.CreateGame("TestPlayer");
+            var humanPlayer = game.Players.First(p => p.Seat == 0);
+            
+            // Act
+            var result = _controller.GetGameState(game.GameId);
+            
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var gameState = Assert.IsType<GameStateDto>(okResult.Value);
+            
+            // All players should have 3 cards each (standard Truco hand)
+            foreach (var player in gameState.Players)
+            {
+                Assert.Equal(3, player.Hand.Count);
+            }
+            
+            // Verify the actual game state has the correct number of cards
+            foreach (var gamePlayer in game.Players)
+            {
+                Assert.Equal(3, gamePlayer.Hand.Count);
+            }
+        }
+
+        [Fact]
+        public void GetGameState_MultipleRequests_ShouldBeConsistent()
+        {
+            // Arrange
+            var game = _gameService.CreateGame("TestPlayer");
+            var humanPlayer = game.Players.First(p => p.Seat == 0);
+            var aiPlayer = game.Players.First(p => p.Seat == 1);
+            
+            // Act - Make multiple requests as different players
+            var humanRequest = _controller.GetGameState(game.GameId, humanPlayer.Id);
+            var aiRequest = _controller.GetGameState(game.GameId, aiPlayer.Id);
+            var defaultRequest = _controller.GetGameState(game.GameId);
+            
+            // Assert
+            var humanResult = Assert.IsType<OkObjectResult>(humanRequest.Result);
+            var aiResult = Assert.IsType<OkObjectResult>(aiRequest.Result);
+            var defaultResult = Assert.IsType<OkObjectResult>(defaultRequest.Result);
+            
+            var humanGameState = Assert.IsType<GameStateDto>(humanResult.Value);
+            var aiGameState = Assert.IsType<GameStateDto>(aiResult.Value);
+            var defaultGameState = Assert.IsType<GameStateDto>(defaultResult.Value);
+            
+            // All responses should have the same basic game info
+            Assert.Equal(humanGameState.Stakes, aiGameState.Stakes);
+            Assert.Equal(humanGameState.CurrentHand, aiGameState.CurrentHand);
+            Assert.Equal(humanGameState.Players.Count, aiGameState.Players.Count);
+            
+            // But card visibility should be different
+            var humanPlayerInHumanView = humanGameState.Players.First(p => p.Seat == 0);
+            var humanPlayerInAiView = aiGameState.Players.First(p => p.Seat == 0);
+            
+            // Human should see their own cards in both views, but AI should not see human cards in AI view
+            Assert.All(humanPlayerInHumanView.Hand, card => Assert.NotNull(card.Value));
+            Assert.All(humanPlayerInAiView.Hand, card => Assert.Null(card.Value));
+        }
+
+        [Fact]
+        public void GetGameState_IntegrationTest_ShouldWorkEndToEnd()
+        {
+            // Arrange
+            var game = _gameService.CreateGame("IntegrationTestPlayer");
+            var humanPlayer = game.Players.First(p => p.Seat == 0);
+            var aiPlayer = game.Players.First(p => p.Seat == 1);
+
+            // Act & Assert - Test without playerId (should default to human player)
+            var defaultResult = _controller.GetGameState(game.GameId);
+            var defaultOk = Assert.IsType<OkObjectResult>(defaultResult.Result);
+            var defaultGameState = Assert.IsType<GameStateDto>(defaultOk.Value);
+            
+            // Human cards should be visible, AI cards should be hidden
+            var humanInDefault = defaultGameState.Players.First(p => p.Seat == 0);
+            var aiInDefault = defaultGameState.Players.First(p => p.Seat == 1);
+            
+            Assert.True(humanInDefault.Hand.All(c => c.Value != null && c.Suit != null), "Human cards should be visible in default request");
+            Assert.True(aiInDefault.Hand.All(c => c.Value == null && c.Suit == null), "AI cards should be hidden in default request");
+
+            // Act & Assert - Test with specific AI player ID
+            var aiResult = _controller.GetGameState(game.GameId, aiPlayer.Id);
+            var aiOk = Assert.IsType<OkObjectResult>(aiResult.Result);
+            var aiGameState = Assert.IsType<GameStateDto>(aiOk.Value);
+            
+            // AI cards should be visible, human cards should be hidden
+            var humanInAi = aiGameState.Players.First(p => p.Seat == 0);
+            var aiInAi = aiGameState.Players.First(p => p.Seat == 1);
+            
+            Assert.True(humanInAi.Hand.All(c => c.Value == null && c.Suit == null), "Human cards should be hidden when requesting as AI");
+            Assert.True(aiInAi.Hand.All(c => c.Value != null && c.Suit != null), "AI cards should be visible when requesting as AI");
+
+            // Verify game state consistency
+            Assert.Equal(defaultGameState.Stakes, aiGameState.Stakes);
+            Assert.Equal(defaultGameState.CurrentHand, aiGameState.CurrentHand);
+            Assert.Equal(defaultGameState.Players.Count, aiGameState.Players.Count);
+        }
+    }
+}

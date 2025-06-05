@@ -38,23 +38,31 @@ namespace TrucoMineiro.API.Controllers
             var gameStateDto = MappingService.MapGameStateToDto(game);
             return Ok(gameStateDto);
         }        /// <summary>
-        /// Gets the current state of a specific game
+        /// Gets the current state of a specific game with player-specific card visibility
         /// </summary>
         /// <remarks>
         /// Sample request:
         /// 
-        ///     GET /api/game/{gameId}
+        ///     GET /api/game/{gameId}?playerId=player1
         ///     
         /// This will return the current state of the specified game including cards,
-        /// player information, scores, and game history.
+        /// player information, scores, and game history. Card visibility is controlled
+        /// based on the requesting player:
+        /// - If playerId is provided, only that player's cards are visible (others are hidden)
+        /// - If playerId is omitted, assumes single-player mode (human at seat 0)
+        /// - In DevMode, all cards may be visible for debugging purposes
+        /// - AI/other player cards are hidden by setting Value=null, Suit=null in production
         /// </remarks>
         /// <param name="gameId">The unique identifier of the game</param>
-        /// <response code="200">Returns the current game state</response>
+        /// <param name="playerId">Optional player ID for player-specific visibility. If omitted, assumes human player at seat 0</param>
+        /// <response code="200">Returns the current game state with appropriate card visibility</response>
         /// <response code="404">If the game with the specified ID doesn't exist</response>
+        /// <response code="400">If the specified player is not found in the game</response>
         [HttpGet("{gameId}")]
         [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<GameStateDto> GetGameState(string gameId)
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public ActionResult<GameStateDto> GetGameState(string gameId, [FromQuery] string? playerId = null)
         {
             var game = _gameService.GetGame(gameId);
             if (game == null)
@@ -62,9 +70,27 @@ namespace TrucoMineiro.API.Controllers
                 return NotFound("Game not found");
             }
 
-            var gameStateDto = MappingService.MapGameStateToDto(game);
+            // Determine the requesting player's seat
+            int requestingPlayerSeat = 0; // Default to seat 0 (human player in single-player mode)
+            
+            if (!string.IsNullOrEmpty(playerId))
+            {
+                // If playerId is provided, find the player and validate they exist in the game
+                var requestingPlayer = game.Players.FirstOrDefault(p => p.Id == playerId);
+                if (requestingPlayer == null)
+                {
+                    return BadRequest($"Player '{playerId}' not found in game '{gameId}'");
+                }
+                requestingPlayerSeat = requestingPlayer.Seat;
+            }
+
+            // Check if DevMode is enabled to show all hands
+            bool showAllHands = _gameService.IsDevMode();
+
+            // Map the game state with player-specific visibility
+            var gameStateDto = MappingService.MapGameStateToDto(game, requestingPlayerSeat, showAllHands);
             return Ok(gameStateDto);
-        }        /// <summary>
+        }/// <summary>
         /// Unified endpoint for button press actions (Truco, Raise, Fold)
         /// </summary>
         /// <remarks>

@@ -105,6 +105,52 @@ namespace TrucoMineiro.API.Services
         }
 
         /// <summary>
+        /// Map a GameState model to a GameStateDto with player-specific card visibility
+        /// </summary>
+        /// <param name="gameState">The game state to map</param>
+        /// <param name="requestingPlayerSeat">The seat of the player requesting the game state (for card visibility)</param>
+        /// <param name="showAllHands">Whether to reveal all player hands (DevMode)</param>
+        public static GameStateDto MapGameStateToDto(GameState gameState, int requestingPlayerSeat, bool showAllHands = false)
+        {
+            return new GameStateDto
+            {
+                Players = gameState.Players.Select(p => MapPlayerToDto(p, gameState.FirstPlayerSeat, requestingPlayerSeat, showAllHands)).ToList(),
+                PlayedCards = gameState.PlayedCards.Select(MapPlayedCardToDto).ToList(),
+                Stakes = gameState.Stakes,
+                IsTrucoCalled = gameState.IsTrucoCalled,
+                IsRaiseEnabled = gameState.IsRaiseEnabled,
+                CurrentHand = gameState.CurrentHand,
+                TeamScores = gameState.TeamScores,
+                TurnWinner = gameState.TurnWinner,
+                ActionLog = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList()
+            };
+        }
+
+        /// <summary>
+        /// Map a Player model to a PlayerDto with player-specific card visibility
+        /// </summary>
+        /// <param name="player">The player to map</param>
+        /// <param name="firstPlayerSeat">The seat of the first player</param>
+        /// <param name="requestingPlayerSeat">The seat of the player requesting the game state</param>
+        /// <param name="showAllHands">Whether to reveal all player hands (DevMode)</param>
+        public static PlayerDto MapPlayerToDto(Player player, int firstPlayerSeat, int requestingPlayerSeat, bool showAllHands = false)
+        {
+            bool shouldHideCards = !showAllHands && player.Seat != requestingPlayerSeat;
+            
+            return new PlayerDto
+            {
+                PlayerId = player.Id,
+                Name = player.Name,
+                Team = player.Team,
+                Hand = player.Hand.Select(card => MapCardToDto(card, shouldHideCards)).ToList(),
+                IsDealer = player.IsDealer,
+                IsActive = player.IsActive,
+                Seat = player.Seat,
+                FirstPlayerSeat = firstPlayerSeat
+            };
+        }
+
+        /// <summary>
         /// Map a GameState model to a StartGameResponse
         /// </summary>
         /// <param name="gameState">The game state to map</param>
