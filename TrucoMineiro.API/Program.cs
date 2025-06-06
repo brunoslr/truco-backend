@@ -42,6 +42,10 @@ builder.Services.AddSingleton<TrucoMineiro.API.Services.MappingService>();
 // Register event system
 builder.Services.AddSingleton<TrucoMineiro.API.Domain.Events.IEventPublisher, TrucoMineiro.API.Domain.Services.InMemoryEventPublisher>();
 
+// Register event handlers
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.PlayerTurnStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.AIPlayerEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.CardPlayedEvent>, TrucoMineiro.API.Domain.EventHandlers.GameFlowEventHandler>();
+
 // Register background services
 builder.Services.AddHostedService<TrucoMineiro.API.Services.GameCleanupService>();
 

@@ -236,10 +236,9 @@ namespace TrucoMineiro.Tests
             Assert.True(response.Success);
             Assert.Equal("Card played successfully", response.Message);
             Assert.NotNull(response.GameState);
-            
-            // Verify a special fold card was created (value=0, empty suit)
+              // Verify a special fold card was created (value=0, empty suit)
             var updatedGame = gameService.GetGame(game.GameId);
-            var playedCard = updatedGame.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == activePlayer.Seat);
+            var playedCard = updatedGame!.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == activePlayer.Seat);
             Assert.NotNull(playedCard);
             Assert.NotNull(playedCard.Card);
             Assert.Equal("0", playedCard.Card.Value);

@@ -213,6 +213,105 @@ docker build -t truco-backend .
 docker run -p 8080:80 truco-backend
 ```
 
+## Architecture
+
+### Event-Driven AI Player System
+
+The application implements a modern event-driven architecture for AI player interactions, providing reactive and scalable game flow management.
+
+#### Core Components
+
+##### Event System
+```
+TrucoMineiro.API.Domain.Events/
+├── GameEventBase.cs           # Base class for all game events
+├── IEventHandler.cs           # Interface for event handlers
+├── IEventPublisher.cs         # Interface for event publishing
+└── GameEvents/
+    ├── PlayerTurnStartedEvent.cs  # Triggered when a player's turn begins
+    ├── CardPlayedEvent.cs         # Triggered when a card is played
+    └── RoundCompletedEvent.cs     # Triggered when a round finishes
+```
+
+##### Event Handlers
+```
+TrucoMineiro.API.Domain.EventHandlers/
+├── AIPlayerEventHandler.cs    # Handles AI decision making and card playing
+└── GameFlowEventHandler.cs    # Manages game flow after card plays
+```
+
+#### Event Flow Architecture
+
+```mermaid
+graph TD
+    A[PlayerTurnStartedEvent] --> B[AIPlayerEventHandler]
+    B --> C[AI Decision Making]
+    C --> D[Game State Update]
+    D --> E[CardPlayedEvent Published]
+    E --> F[GameFlowEventHandler]
+    F --> G{Round Complete?}
+    G -->|Yes| H[RoundCompletedEvent]
+    G -->|No| I[Next PlayerTurnStartedEvent]
+    H --> J[Hand Complete Check]
+    I --> B
+```
+
+#### Key Features
+
+1. **Reactive AI Players**: AI players respond to `PlayerTurnStartedEvent` rather than being called synchronously
+2. **Realistic Timing**: AI players have thinking delays (500-2000ms) for better user experience
+3. **Loose Coupling**: Event handlers are decoupled from direct service calls
+4. **Extensibility**: Easy to add new event handlers for additional game features
+5. **Comprehensive Testing**: Full integration tests with mock implementations
+
+#### Service Architecture
+
+##### Core Interfaces
+- **`IAIPlayerService`**: AI decision making and card selection logic
+- **`IGameStateManager`**: Game state lifecycle and management
+- **`IGameFlowService`**: Game flow control and turn management
+- **`IHandResolutionService`**: Card ranking and round winner determination
+- **`IGameRepository`**: Game state persistence and retrieval
+
+##### Dependency Injection
+All event handlers and services are registered in the DI container (`Program.cs`) with proper scoping:
+```csharp
+// Event Handlers
+services.AddScoped<IEventHandler<PlayerTurnStartedEvent>, AIPlayerEventHandler>();
+services.AddScoped<IEventHandler<CardPlayedEvent>, GameFlowEventHandler>();
+
+// Core Services
+services.AddScoped<IAIPlayerService, AIPlayerService>();
+services.AddScoped<IGameStateManager, GameStateManager>();
+services.AddScoped<IHandResolutionService, HandResolutionService>();
+```
+
+#### Testing Strategy
+
+The event-driven system includes comprehensive integration tests:
+- **`EventDrivenAIPlayerTests`**: Tests AI player event handling with realistic game scenarios
+- **Mock Implementations**: Complete test doubles for all interfaces
+- **Event Validation**: Validates proper event publishing and chaining behavior
+
+### Domain Models
+
+#### GameState
+Central domain model containing:
+- Player information and hands
+- Current game state (round, hand, scores)
+- Played cards and action history
+- Team scores and game completion status
+
+#### Player
+Represents game participants with:
+- Identity (name, seat, team)
+- Current hand of cards
+- AI/Human designation
+- Active status
+
+#### Card & PlayedCard
+Card representation with suit and value, and tracking of played cards with player association.
+
 ## Frontend Integration
 
-This backend is designed to work with the Truco Mineiro frontend project. For more details, see the frontend documentation or contact the frontend team.
+This backend is designed to work with the Truco Mineiro frontend project. The event-driven architecture ensures smooth real-time game flow and responsive AI interactions. For more details, see the frontend documentation or contact the frontend team.
