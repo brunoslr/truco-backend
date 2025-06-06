@@ -10,13 +10,15 @@ namespace TrucoMineiro.API.Services
     /// Service for managing Truco game logic (legacy wrapper around domain services)
     /// </summary>
     public class GameService
-    {
-        private readonly IGameStateManager _gameStateManager;
+    {        private readonly IGameStateManager _gameStateManager;
         private readonly IGameRepository _gameRepository;
         private readonly IGameFlowService _gameFlowService;
         private readonly ITrucoRulesEngine _trucoRulesEngine;
         private readonly IAIPlayerService _aiPlayerService;
-        private readonly IScoreCalculationService _scoreCalculationService;        private readonly bool _devMode;
+        private readonly IScoreCalculationService _scoreCalculationService;
+        private readonly IGameFlowReactionService _gameFlowReactionService;
+
+        private readonly bool _devMode;
         private readonly bool _autoAiPlay;
         private readonly int _aiPlayDelayMs;
         private readonly int _newHandDelayMs;
@@ -30,6 +32,7 @@ namespace TrucoMineiro.API.Services
         /// <param name="trucoRulesEngine">Truco rules engine</param>
         /// <param name="aiPlayerService">AI player service</param>
         /// <param name="scoreCalculationService">Score calculation service</param>
+        /// <param name="gameFlowReactionService">Game flow reaction service</param>
         /// <param name="configuration">Application configuration</param>
         public GameService(
             IGameStateManager gameStateManager,
@@ -38,6 +41,7 @@ namespace TrucoMineiro.API.Services
             ITrucoRulesEngine trucoRulesEngine,
             IAIPlayerService aiPlayerService,
             IScoreCalculationService scoreCalculationService,
+            IGameFlowReactionService gameFlowReactionService,
             IConfiguration configuration)
         {
             _gameStateManager = gameStateManager;
@@ -46,7 +50,9 @@ namespace TrucoMineiro.API.Services
             _trucoRulesEngine = trucoRulesEngine;
             _aiPlayerService = aiPlayerService;
             _scoreCalculationService = scoreCalculationService;
-              // Read configuration from appsettings.json
+            _gameFlowReactionService = gameFlowReactionService;
+            
+            // Read configuration from appsettings.json
             _devMode = configuration.GetValue<bool>("FeatureFlags:DevMode", false);
             _autoAiPlay = configuration.GetValue<bool>("FeatureFlags:AutoAiPlay", true);
             _aiPlayDelayMs = configuration.GetValue<int>("GameSettings:AIPlayDelayMs", GameConfiguration.DefaultAIPlayDelayMs);
@@ -107,31 +113,132 @@ namespace TrucoMineiro.API.Services
             var gameTask = _gameRepository.GetGameAsync(gameId);
             return gameTask.GetAwaiter().GetResult();
         }        /// <summary>
-        /// Plays a card from a player's hand
+        /// Plays a card from a player's hand with simplified logic
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
         /// <param name="playerSeat">The seat of the player making the move (0-3)</param>
         /// <param name="cardIndex">The index of the card in the player's hand</param>
-        /// <returns>True if the card was played successfully, false otherwise</returns>
-        public bool PlayCard(string gameId, int playerSeat, int cardIndex)
+        /// <param name="isFold">Whether this is a fold action</param>
+        /// <param name="requestingPlayerSeat">The seat of the player making the request (for response visibility)</param>
+        /// <returns>PlayCardResponseDto with the updated game state</returns>
+        public PlayCardResponseDto PlayCard(string gameId, int playerSeat, int cardIndex, bool isFold = false, int requestingPlayerSeat = 0)
         {
             var game = GetGame(gameId);
             if (game == null)
             {
+                return MappingService.MapGameStateToPlayCardResponse(new GameState(), requestingPlayerSeat, _devMode, false, "Game not found");
+            }
+
+            // Handle fold action with special card creation (value=0, empty suit)
+            if (isFold)
+            {
+                var foldSuccess = HandleFoldAction(game, playerSeat);
+                if (!foldSuccess)
+                {
+                    return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Cannot fold at this time");
+                }
+            }
+            else
+            {
+                // Handle regular card play - simplified to only remove card and add to played cards
+                var playSuccess = HandleCardPlay(game, playerSeat, cardIndex);
+                if (!playSuccess)
+                {
+                    return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Invalid card play");
+                }
+            }
+
+            // Process post-card-play reactions using the new flow mechanism
+            var reactionTask = _gameFlowReactionService.ProcessCardPlayReactionsAsync(game, _autoAiPlay, _aiPlayDelayMs, _newHandDelayMs);
+            reactionTask.GetAwaiter().GetResult();
+
+            // Save the game state
+            var saveTask = _gameRepository.SaveGameAsync(game);
+            saveTask.GetAwaiter().GetResult();
+
+            return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, true, "Card played successfully");
+        }
+
+        /// <summary>
+        /// Handles fold action by creating a special card with value=0 and empty suit
+        /// </summary>
+        private bool HandleFoldAction(GameState game, int playerSeat)
+        {
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
+            if (player == null || !player.IsActive)
+            {
                 return false;
             }
 
-            // Use the domain service to handle the card play
-            var success = _gameFlowService.PlayCard(game, playerSeat, cardIndex);
-            
-            if (success)
+            // Create special fold card with value=0 and empty suit
+            var foldCard = new Card { Value = "0", Suit = "" };
+
+            // Find the player's played card slot and set the fold card
+            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);
+            if (playedCard != null)
             {
-                // Save the updated game state
-                var saveTask = _gameRepository.SaveGameAsync(game);
-                saveTask.GetAwaiter().GetResult();
+                playedCard.Card = foldCard;
+            }
+            else
+            {
+                game.PlayedCards.Add(new PlayedCard(player.Seat, foldCard));
             }
 
-            return success;
+            // Add to the action log
+            game.ActionLog.Add(new ActionLogEntry("card-played")
+            {
+                PlayerSeat = player.Seat,
+                Card = "Fold"
+            });
+
+            // Move to the next player's turn
+            _gameFlowService.AdvanceToNextPlayer(game);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Handles regular card play by removing card from hand and adding to played cards
+        /// </summary>
+        private bool HandleCardPlay(GameState game, int playerSeat, int cardIndex)
+        {
+            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
+            if (player == null || !player.IsActive)
+            {
+                return false;
+            }
+
+            if (cardIndex < 0 || cardIndex >= player.Hand.Count)
+            {
+                return false;
+            }
+
+            // Remove card from player's hand
+            var card = player.Hand[cardIndex];
+            player.Hand.RemoveAt(cardIndex);
+
+            // Add to played cards array
+            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);
+            if (playedCard != null)
+            {
+                playedCard.Card = card;
+            }
+            else
+            {
+                game.PlayedCards.Add(new PlayedCard(player.Seat, card));
+            }
+
+            // Add to the action log
+            game.ActionLog.Add(new ActionLogEntry("card-played")
+            {
+                PlayerSeat = player.Seat,
+                Card = $"{card.Value} of {card.Suit}"
+            });
+
+            // Move to the next player's turn
+            _gameFlowService.AdvanceToNextPlayer(game);
+
+            return true;
         }/// <summary>
         /// Call Truco to raise the stakes
         /// </summary>
@@ -294,47 +401,14 @@ namespace TrucoMineiro.API.Services
         /// <param name="cardIndex">The index of the card in the player's hand</param>
         /// <param name="isFold">Whether this is a fold action</param>
         /// <param name="requestingPlayerSeat">The seat of the player making the request (for response visibility)</param>
-        /// <returns>PlayCardResponseDto with the updated game state</returns>
+        /// <returns>PlayCardResponseDto with the updated game state</returns>        /// <summary>
+        /// Enhanced play card method that now just forwards to the simplified PlayCard method
+        /// This is kept for backwards compatibility with tests
+        /// </summary>
         public PlayCardResponseDto PlayCardEnhanced(string gameId, int playerSeat, int cardIndex, bool isFold = false, int requestingPlayerSeat = 0)
         {
-            var game = GetGame(gameId);
-            if (game == null)
-            {
-                return MappingService.MapGameStateToPlayCardResponse(new GameState(), requestingPlayerSeat, _devMode, false, "Game not found");
-            }
-
-            // Handle fold action
-            if (isFold)
-            {
-                var foldSuccess = Fold(gameId, playerSeat);
-                if (!foldSuccess)
-                {
-                    return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Cannot fold at this time");
-                }
-                return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, true, "Hand folded successfully");
-            }
-
-            // Handle card play for human player using the same method as AI
-            var playSuccess = PlayCard(gameId, playerSeat, cardIndex);
-            if (!playSuccess)
-            {
-                return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Invalid card play");
-            }            // Process hand completion if needed
-            var handCompletionTask = _gameFlowService.ProcessHandCompletionAsync(game, _newHandDelayMs);
-            handCompletionTask.GetAwaiter().GetResult();
-
-            // Automatically handle AI player turns only if AutoAiPlay is enabled
-            if (_autoAiPlay)
-            {
-                var aiTurnsTask = _gameFlowService.ProcessAITurnsAsync(game, _aiPlayDelayMs);
-                aiTurnsTask.GetAwaiter().GetResult();
-            }
-
-            // Save the final game state
-            var saveTask = _gameRepository.SaveGameAsync(game);
-            saveTask.GetAwaiter().GetResult();
-
-            return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, true, "Card played successfully");
+            // Simply forward to the new PlayCard method for consistency
+            return PlayCard(gameId, playerSeat, cardIndex, isFold, requestingPlayerSeat);
         }
     }
 }

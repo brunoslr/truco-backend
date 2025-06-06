@@ -120,7 +120,12 @@ namespace TrucoMineiro.Tests
                     // Reset for new hand
                     gameState.PlayedCards.Clear();
                     gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
-                });
+                });            // Create mock GameFlowReactionService
+            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
+            
+            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
+                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns(Task.CompletedTask);
 
             return new GameService(
                 mockGameStateManager.Object,
@@ -129,6 +134,7 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockGameFlowReactionService.Object,
                 configuration);
         }        private GameState CreateValidGameState(string? playerName = null)
         {
@@ -137,14 +143,14 @@ namespace TrucoMineiro.Tests
             gameState.FirstPlayerSeat = 0; // Ensure human player starts
             gameState.CurrentPlayerIndex = 0; // Ensure human player is active
             return gameState;
-        }[Fact]
-        public void PlayCardEnhanced_ShouldReturnSuccess_WhenValidMove()
+        }    [Fact]
+        public void PlayCard_ShouldReturnSuccess_WhenValidMove()
         {
             // Arrange
             var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);            // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, activePlayer.Seat);
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 0, false, activePlayer.Seat);
 
             // Assert
             Assert.True(response.Success);
@@ -152,15 +158,15 @@ namespace TrucoMineiro.Tests
             Assert.NotNull(response.GameState);
             Assert.Equal(2, response.Hand.Count); // Player should have 2 cards left
             Assert.Equal(4, response.PlayerHands.Count); // Should have all 4 player hands
-        }        [Fact]
-        public void PlayCardEnhanced_ShouldHideAICards_WhenNotInDevMode()
+        }    [Fact]
+        public void PlayCard_ShouldHideAICards_WhenNotInDevMode()
         {            // Arrange
             var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 0, false, 0);
 
             // Assert
             Assert.True(response.Success);
@@ -177,8 +183,8 @@ namespace TrucoMineiro.Tests
                 Assert.All(aiHand.Cards, card => Assert.Null(card.Value));
                 Assert.All(aiHand.Cards, card => Assert.Null(card.Suit));
             }
-        }        [Fact]
-        public void PlayCardEnhanced_ShouldShowAllCards_WhenInDevMode()
+        }    [Fact]
+        public void PlayCard_ShouldShowAllCards_WhenInDevMode()
         {
             // Arrange
             var devModeSettings = new Dictionary<string, string?> {
@@ -194,7 +200,7 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 0, false, 0);
 
             // Assert
             Assert.True(response.Success);// All player hands should be visible in DevMode
@@ -207,8 +213,8 @@ namespace TrucoMineiro.Tests
                     Assert.All(playerHand.Cards, card => Assert.NotNull(card.Suit));
                 }
             }
-        }        [Fact]
-        public void PlayCardEnhanced_ShouldHandleFold_WhenFoldRequested()
+        }    [Fact]
+        public void PlayCard_ShouldHandleFold_WhenFoldRequested()
         {
             // Arrange
             var gameService = CreateGameService();
@@ -216,24 +222,32 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, true, activePlayer.Seat);
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 0, true, activePlayer.Seat);
 
             // Assert
             Assert.True(response.Success);
-            Assert.Equal("Hand folded successfully", response.Message);
+            Assert.Equal("Card played successfully", response.Message);
             Assert.NotNull(response.GameState);
-        }        [Fact]
-        public void PlayCardEnhanced_ShouldReturnError_WhenGameNotFound()
+            
+            // Verify a special fold card was created (value=0, empty suit)
+            var updatedGame = gameService.GetGame(game.GameId);
+            var playedCard = updatedGame.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == activePlayer.Seat);
+            Assert.NotNull(playedCard);
+            Assert.NotNull(playedCard.Card);
+            Assert.Equal("0", playedCard.Card.Value);
+            Assert.Equal("", playedCard.Card.Suit);
+        }[Fact]
+        public void PlayCard_ShouldReturnError_WhenGameNotFound()
         {
             // Arrange
             var gameService = CreateGameService();            // Act
-            var response = gameService.PlayCardEnhanced("invalid-game-id", 0, 0, false, 0);
+            var response = gameService.PlayCard("invalid-game-id", 0, 0, false, 0);
 
             // Assert
             Assert.False(response.Success);
             Assert.Equal("Game not found", response.Message);
-        }        [Fact]
-        public void PlayCardEnhanced_ShouldReturnError_WhenInvalidCardIndex()
+        }[Fact]
+        public void PlayCard_ShouldReturnError_WhenInvalidCardIndex()
         {
             // Arrange
             var gameService = CreateGameService();
@@ -241,13 +255,13 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 99, false, activePlayer.Seat);
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 99, false, activePlayer.Seat);
 
             // Assert
             Assert.False(response.Success);
             Assert.Equal("Invalid card play", response.Message);
-        }        [Fact]
-        public void PlayCardEnhanced_ShouldHandleAITurns_WhenAutoAiPlayEnabled()
+        }[Fact]
+        public void PlayCard_ShouldHandleAITurns_WhenAutoAiPlayEnabled()
         {
             // Arrange
             var autoAiPlaySettings = new Dictionary<string, string?> {
@@ -264,7 +278,7 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 0, false, 0);
 
             // Assert
             Assert.True(response.Success);
@@ -272,8 +286,8 @@ namespace TrucoMineiro.Tests
             // Check that AI players have played their cards
             var playedCards = response.GameState.PlayedCards.Where(pc => pc.Card != null).Count();
             Assert.True(playedCards > 1); // Should be more than just the active player's card
-        }        [Fact]
-        public void PlayCardEnhanced_ShouldNotHandleAITurns_WhenAutoAiPlayDisabled()
+        }[Fact]
+        public void PlayCard_ShouldNotHandleAITurns_WhenAutoAiPlayDisabled()
         {
             // Arrange
             var autoAiPlayDisabledSettings = new Dictionary<string, string?> {
@@ -290,7 +304,7 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 0, false, 0);
 
             // Assert
             Assert.True(response.Success);
@@ -322,7 +336,7 @@ namespace TrucoMineiro.Tests
             var aiPlayerHand = response.PlayerHands.First(h => h.Seat == 1);
             Assert.All(aiPlayerHand.Cards, card => Assert.Null(card.Value));
         }        [Fact]
-        public void Debug_PlayCardEnhanced_CardVisibility()
+        public void Debug_PlayCard_CardVisibility()
         {
             // Arrange - Test without DevMode first
             var gameService = CreateGameService();
@@ -338,7 +352,7 @@ namespace TrucoMineiro.Tests
             }
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);            Console.WriteLine($"\nAfter play card:");
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 0, false, 0);            Console.WriteLine($"\nAfter play card:");
             Console.WriteLine($"Success: {response.Success}");
             Console.WriteLine($"Message: {response.Message}");
             Console.WriteLine($"Active player hand count in response: {response.Hand.Count}");

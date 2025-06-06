@@ -68,9 +68,7 @@ namespace TrucoMineiro.Tests
         mockScoreCalculationService.Setup(x => x.IsGameComplete(It.IsAny<GameState>()))
             .Returns(false);        // Configure mock TrucoRulesEngine
         mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
-            .Returns(1);
-
-        // Configure mock GameFlowService
+            .Returns(1);        // Configure mock GameFlowService
         mockGameFlowService.Setup(x => x.PlayCard(It.IsAny<GameState>(), It.IsAny<int>(), It.IsAny<int>()))
             .Returns((GameState gameState, int playerSeat, int cardIndex) => {
                 var player = gameState.Players[playerSeat];
@@ -83,6 +81,14 @@ namespace TrucoMineiro.Tests
                 
                 // Add to played cards
                 gameState.PlayedCards.Add(new PlayedCard(playerSeat, card));
+                
+                // Add to the action log (like the real GameFlowService does)
+                gameState.ActionLog.Add(new ActionLogEntry("card-played")
+                {
+                    PlayerSeat = playerSeat,
+                    Card = $"{card.Value} of {card.Suit}"
+                });
+                
                 gameState.CurrentPlayerIndex = (playerSeat + 1) % 4;
                 return true;
             });
@@ -122,7 +128,11 @@ namespace TrucoMineiro.Tests
                 // Reset for new hand
                 gameState.PlayedCards.Clear();
                 gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
-            });
+            });        // Create mock GameFlowReactionService
+        var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
+        mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
+            It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Returns(Task.CompletedTask);
 
         return new GameService(
             mockGameStateManager.Object,
@@ -131,6 +141,7 @@ namespace TrucoMineiro.Tests
             mockTrucoRulesEngine.Object,
             mockAIPlayerService.Object,
             mockScoreCalculationService.Object,
+            mockGameFlowReactionService.Object,
             configuration);
     }    private GameState CreateValidGameState(string? playerName = null)
     {
@@ -203,12 +214,11 @@ namespace TrucoMineiro.Tests
             
             // Find the active player
             var activePlayer = game.Players.First(p => p.IsActive);
-            
-            // Act
-            var result = gameService.PlayCard(game.GameId, activePlayer.Seat, 0);
+              // Act
+            var response = gameService.PlayCard(game.GameId, activePlayer.Seat, 0);
 
             // Assert
-            Assert.True(result);
+            Assert.True(response.Success);
             
             // Get the updated game state
             var updatedGame = gameService.GetGame(game.GameId);

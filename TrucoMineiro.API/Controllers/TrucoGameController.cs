@@ -267,11 +267,10 @@ namespace TrucoMineiro.API.Controllers
         /// </remarks>
         /// <param name="request">The play card request containing game ID, player seat, card index, and fold flag</param>
         /// <response code="200">Returns the updated game state with proper card visibility</response>
-        /// <response code="400">If the request is invalid</response>
-        [HttpPost("play-card")]
+        /// <response code="400">If the request is invalid</response>        [HttpPost("play-card")]
         [ProducesResponseType(typeof(PlayCardResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<PlayCardResponseDto> PlayCardEnhanced([FromBody] PlayCardRequestDto request)
+        public ActionResult<PlayCardResponseDto> PlayCard([FromBody] PlayCardRequestDto request)
         {
             if (string.IsNullOrWhiteSpace(request.GameId) || 
                 request.PlayerSeat < 0 || request.PlayerSeat > 3 ||
@@ -286,15 +285,15 @@ namespace TrucoMineiro.API.Controllers
                     PlayerHands = new List<PlayerHandDto>()
                 };
                 return BadRequest(errorResponse);
-            }
-
-            var response = _gameService.PlayCardEnhanced(
+            }            var response = _gameService.PlayCard(
                 request.GameId, 
                 request.PlayerSeat, 
                 request.CardIndex, 
                 request.IsFold, 
                 request.PlayerSeat
-            );            if (!response.Success)
+            );
+
+            if (!response.Success)
             {
                 return BadRequest(response);
             }

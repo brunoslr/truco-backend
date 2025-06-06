@@ -72,17 +72,12 @@ namespace TrucoMineiro.Tests
                     {
                         return false;
                     }
-                    
-                    // Play the card (simulate the real behavior)
+                      // Play the card (simulate the real behavior)
                     var card = player.Hand[cardIndex];
                     player.Hand.RemoveAt(cardIndex);
                     
-                    // Update played cards
-                    var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == playerSeat);
-                    if (playedCard != null)
-                    {
-                        playedCard.Card = card;
-                    }
+                    // Add to played cards
+                    game.PlayedCards.Add(new PlayedCard(playerSeat, card));
                     
                     // Move to next player (simple rotation)
                     player.IsActive = false;
@@ -94,12 +89,28 @@ namespace TrucoMineiro.Tests
                     }
                     
                     return true;
+                });            mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
+                .Returns((GameState gameState, int aiPlayDelayMs) => {
+                    // Simulate AI players playing cards automatically
+                    for (int seat = 1; seat <= 3; seat++) // AI players are seats 1, 2, 3
+                    {
+                        var aiPlayer = gameState.Players[seat];
+                        if (aiPlayer.Hand.Count > 0)
+                        {
+                            var cardToPlay = aiPlayer.Hand[0];
+                            aiPlayer.Hand.RemoveAt(0);
+                            gameState.PlayedCards.Add(new PlayedCard(seat, cardToPlay));
+                        }
+                    }
+                    return Task.CompletedTask;
                 });
 
-            mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);
-
             mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
+                .Returns(Task.CompletedTask);            // Create mock GameFlowReactionService
+            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
+            
+            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
+                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
                 .Returns(Task.CompletedTask);
 
             _gameService = new GameService(
@@ -109,6 +120,7 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockGameFlowReactionService.Object,
                 configuration);
             _controller = new TrucoGameController(_gameService);
         }        [Fact]
@@ -130,7 +142,7 @@ namespace TrucoMineiro.Tests
                 CardIndex = cardIndex
             };
             
-            var result = _controller.PlayCardEnhanced(request);
+            var result = _controller.PlayCard(request);
             
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
@@ -145,22 +157,15 @@ namespace TrucoMineiro.Tests
             Assert.Equal(cardToPlay.Suit, playedCard.Card.Suit);
             Assert.Equal(cardToPlay.Value, playedCard.Card.Value);
         }
-        
-        [Fact]
+          [Fact]
         public void PlayCard_WithAIPlayers_ShouldTriggerAIResponses()
         {
             // Arrange
             var game = _gameService.CreateGame("TestPlayer");
             var humanPlayer = game.Players.First(p => p.Seat == 0);
             var cardIndex = 0;
-            
-            // Before playing any card, all AI PlayedCards should be empty
-            foreach (var aiPlayer in game.Players.Where(p => p.Seat != 0))
-            {
-                var aiPlayedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == aiPlayer.Seat);
-                Assert.NotNull(aiPlayedCard);
-                Assert.Null(aiPlayedCard.Card);
-            }
+              // Before playing any card, PlayedCards should be empty
+            Assert.Empty(game.PlayedCards);
             
             // Act
             var request = new PlayCardRequestDto
@@ -170,7 +175,7 @@ namespace TrucoMineiro.Tests
                 CardIndex = cardIndex
             };
             
-            var result = _controller.PlayCardEnhanced(request);
+            var result = _controller.PlayCard(request);
             
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);

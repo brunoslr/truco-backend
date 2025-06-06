@@ -33,6 +33,7 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IScoreCalculationS
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IAIPlayerService, TrucoMineiro.API.Domain.Services.AIPlayerService>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameStateManager, TrucoMineiro.API.Domain.Services.GameStateManager>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameFlowService, TrucoMineiro.API.Domain.Services.GameFlowService>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameFlowReactionService, TrucoMineiro.API.Domain.Services.GameFlowReactionService>();
 
 // Register application services
 builder.Services.AddScoped<TrucoMineiro.API.Services.GameService>();

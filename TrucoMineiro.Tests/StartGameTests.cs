@@ -118,8 +118,12 @@ namespace TrucoMineiro.Tests
                     // Reset for new hand
                     gameState.PlayedCards.Clear();
                     gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
-                });
-
+                });            // Create mock GameFlowReactionService
+            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
+            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
+                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns(Task.CompletedTask);
+                
             return new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
@@ -127,6 +131,7 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockGameFlowReactionService.Object,
                 configuration);
         }        private GameState CreateValidGameState(string? playerName = null)
         {

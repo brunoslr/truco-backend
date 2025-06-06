@@ -74,17 +74,12 @@ namespace TrucoMineiro.Tests
                     {
                         return false;
                     }
-                    
-                    // Play the card (simulate the real behavior)
+                      // Play the card (simulate the real behavior)
                     var card = player.Hand[cardIndex];
                     player.Hand.RemoveAt(cardIndex);
                     
-                    // Update played cards
-                    var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == playerSeat);
-                    if (playedCard != null)
-                    {
-                        playedCard.Card = card;
-                    }
+                    // Add to played cards
+                    game.PlayedCards.Add(new PlayedCard(playerSeat, card));
                     
                     // Move to next player (simple rotation)
                     player.IsActive = false;
@@ -102,6 +97,11 @@ namespace TrucoMineiro.Tests
                 .Returns(Task.CompletedTask);
 
             mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
+                .Returns(Task.CompletedTask);            // Create mock GameFlowReactionService
+            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
+            
+            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
+                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
                 .Returns(Task.CompletedTask);
 
             _gameService = new GameService(
@@ -111,11 +111,10 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockGameFlowReactionService.Object,
                 configuration);
             _controller = new TrucoGameController(_gameService);
-        }
-
-        [Fact]
+        }        [Fact]
         public void PlayCard_ShouldRemoveCardFromPlayerHandAndAddToPlayedCards()
         {
             // Arrange
@@ -135,7 +134,7 @@ namespace TrucoMineiro.Tests
                 CardIndex = cardIndex
             };
             
-            var result = _controller.PlayCardEnhanced(request);
+            var result = _controller.PlayCard(request);
             
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
@@ -176,7 +175,7 @@ namespace TrucoMineiro.Tests
                 PlayerSeat = humanPlayer.Seat,
                 CardIndex = invalidCardIndex
             };
-              var result = _controller.PlayCardEnhanced(request);
+              var result = _controller.PlayCard(request);
             
             // Assert
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
@@ -189,11 +188,9 @@ namespace TrucoMineiro.Tests
             
             // Verify that the player's hand was not modified
             Assert.Equal(originalHandSize, updatedPlayer.Hand.Count);
-            
-            // Verify that the played cards array was not modified
+              // Verify that the played cards array was not modified (should remain empty)
             var playedCard = updatedGame.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == humanPlayer.Seat);
-            Assert.NotNull(playedCard);
-            Assert.Null(playedCard.Card); // Should still be null
+            Assert.Null(playedCard); // Should be null since no card was played
         }
 
         [Fact]
@@ -218,7 +215,7 @@ namespace TrucoMineiro.Tests
                 CardIndex = 0
             };
             
-            var result1 = _controller.PlayCardEnhanced(request1);
+            var result1 = _controller.PlayCard(request1);
             
             // Get updated state after first card
             var gameAfterFirst = _gameService.GetGame(game.GameId);
@@ -235,7 +232,7 @@ namespace TrucoMineiro.Tests
                 CardIndex = 0
             };
             
-            var result2 = _controller.PlayCardEnhanced(request2);
+            var result2 = _controller.PlayCard(request2);
             
             // Assert
             var okResult1 = Assert.IsType<OkObjectResult>(result1.Result);
@@ -256,9 +253,8 @@ namespace TrucoMineiro.Tests
             // Verify that neither of the played cards are still in the hand
             Assert.DoesNotContain(cardsToPlay[0], finalPlayer.Hand);
             Assert.DoesNotContain(cardsToPlay[1], finalPlayer.Hand);
-            
-            // Verify that the last played card is in the played cards array
-            var playedCard = finalGame.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == humanPlayer.Seat);
+              // Verify that the last played card is in the played cards array
+            var playedCard = finalGame.PlayedCards.LastOrDefault(pc => pc.PlayerSeat == humanPlayer.Seat);
             Assert.NotNull(playedCard);
             Assert.NotNull(playedCard.Card);
             Assert.Equal(cardsToPlay[1].Suit, playedCard.Card.Suit);
