@@ -262,12 +262,12 @@ namespace TrucoMineiro.API.Controllers
         ///         "isFold": false
         ///     }
         ///        /// This endpoint handles human players, AI players, and fold scenarios.
-        /// When AutoAiPlay is enabled, AI players will automatically play their turns after a human player's move.
-        /// Card visibility follows the same rules as the start game endpoint.
+        /// When AutoAiPlay is enabled, AI players will automatically play their turns after a human player's move.        /// Card visibility follows the same rules as the start game endpoint.
         /// </remarks>
         /// <param name="request">The play card request containing game ID, player seat, card index, and fold flag</param>
         /// <response code="200">Returns the updated game state with proper card visibility</response>
-        /// <response code="400">If the request is invalid</response>        [HttpPost("play-card")]
+        /// <response code="400">If the request is invalid</response>
+        [HttpPost("play-card")]
         [ProducesResponseType(typeof(PlayCardResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public ActionResult<PlayCardResponseDto> PlayCard([FromBody] PlayCardRequestDto request)
@@ -285,7 +285,8 @@ namespace TrucoMineiro.API.Controllers
                     PlayerHands = new List<PlayerHandDto>()
                 };
                 return BadRequest(errorResponse);
-            }            var response = _gameService.PlayCard(
+            }            
+            var response = _gameService.PlayCard(
                 request.GameId, 
                 request.PlayerSeat, 
                 request.CardIndex, 

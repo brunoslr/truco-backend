@@ -1,6 +1,6 @@
 using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Interfaces;
-using TrucoMineiro.API.Models;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Services
 {
@@ -8,7 +8,8 @@ namespace TrucoMineiro.API.Domain.Services
     /// Implementation of Truco rules and special game mechanics
     /// </summary>
     public class TrucoRulesEngine : ITrucoRulesEngine
-    {        public bool ProcessTrucoCall(GameState game, int playerSeat)
+    {        
+        public bool ProcessTrucoCall(GameState game, int playerSeat)
         {
             if (!CanCallTruco(game, playerSeat))
                 return false;

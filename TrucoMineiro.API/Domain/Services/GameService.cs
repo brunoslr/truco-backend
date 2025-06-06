@@ -1,16 +1,17 @@
 using TrucoMineiro.API.Constants;
-using TrucoMineiro.API.Models;
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
 using System.Threading;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Services
 {    /// <summary>
-    /// Service for managing Truco game logic (legacy wrapper around domain services)
-    /// </summary>
+     /// Service for managing Truco game logic (legacy wrapper around domain services)
+     /// </summary>
     public class GameService
-    {        private readonly IGameStateManager _gameStateManager;
+    {
+        private readonly IGameStateManager _gameStateManager;
         private readonly IGameRepository _gameRepository;
         private readonly IGameFlowService _gameFlowService;
         private readonly ITrucoRulesEngine _trucoRulesEngine;
@@ -51,29 +52,12 @@ namespace TrucoMineiro.API.Services
             _aiPlayerService = aiPlayerService;
             _scoreCalculationService = scoreCalculationService;
             _gameFlowReactionService = gameFlowReactionService;
-            
+
             // Read configuration from appsettings.json
             _devMode = configuration.GetValue<bool>("FeatureFlags:DevMode", false);
             _autoAiPlay = configuration.GetValue<bool>("FeatureFlags:AutoAiPlay", true);
             _aiPlayDelayMs = configuration.GetValue<int>("GameSettings:AIPlayDelayMs", GameConfiguration.DefaultAIPlayDelayMs);
             _newHandDelayMs = configuration.GetValue<int>("GameSettings:NewHandDelayMs", GameConfiguration.DefaultNewHandDelayMs);
-        }/// <summary>
-        /// Creates a new game with 4 players and deals cards
-        /// </summary>
-        /// <returns>The newly created game state</returns>
-        public GameState CreateGame()
-        {
-            var gameTask = _gameStateManager.CreateGameAsync();
-            var gameState = gameTask.GetAwaiter().GetResult();
-
-            // In dev mode, the game is properly initialized with one active player
-            // No need to override the proper active player logic
-            
-            // Save the updated game state
-            var saveTask = _gameRepository.SaveGameAsync(gameState);
-            saveTask.GetAwaiter().GetResult();
-
-            return gameState;
         }
 
         /// <summary>
@@ -81,18 +65,18 @@ namespace TrucoMineiro.API.Services
         /// </summary>
         /// <param name="playerName">Name for the player at seat 0</param>
         /// <returns>The newly created game state</returns>
-        public GameState CreateGame(string playerName)
+        public GameState CreateGame(string? playerName = null)
         {
             var gameTask = _gameStateManager.CreateGameAsync(playerName);
             var gameState = gameTask.GetAwaiter().GetResult();
-            
+
             // Update stakes to 2 as per legacy requirements
             gameState.CurrentStake = 2;
-            
+
             // Save the updated game state
             var saveTask = _gameRepository.SaveGameAsync(gameState);
             saveTask.GetAwaiter().GetResult();
-            
+
             return gameState;
         }
 
@@ -103,7 +87,9 @@ namespace TrucoMineiro.API.Services
         public bool IsDevMode()
         {
             return _devMode;
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Gets a game by ID
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
@@ -112,7 +98,9 @@ namespace TrucoMineiro.API.Services
         {
             var gameTask = _gameRepository.GetGameAsync(gameId);
             return gameTask.GetAwaiter().GetResult();
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Plays a card from a player's hand with simplified logic
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
@@ -141,7 +129,7 @@ namespace TrucoMineiro.API.Services
             else
             {
                 // Handle regular card play - simplified to only remove card and add to played cards
-                var playSuccess = HandleCardPlay(game, playerSeat, cardIndex);
+                var playSuccess = _gameFlowService.PlayCard(game, playerSeat, cardIndex);
                 if (!playSuccess)
                 {
                     return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Invalid card play");
@@ -198,48 +186,6 @@ namespace TrucoMineiro.API.Services
         }
 
         /// <summary>
-        /// Handles regular card play by removing card from hand and adding to played cards
-        /// </summary>
-        private bool HandleCardPlay(GameState game, int playerSeat, int cardIndex)
-        {
-            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
-            if (player == null || !player.IsActive)
-            {
-                return false;
-            }
-
-            if (cardIndex < 0 || cardIndex >= player.Hand.Count)
-            {
-                return false;
-            }
-
-            // Remove card from player's hand
-            var card = player.Hand[cardIndex];
-            player.Hand.RemoveAt(cardIndex);
-
-            // Add to played cards array
-            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);
-            if (playedCard != null)
-            {
-                playedCard.Card = card;
-            }
-            else
-            {
-                game.PlayedCards.Add(new PlayedCard(player.Seat, card));
-            }
-
-            // Add to the action log
-            game.ActionLog.Add(new ActionLogEntry("card-played")
-            {
-                PlayerSeat = player.Seat,
-                Card = $"{card.Value} of {card.Suit}"
-            });
-
-            // Move to the next player's turn
-            _gameFlowService.AdvanceToNextPlayer(game);
-
-            return true;
-        }/// <summary>
         /// Call Truco to raise the stakes
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
@@ -270,10 +216,11 @@ namespace TrucoMineiro.API.Services
                 // First Truco call
                 newStakes = TrucoConstants.Stakes.TrucoCall;
                 game.IsTrucoCalled = true;
-            }            else
+            }
+            else
             {
                 // Raise stakes: 4 -> 8 -> 12 (each raise adds 4)
-                newStakes = game.Stakes + TrucoConstants.Stakes.RaiseAmount;            if (newStakes > TrucoConstants.Stakes.Maximum)
+                newStakes = game.Stakes + TrucoConstants.Stakes.RaiseAmount; if (newStakes > TrucoConstants.Stakes.Maximum)
                 {
                     return false;
                 }
@@ -289,7 +236,9 @@ namespace TrucoMineiro.API.Services
             });
 
             return true;
-        }        /// <summary>
+        }        
+        
+        /// <summary>
         /// Raises the stakes after a Truco call
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
@@ -318,7 +267,8 @@ namespace TrucoMineiro.API.Services
             if (newStakes > TrucoConstants.Stakes.Maximum)
             {
                 return false;
-            }            game.Stakes = newStakes;
+            }
+            game.Stakes = newStakes;
 
             // Add to the action log
             game.ActionLog.Add(new ActionLogEntry("button-pressed")
@@ -328,7 +278,8 @@ namespace TrucoMineiro.API.Services
             });
 
             return true;
-        }        /// <summary>
+        }        
+        /// <summary>
         /// Folds the hand in response to a Truco or other challenge
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>
@@ -367,7 +318,7 @@ namespace TrucoMineiro.API.Services
 
             // Reset for the next hand
             _gameFlowService.StartNewHand(game);
-            
+
             return true;
         }
 
@@ -381,7 +332,8 @@ namespace TrucoMineiro.API.Services
             var game = GetGame(gameId);
             if (game == null)
             {
-                return false;            }
+                return false;
+            }
 
             // Reset the game for a new hand
             _gameFlowService.StartNewHand(game);
@@ -393,7 +345,9 @@ namespace TrucoMineiro.API.Services
             });
 
             return true;
-        }/// <summary>
+        }
+
+        /// <summary>
         /// Enhanced play card method that handles human players, AI players, and fold scenarios
         /// </summary>
         /// <param name="gameId">The unique identifier of the game</param>

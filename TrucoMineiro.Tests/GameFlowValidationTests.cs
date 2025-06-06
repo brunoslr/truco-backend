@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using TrucoMineiro.API.Services;
 using TrucoMineiro.API.DTOs;
-using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
 using Moq;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.Tests
 {
@@ -66,9 +66,7 @@ namespace TrucoMineiro.Tests
 
             // Configure mock TrucoRulesEngine
             mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
-                .Returns(1);
-
-            // Configure mock GameFlowService to simulate real card playing
+                .Returns(1);            // Configure mock GameFlowService to simulate real card playing
             mockGameFlowService.Setup(x => x.PlayCard(It.IsAny<GameState>(), It.IsAny<int>(), It.IsAny<int>()))
                 .Returns((GameState gameState, int playerSeat, int cardIndex) => {
                     var player = gameState.Players[playerSeat];
@@ -86,6 +84,12 @@ namespace TrucoMineiro.Tests
                     
                     // Move to next player
                     gameState.CurrentPlayerIndex = (playerSeat + 1) % 4;
+                    
+                    // Update player activity flags
+                    foreach (var p in gameState.Players)
+                    {
+                        p.IsActive = (p.Seat == gameState.CurrentPlayerIndex);
+                    }
                     
                     return true;
                 });
@@ -120,9 +124,7 @@ namespace TrucoMineiro.Tests
             gameState.FirstPlayerSeat = 0; // Ensure human player starts
             gameState.CurrentPlayerIndex = 0; // Ensure human player is active
             return gameState;
-        }
-
-        [Fact]
+        }        [Fact]
         public void GameFlow_ShouldReflectPlayedCardsInGameState()
         {
             // Step 1: Create a new game
@@ -135,6 +137,18 @@ namespace TrucoMineiro.Tests
             Assert.All(game.Players, player => Assert.Equal(3, player.Hand.Count)); // Each player should have 3 cards
             Assert.Empty(game.PlayedCards); // No cards should be played yet
 
+            // Ensure player 0 is active (needed for HandleCardPlay check in PlayCard)
+            game.CurrentPlayerIndex = 0;
+            var activePlayer = game.Players.FirstOrDefault(p => p.Seat == 0);
+            if (activePlayer != null)
+            {
+                activePlayer.IsActive = true;
+                foreach (var player in game.Players.Where(p => p.Seat != 0))
+                {
+                    player.IsActive = false;
+                }
+            }
+
             // Step 2: Have first player (seat 0) play the first card - save the value for later check
             var firstPlayer = game.Players[0];
             var firstCardToPlay = firstPlayer.Hand[0]; // Save the card that will be played
@@ -142,8 +156,7 @@ namespace TrucoMineiro.Tests
             var firstCardSuit = firstCardToPlay.Suit;
             
             Console.WriteLine($"First player will play: {firstCardValue} of {firstCardSuit}");
-            
-            var firstPlayResponse = gameService.PlayCardEnhanced(game.GameId, 0, 0, false, 0);
+            var firstPlayResponse = gameService.PlayCard(game.GameId, 0, 0, false, 0);
             
             // Verify first play was successful
             Assert.True(firstPlayResponse.Success, $"First play failed: {firstPlayResponse.Message}");
@@ -159,8 +172,7 @@ namespace TrucoMineiro.Tests
             var secondCardSuit = secondCardToPlay.Suit;
             
             Console.WriteLine($"Second player will play: {secondCardValue} of {secondCardSuit}");
-            
-            var secondPlayResponse = gameService.PlayCardEnhanced(game.GameId, 1, 0, false, 0);
+              var secondPlayResponse = gameService.PlayCard(game.GameId, 1, 0, false, 0);
             
             // Verify second play was successful
             Assert.True(secondPlayResponse.Success, $"Second play failed: {secondPlayResponse.Message}");
@@ -190,17 +202,18 @@ namespace TrucoMineiro.Tests
             
             // Verify played cards are visible in PlayedCards array
             Assert.Equal(2, finalGameState.PlayedCards.Count); // Should have 2 played cards
-            
-            // Verify first played card matches what was played
+              // Verify first played card matches what was played
             var firstPlayedCard = finalGameState.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == 0);
             Assert.NotNull(firstPlayedCard);
-            Assert.Equal(firstCardValue, firstPlayedCard.Card.Value);
+            Assert.NotNull(firstPlayedCard.Card);
+            Assert.Equal(firstCardValue, firstPlayedCard.Card!.Value);
             Assert.Equal(firstCardSuit, firstPlayedCard.Card.Suit);
             
             // Verify second played card matches what was played
             var secondPlayedCard = finalGameState.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == 1);
             Assert.NotNull(secondPlayedCard);
-            Assert.Equal(secondCardValue, secondPlayedCard.Card.Value);
+            Assert.NotNull(secondPlayedCard.Card);
+            Assert.Equal(secondCardValue, secondPlayedCard.Card!.Value);
             Assert.Equal(secondCardSuit, secondPlayedCard.Card.Suit);
         }
     }

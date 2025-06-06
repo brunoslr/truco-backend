@@ -1,6 +1,4 @@
-using System.Collections.Generic;
-
-namespace TrucoMineiro.API.Models
+namespace TrucoMineiro.API.Domain.Models
 {
     /// <summary>
     /// Represents a deck of cards for the Truco game

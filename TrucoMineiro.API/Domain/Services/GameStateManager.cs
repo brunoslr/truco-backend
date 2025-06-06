@@ -1,6 +1,6 @@
 using TrucoMineiro.API.Domain.Interfaces;
-using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Constants;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Services
 {
@@ -181,7 +181,9 @@ namespace TrucoMineiro.API.Domain.Services
             game.PendingTrucoCall = false;
             game.TrucoCallerSeat = null;
             game.LastTrucoResponse = null;
-            game.LastActivity = DateTime.UtcNow;            // Rotate dealer to next seat (clockwise) - the dealer moves to the left at the end of each hand
+            game.LastActivity = DateTime.UtcNow;            
+            
+            // Rotate dealer to next seat (clockwise) - the dealer moves to the left at the end of each hand
             // In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese)
             game.DealerSeat = GameConfiguration.GetNextDealerSeat(game.DealerSeat);
             game.FirstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(game.DealerSeat);
@@ -200,24 +202,6 @@ namespace TrucoMineiro.API.Domain.Services
 
             await _gameRepository.SaveGameAsync(game);
             return true;
-        }
-
-        public async Task<bool> AdvanceToNextRoundAsync(string gameId)
-        {
-            var game = await _gameRepository.GetGameAsync(gameId);
-            if (game == null || game.IsCompleted) return false;
-
-            if (game.CurrentRound < 3)
-            {
-                game.CurrentRound++;
-                game.PlayedCards.Clear(); // Clear played cards for the new round
-                game.LastActivity = DateTime.UtcNow;
-
-                await _gameRepository.SaveGameAsync(game);
-                return true;
-            }
-
-            return false;
         }
 
         public async Task<bool> RecordRoundWinnerAsync(string gameId, int winningTeam)

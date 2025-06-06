@@ -5,10 +5,10 @@ using TrucoMineiro.API.Controllers;
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
-using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Services;
 using Moq;
 using Xunit;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.Tests
 {
@@ -111,6 +111,14 @@ namespace TrucoMineiro.Tests
             
             mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
                 It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Callback((GameState gameState, bool autoAiPlay, int aiPlayDelayMs, int newHandDelayMs) => {
+                    // If autoAiPlay is true, process AI turns
+                    if (autoAiPlay)
+                    {
+                        // Use the already mocked ProcessAITurnsAsync to process AI turns
+                        mockGameFlowService.Object.ProcessAITurnsAsync(gameState, aiPlayDelayMs).GetAwaiter().GetResult();
+                    }
+                })
                 .Returns(Task.CompletedTask);
 
             _gameService = new GameService(

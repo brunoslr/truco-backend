@@ -5,10 +5,10 @@ using TrucoMineiro.API.Controllers;
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
-using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Services;
 using Moq;
 using Xunit;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.Tests
 {

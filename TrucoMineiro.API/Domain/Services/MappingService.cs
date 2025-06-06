@@ -1,6 +1,6 @@
 using TrucoMineiro.API.DTOs;
-using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Constants;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Services
 {

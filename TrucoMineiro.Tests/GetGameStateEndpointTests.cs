@@ -3,12 +3,12 @@ using TrucoMineiro.API.Services;
 using TrucoMineiro.API.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using TrucoMineiro.API.DTOs;
-using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
 using Moq;
 using System.Collections.Generic;
 using Xunit;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.Tests
 {

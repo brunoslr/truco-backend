@@ -1,6 +1,6 @@
 using TrucoMineiro.API.Constants;
 
-namespace TrucoMineiro.API.Models
+namespace TrucoMineiro.API.Domain.Models
 {
     /// <summary>
     /// Represents an action in the game log
@@ -141,7 +141,9 @@ namespace TrucoMineiro.API.Models
         /// <summary>
         /// Cards played in the current round
         /// </summary>
-        public List<PlayedCard> PlayedCards { get; set; } = new List<PlayedCard>();        /// <summary>
+        public List<PlayedCard> PlayedCards { get; set; } = new List<PlayedCard>();       
+        
+        /// <summary>
         /// Current points at stake in the round
         /// </summary>
         public int Stakes { get; set; } = TrucoConstants.Stakes.Initial;
@@ -241,15 +243,14 @@ namespace TrucoMineiro.API.Models
                 {
                     new Player("You", TrucoConstants.Teams.PlayerTeam, 0),
                     new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1),
-                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),
-                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
+                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
                 };
             }            // Set the dealer and first player
             Players[DealerSeat].IsDealer = true;
             Players[FirstPlayerSeat].IsActive = true;
 
-            // Initialize the played cards for each seat
-            PlayedCards = Players.Select(p => new PlayedCard(p.Seat)).ToList();
+            // Initialize the played cards as empty collection
+            PlayedCards = new List<PlayedCard>();
 
             // Reset the game state
             ResetRound();
@@ -275,16 +276,15 @@ namespace TrucoMineiro.API.Models
             {
                 // Update the name of the player at seat 0
                 var player = Players.FirstOrDefault(p => p.Seat == 0);
-                if (player != null)
-                {
+                if (player != null)                {
                     player.Name = playerName;
                 }
             }            // Set the dealer and first player
             Players[DealerSeat].IsDealer = true;
             Players[FirstPlayerSeat].IsActive = true;
 
-            // Initialize the played cards for each seat
-            PlayedCards = Players.Select(p => new PlayedCard(p.Seat)).ToList();
+            // Initialize the played cards as empty collection
+            PlayedCards = new List<PlayedCard>();
 
             // Reset the game state
             ResetRound();

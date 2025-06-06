@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using TrucoMineiro.API.Constants;
-using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Services;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
 using Moq;
 using Xunit;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.Tests
 {    public class StartGameTests

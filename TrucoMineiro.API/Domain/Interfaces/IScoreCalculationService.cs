@@ -1,4 +1,4 @@
-using TrucoMineiro.API.Models;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Interfaces
 {

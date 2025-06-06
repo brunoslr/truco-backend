@@ -1,4 +1,4 @@
-namespace TrucoMineiro.API.Models
+namespace TrucoMineiro.API.Domain.Models
 {
     /// <summary>
     /// Represents a playing card in the Truco game

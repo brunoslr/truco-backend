@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using TrucoMineiro.API.Domain.Interfaces;
-using TrucoMineiro.API.Models;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Repositories
 {
