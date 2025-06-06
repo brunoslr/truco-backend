@@ -41,7 +41,9 @@ namespace TrucoMineiro.API.Controllers
                 service = "TrucoMineiro.API",
                 version = "1.0.0"
             });
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Gets the current state of a specific game with player-specific card visibility
         /// </summary>
         /// <remarks>
@@ -94,7 +96,9 @@ namespace TrucoMineiro.API.Controllers
             // Map the game state with player-specific visibility
             var gameStateDto = MappingService.MapGameStateToDto(game, requestingPlayerSeat, showAllHands);
             return Ok(gameStateDto);
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Unified endpoint for button press actions (Truco, Raise, Fold)
         /// </summary>
         /// <remarks>
@@ -242,7 +246,9 @@ namespace TrucoMineiro.API.Controllers
             var game = _gameService.CreateGame(request.PlayerName);
             var response = MappingService.MapGameStateToStartGameResponse(game, 0, _gameService.IsDevMode());
             return Ok(response);
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Play a card from a player's hand (new endpoint with enhanced features)
         /// </summary>
         /// <remarks>

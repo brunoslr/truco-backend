@@ -17,12 +17,20 @@ namespace TrucoMineiro.API.Constants
         /// - Seat 2: AI 2
         /// - Seat 3: AI 3 (Initial dealer/Pé)
         /// </summary>
-        public const int InitialDealerSeat = 3;
-
-        /// <summary>
+        public const int InitialDealerSeat = 3;        /// <summary>
         /// Number of players in the game
         /// </summary>
         public const int MaxPlayers = 4;
+        
+        /// <summary>
+        /// Default delay in milliseconds between AI player actions if not set in configuration
+        /// </summary>
+        public const int DefaultAIPlayDelayMs = 2000;
+        
+        /// <summary>
+        /// Default delay in milliseconds before starting a new hand if not set in configuration
+        /// </summary>
+        public const int DefaultNewHandDelayMs = 5000;
 
         /// <summary>
         /// Gets the first player seat based on the dealer seat.

@@ -153,20 +153,19 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
             
             // Act
-            var result = gameService.PlayCard(game.GameId, activePlayer.Id, 0);
+            var result = gameService.PlayCard(game.GameId, activePlayer.Seat, 0);
 
             // Assert
             Assert.True(result);
             
             // The player should have one less card
             Assert.Equal(2, activePlayer.Hand.Count);
-            
-            // A card should have been played
-            var playedCard = game.PlayedCards.First(pc => pc.PlayerId == activePlayer.Id);
+              // A card should have been played
+            var playedCard = game.PlayedCards.First(pc => pc.PlayerSeat == activePlayer.Seat);
             Assert.NotNull(playedCard.Card);
             
             // An action should have been logged
-            Assert.Contains(game.ActionLog, a => a.Type == "card-played" && a.PlayerId == activePlayer.Id);
+            Assert.Contains(game.ActionLog, a => a.Type == "card-played" && a.PlayerSeat == activePlayer.Seat);
         }
     }
 }

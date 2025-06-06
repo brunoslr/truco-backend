@@ -90,10 +90,8 @@ namespace TrucoMineiro.Tests
             // Arrange
             var gameService = CreateGameService();
             var game = gameService.CreateGame("TestPlayer");
-            var activePlayer = game.Players.First(p => p.IsActive);
-
-            // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Id, 0, false, activePlayer.Seat);
+            var activePlayer = game.Players.First(p => p.IsActive);            // Act
+            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, activePlayer.Seat);
 
             // Assert
             Assert.True(response.Success);
@@ -109,7 +107,7 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Id, 0, false, 0);
+            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);
 
             // Assert
             Assert.True(response.Success);
@@ -142,7 +140,7 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Id, 0, false, 0);
+            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);
 
             // Assert
             Assert.True(response.Success);// All player hands should be visible in DevMode
@@ -164,7 +162,7 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Id, 0, true, activePlayer.Seat);
+            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, true, activePlayer.Seat);
 
             // Assert
             Assert.True(response.Success);
@@ -174,10 +172,8 @@ namespace TrucoMineiro.Tests
         public void PlayCardEnhanced_ShouldReturnError_WhenGameNotFound()
         {
             // Arrange
-            var gameService = CreateGameService();
-
-            // Act
-            var response = gameService.PlayCardEnhanced("invalid-game-id", "player1", 0, false, 0);
+            var gameService = CreateGameService();            // Act
+            var response = gameService.PlayCardEnhanced("invalid-game-id", 0, 0, false, 0);
 
             // Assert
             Assert.False(response.Success);
@@ -191,7 +187,7 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Id, 99, false, activePlayer.Seat);
+            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 99, false, activePlayer.Seat);
 
             // Assert
             Assert.False(response.Success);
@@ -211,7 +207,7 @@ namespace TrucoMineiro.Tests
             var activePlayer = game.Players.First(p => p.IsActive);
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Id, 0, false, 0);
+            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);
 
             // Assert
             Assert.True(response.Success);
@@ -259,7 +255,7 @@ namespace TrucoMineiro.Tests
             }
 
             // Act
-            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Id, 0, false, 0);            Console.WriteLine($"\nAfter play card:");
+            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);            Console.WriteLine($"\nAfter play card:");
             Console.WriteLine($"Success: {response.Success}");
             Console.WriteLine($"Message: {response.Message}");
             Console.WriteLine($"Active player hand count in response: {response.Hand.Count}");

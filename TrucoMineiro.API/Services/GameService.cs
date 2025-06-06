@@ -3,6 +3,7 @@ using TrucoMineiro.API.Models;
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
+using System.Threading;
 
 namespace TrucoMineiro.API.Services
 {
@@ -12,12 +13,13 @@ namespace TrucoMineiro.API.Services
     public class GameService
     {
         private readonly IGameStateManager _gameStateManager;
-        private readonly IGameRepository _gameRepository;
-        private readonly IHandResolutionService _handResolutionService;
+        private readonly IGameRepository _gameRepository;        private readonly IHandResolutionService _handResolutionService;
         private readonly ITrucoRulesEngine _trucoRulesEngine;
         private readonly IAIPlayerService _aiPlayerService;
         private readonly IScoreCalculationService _scoreCalculationService;
         private readonly bool _devMode;
+        private readonly int _aiPlayDelayMs;
+        private readonly int _newHandDelayMs;
 
         /// <summary>
         /// Constructor for GameService
@@ -41,12 +43,12 @@ namespace TrucoMineiro.API.Services
             _gameStateManager = gameStateManager;
             _gameRepository = gameRepository;
             _handResolutionService = handResolutionService;
-            _trucoRulesEngine = trucoRulesEngine;
-            _aiPlayerService = aiPlayerService;
+            _trucoRulesEngine = trucoRulesEngine;            _aiPlayerService = aiPlayerService;
             _scoreCalculationService = scoreCalculationService;
-            
-            // Read DevMode configuration from appsettings.json
+              // Read configuration from appsettings.json
             _devMode = configuration.GetValue<bool>("FeatureFlags:DevMode", false);
+            _aiPlayDelayMs = configuration.GetValue<int>("GameSettings:AIPlayDelayMs", GameConfiguration.DefaultAIPlayDelayMs);
+            _newHandDelayMs = configuration.GetValue<int>("GameSettings:NewHandDelayMs", GameConfiguration.DefaultNewHandDelayMs);
         }        /// <summary>
         /// Creates a new game with 4 players and deals cards
         /// </summary>
@@ -493,11 +495,16 @@ namespace TrucoMineiro.API.Services
                 return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Invalid card play");
             }
 
-            // In DevMode, automatically handle AI player turns
-            if (_devMode)
+            // Check if we need to delay before starting a new hand
+            bool isHandComplete = game.PlayedCards.All(pc => pc.Card != null);
+            if (isHandComplete)
             {
-                HandleAIPlayerTurns(game);
+                // Add delay before starting a new hand (will be applied on client side)
+                Thread.Sleep(_newHandDelayMs);
             }
+
+            // Automatically handle AI player turns
+            HandleAIPlayerTurns(game);
 
             return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, true, "Card played successfully");
         }
@@ -521,7 +528,10 @@ namespace TrucoMineiro.API.Services
                 if (activePlayer.Seat == 0 || game.PlayedCards.All(pc => pc.Card != null))
                 {
                     break;
-                }                // AI player plays first available card
+                }                // Add a delay before AI plays
+                Thread.Sleep(_aiPlayDelayMs);
+                
+                // AI player plays first available card
                 if (activePlayer.Hand.Count > 0)
                 {
                     PlayCard(game.GameId, activePlayer.Seat, 0);

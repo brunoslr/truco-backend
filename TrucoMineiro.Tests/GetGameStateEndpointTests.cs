@@ -89,10 +89,8 @@ namespace TrucoMineiro.Tests
             var gameState = new GameState();
             gameState.InitializeGame(playerName ?? "TestPlayer");
             return gameState;
-        }
-
-        [Fact]
-        public void GetGameState_WithoutPlayerId_ShouldShowOnlyHumanPlayerCards()
+        }        [Fact]
+        public void GetGameState_WithoutPlayerSeat_ShouldShowOnlyHumanPlayerCards()
         {
             // Arrange
             var game = _gameService.CreateGame("TestPlayer");
@@ -123,17 +121,14 @@ namespace TrucoMineiro.Tests
                     Assert.Null(card.Suit);
                 });
             }
-        }
-
-        [Fact]
-        public void GetGameState_WithPlayerId_ShouldShowOnlyRequestingPlayerCards()
+        }        [Fact]
+        public void GetGameState_WithPlayerSeat_ShouldShowOnlyRequestingPlayerCards()
         {
             // Arrange
             var game = _gameService.CreateGame("TestPlayer");
             var aiPlayer = game.Players.First(p => p.Seat == 1);
-            
-            // Act - Request as AI player at seat 1
-            var result = _controller.GetGameState(game.GameId, aiPlayer.Id);
+              // Act - Request as AI player at seat 1
+            var result = _controller.GetGameState(game.GameId, aiPlayer.Seat);
             
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
@@ -157,21 +152,18 @@ namespace TrucoMineiro.Tests
                     Assert.Null(card.Suit);
                 });
             }
-        }
-
-        [Fact]
-        public void GetGameState_WithInvalidPlayerId_ShouldReturnBadRequest()
+        }        [Fact]
+        public void GetGameState_WithInvalidPlayerSeat_ShouldReturnBadRequest()
         {
             // Arrange
             var game = _gameService.CreateGame("TestPlayer");
-            var invalidPlayerId = "non-existent-player";
+            var invalidPlayerSeat = 999; // Using a seat number that doesn't exist
             
             // Act
-            var result = _controller.GetGameState(game.GameId, invalidPlayerId);
-            
-            // Assert
+            var result = _controller.GetGameState(game.GameId, invalidPlayerSeat);
+              // Assert
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.Contains("not found in game", badRequestResult.Value?.ToString());
+            Assert.Contains("Player seat must be between 0 and 3", badRequestResult.Value?.ToString());
         }
 
         [Fact]
@@ -304,10 +296,9 @@ namespace TrucoMineiro.Tests
             var game = _gameService.CreateGame("TestPlayer");
             var humanPlayer = game.Players.First(p => p.Seat == 0);
             var aiPlayer = game.Players.First(p => p.Seat == 1);
-            
-            // Act - Make multiple requests as different players
-            var humanRequest = _controller.GetGameState(game.GameId, humanPlayer.Id);
-            var aiRequest = _controller.GetGameState(game.GameId, aiPlayer.Id);
+              // Act - Make multiple requests as different players
+            var humanRequest = _controller.GetGameState(game.GameId, humanPlayer.Seat);
+            var aiRequest = _controller.GetGameState(game.GameId, aiPlayer.Seat);
             var defaultRequest = _controller.GetGameState(game.GameId);
             
             // Assert
@@ -339,9 +330,7 @@ namespace TrucoMineiro.Tests
             // Arrange
             var game = _gameService.CreateGame("IntegrationTestPlayer");
             var humanPlayer = game.Players.First(p => p.Seat == 0);
-            var aiPlayer = game.Players.First(p => p.Seat == 1);
-
-            // Act & Assert - Test without playerId (should default to human player)
+            var aiPlayer = game.Players.First(p => p.Seat == 1);            // Act & Assert - Test without playerSeat (should default to human player at seat 0)
             var defaultResult = _controller.GetGameState(game.GameId);
             var defaultOk = Assert.IsType<OkObjectResult>(defaultResult.Result);
             var defaultGameState = Assert.IsType<GameStateDto>(defaultOk.Value);
@@ -351,10 +340,8 @@ namespace TrucoMineiro.Tests
             var aiInDefault = defaultGameState.Players.First(p => p.Seat == 1);
             
             Assert.True(humanInDefault.Hand.All(c => c.Value != null && c.Suit != null), "Human cards should be visible in default request");
-            Assert.True(aiInDefault.Hand.All(c => c.Value == null && c.Suit == null), "AI cards should be hidden in default request");
-
-            // Act & Assert - Test with specific AI player ID
-            var aiResult = _controller.GetGameState(game.GameId, aiPlayer.Id);
+            Assert.True(aiInDefault.Hand.All(c => c.Value == null && c.Suit == null), "AI cards should be hidden in default request");            // Act & Assert - Test with specific AI player seat
+            var aiResult = _controller.GetGameState(game.GameId, aiPlayer.Seat);
             var aiOk = Assert.IsType<OkObjectResult>(aiResult.Result);
             var aiGameState = Assert.IsType<GameStateDto>(aiOk.Value);
             
