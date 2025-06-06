@@ -217,7 +217,29 @@ namespace TrucoMineiro.API.Domain.Models
         public bool IsCompleted { get; set; } = false;        /// <summary>
         /// The winning team if the game is completed (1 or 2)
         /// </summary>
-        public int? WinningTeam { get; set; }        /// <summary>
+        public int? WinningTeam { get; set; }
+
+        /// <summary>
+        /// Current game status (waiting, active, completed)
+        /// </summary>
+        public string GameStatus { get; set; } = "waiting";
+
+        /// <summary>
+        /// Current Truco level (1 = Truco, 3 = Seis, 6 = Nove, 9 = Doze, 12 = maximum)
+        /// </summary>
+        public int TrucoLevel { get; set; } = 1;
+
+        /// <summary>
+        /// ID of the player who called Truco
+        /// </summary>
+        public string? TrucoCalledBy { get; set; }
+
+        /// <summary>
+        /// Whether we're waiting for a Truco response
+        /// </summary>
+        public bool WaitingForTrucoResponse { get; set; } = false;
+
+        /// <summary>
         /// The maximum number of players (typically 4 for Truco)
         /// </summary>
         public const int MaxPlayers = TrucoConstants.Game.MaxPlayers;
@@ -376,6 +398,40 @@ namespace TrucoMineiro.API.Domain.Models
                     ActionLog.Add(new ActionLogEntry("game-result") { WinnerTeam = team });
                 }
             }
+        }
+
+        /// <summary>
+        /// Start the game by setting status to active
+        /// </summary>
+        public void StartGame()
+        {
+            GameStatus = "active";
+            LastActivity = DateTime.UtcNow;
+            
+            // Set first player as active
+            foreach (var player in Players)
+            {
+                player.IsActive = player.Seat == FirstPlayerSeat;
+            }
+            
+            ActionLog.Add(new ActionLogEntry("game-started"));
+        }
+
+        /// <summary>
+        /// Get the current active player
+        /// </summary>
+        public Player? GetCurrentPlayer()
+        {
+            return Players.FirstOrDefault(p => p.Seat == CurrentPlayerIndex);
+        }
+
+        /// <summary>
+        /// Get the next player in turn order
+        /// </summary>
+        public Player? GetNextPlayer()
+        {
+            var nextIndex = (CurrentPlayerIndex + 1) % MaxPlayers;
+            return Players.FirstOrDefault(p => p.Seat == nextIndex);
         }
     }
 }
