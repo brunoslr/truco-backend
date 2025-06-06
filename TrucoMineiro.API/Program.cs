@@ -39,6 +39,9 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameFlowReactionS
 builder.Services.AddScoped<TrucoMineiro.API.Services.GameService>();
 builder.Services.AddSingleton<TrucoMineiro.API.Services.MappingService>();
 
+// Register event system
+builder.Services.AddSingleton<TrucoMineiro.API.Domain.Events.IEventPublisher, TrucoMineiro.API.Domain.Services.InMemoryEventPublisher>();
+
 // Register background services
 builder.Services.AddHostedService<TrucoMineiro.API.Services.GameCleanupService>();
 
