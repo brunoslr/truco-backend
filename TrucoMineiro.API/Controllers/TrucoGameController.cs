@@ -261,9 +261,8 @@ namespace TrucoMineiro.API.Controllers
         ///         "cardIndex": 0,
         ///         "isFold": false
         ///     }
-        ///     
-        /// This endpoint handles human players, AI players, and fold scenarios.
-        /// In DevMode, AI players will automatically play their turns after a human player's move.
+        ///        /// This endpoint handles human players, AI players, and fold scenarios.
+        /// When AutoAiPlay is enabled, AI players will automatically play their turns after a human player's move.
         /// Card visibility follows the same rules as the start game endpoint.
         /// </remarks>
         /// <param name="request">The play card request containing game ID, player seat, card index, and fold flag</param>

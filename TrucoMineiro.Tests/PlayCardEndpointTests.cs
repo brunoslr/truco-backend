@@ -17,12 +17,13 @@ namespace TrucoMineiro.Tests
         {
             var inMemorySettings = new Dictionary<string, string?> {
                 {"FeatureFlags:DevMode", "false"},
+                {"FeatureFlags:AutoAiPlay", "true"}, // Enable AI auto-play by default
             };
 
             _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(inMemorySettings)
                 .Build();
-        }        private GameService CreateGameService(IConfiguration? config = null)
+        }private GameService CreateGameService(IConfiguration? config = null)
         {
             var configuration = config ?? _configuration;
               // Create a dictionary to store created games (simulating repository storage)
@@ -31,7 +32,7 @@ namespace TrucoMineiro.Tests
             // Create mock services
             var mockGameStateManager = new Mock<IGameStateManager>();
             var mockGameRepository = new Mock<IGameRepository>();
-            var mockHandResolutionService = new Mock<IHandResolutionService>();
+            var mockGameFlowService = new Mock<IGameFlowService>();
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
             var mockScoreCalculationService = new Mock<IScoreCalculationService>();
@@ -63,26 +64,78 @@ namespace TrucoMineiro.Tests
 
             // Configure mock ScoreCalculationService
             mockScoreCalculationService.Setup(x => x.IsGameComplete(It.IsAny<GameState>()))
-                .Returns(false);
-
-            // Configure mock TrucoRulesEngine
+                .Returns(false);            // Configure mock TrucoRulesEngine
             mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
                 .Returns(1);
+
+            // Configure mock GameFlowService
+            mockGameFlowService.Setup(x => x.PlayCard(It.IsAny<GameState>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns((GameState gameState, int playerSeat, int cardIndex) => {
+                    var player = gameState.Players[playerSeat];
+                    if (cardIndex < 0 || cardIndex >= player.Hand.Count)
+                        return false;
+                    
+                    // Play the card
+                    var card = player.Hand[cardIndex];
+                    player.Hand.RemoveAt(cardIndex);
+                    
+                    // Add to played cards
+                    gameState.PlayedCards.Add(new PlayedCard(playerSeat, card));
+                    gameState.CurrentPlayerIndex = (playerSeat + 1) % 4;
+                    return true;
+                });
+
+            mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
+                .Returns((GameState gameState, int aiPlayDelayMs) => {
+                    // Simple AI logic for testing - make AI players play their first card
+                    while (gameState.CurrentPlayerIndex != 0 && gameState.Players[gameState.CurrentPlayerIndex].Hand.Count > 0)
+                    {
+                        var aiPlayer = gameState.Players[gameState.CurrentPlayerIndex];
+                        if (aiPlayer.Hand.Count > 0)
+                        {
+                            var card = aiPlayer.Hand[0];
+                            aiPlayer.Hand.RemoveAt(0);
+                            gameState.PlayedCards.Add(new PlayedCard(gameState.CurrentPlayerIndex, card));
+                            gameState.CurrentPlayerIndex = (gameState.CurrentPlayerIndex + 1) % 4;
+                        }
+                    }
+                    return Task.CompletedTask;
+                });
+
+            mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
+                .Returns((GameState gameState, int newHandDelayMs) => {
+                    // Check if all players have played
+                    bool allPlayersPlayed = gameState.PlayedCards.Count >= 4;
+                    if (allPlayersPlayed)
+                    {
+                        // Clear played cards for next round
+                        gameState.PlayedCards.Clear();
+                        gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
+                    }
+                    return Task.CompletedTask;
+                });
+
+            mockGameFlowService.Setup(x => x.StartNewHand(It.IsAny<GameState>()))
+                .Callback((GameState gameState) => {
+                    // Reset for new hand
+                    gameState.PlayedCards.Clear();
+                    gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
+                });
 
             return new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
-                mockHandResolutionService.Object,
+                mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
                 configuration);
-        }
-
-        private GameState CreateValidGameState(string? playerName = null)
+        }        private GameState CreateValidGameState(string? playerName = null)
         {
             var gameState = new GameState();
             gameState.InitializeGame(playerName ?? "TestPlayer");
+            gameState.FirstPlayerSeat = 0; // Ensure human player starts
+            gameState.CurrentPlayerIndex = 0; // Ensure human player is active
             return gameState;
         }[Fact]
         public void PlayCardEnhanced_ShouldReturnSuccess_WhenValidMove()
@@ -131,6 +184,7 @@ namespace TrucoMineiro.Tests
             var devModeSettings = new Dictionary<string, string?> {
                 {"FeatureFlags:DevMode", "true"},
             };
+
             var devConfig = new ConfigurationBuilder()
                 .AddInMemoryCollection(devModeSettings)
                 .Build();
@@ -192,17 +246,20 @@ namespace TrucoMineiro.Tests
             // Assert
             Assert.False(response.Success);
             Assert.Equal("Invalid card play", response.Message);
-        }
-
-        [Fact]
-        public void PlayCardEnhanced_ShouldHandleAITurns_InDevMode()
+        }        [Fact]
+        public void PlayCardEnhanced_ShouldHandleAITurns_WhenAutoAiPlayEnabled()
         {
             // Arrange
-            var devModeSettings = new Dictionary<string, string?> {
-                {"FeatureFlags:DevMode", "true"},
-            };            var devConfig = new ConfigurationBuilder()
-                .AddInMemoryCollection(devModeSettings)
-                .Build();            var gameService = CreateGameService(devConfig);
+            var autoAiPlaySettings = new Dictionary<string, string?> {
+                {"FeatureFlags:DevMode", "false"},
+                {"FeatureFlags:AutoAiPlay", "true"},
+            };
+
+            var autoAiPlayConfig = new ConfigurationBuilder()
+                .AddInMemoryCollection(autoAiPlaySettings)
+                .Build();
+
+            var gameService = CreateGameService(autoAiPlayConfig);
             var game = gameService.CreateGame("TestPlayer");
             var activePlayer = game.Players.First(p => p.IsActive);
 
@@ -216,6 +273,32 @@ namespace TrucoMineiro.Tests
             var playedCards = response.GameState.PlayedCards.Where(pc => pc.Card != null).Count();
             Assert.True(playedCards > 1); // Should be more than just the active player's card
         }        [Fact]
+        public void PlayCardEnhanced_ShouldNotHandleAITurns_WhenAutoAiPlayDisabled()
+        {
+            // Arrange
+            var autoAiPlayDisabledSettings = new Dictionary<string, string?> {
+                {"FeatureFlags:DevMode", "false"},
+                {"FeatureFlags:AutoAiPlay", "false"},
+            };
+
+            var autoAiPlayDisabledConfig = new ConfigurationBuilder()
+                .AddInMemoryCollection(autoAiPlayDisabledSettings)
+                .Build();
+
+            var gameService = CreateGameService(autoAiPlayDisabledConfig);
+            var game = gameService.CreateGame("TestPlayer");
+            var activePlayer = game.Players.First(p => p.IsActive);
+
+            // Act
+            var response = gameService.PlayCardEnhanced(game.GameId, activePlayer.Seat, 0, false, 0);
+
+            // Assert
+            Assert.True(response.Success);
+            
+            // Check that only the human player has played a card (AI should not have played automatically)
+            var playedCards = response.GameState.PlayedCards.Where(pc => pc.Card != null).Count();
+            Assert.Equal(1, playedCards); // Should be only the human player's card
+        }[Fact]
         public void MapGameStateToPlayCardResponse_ShouldMapCorrectly()
         {
             // Arrange

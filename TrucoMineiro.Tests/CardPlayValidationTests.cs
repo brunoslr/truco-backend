@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TrucoMineiro.API.Controllers;
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Domain.Interfaces;
+using TrucoMineiro.API.Domain.Services;
 using TrucoMineiro.API.Models;
 using TrucoMineiro.API.Services;
 using Moq;
@@ -38,16 +39,21 @@ namespace TrucoMineiro.Tests
             // Create mock services
             var mockGameStateManager = new Mock<IGameStateManager>();
             var mockGameRepository = new Mock<IGameRepository>();
-            var mockHandResolutionService = new Mock<IHandResolutionService>();
+            var mockGameFlowService = new Mock<IGameFlowService>();
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
-            var mockScoreCalculationService = new Mock<IScoreCalculationService>();
-
-            // Configure mock GameStateManager to return a valid GameState and store it
+            var mockScoreCalculationService = new Mock<IScoreCalculationService>();            // Configure mock GameStateManager to return a valid GameState and store it
             mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
                 .ReturnsAsync((string playerName) => {
                     var gameState = new GameState();
                     gameState.InitializeGame(playerName);
+                    // Fix the FirstPlayerSeat to match the real GameStateManager behavior
+                    gameState.FirstPlayerSeat = 0; // Human player should be first
+                    // Ensure human player (seat 0) is active, not AI (seat 1)
+                    foreach (var player in gameState.Players)
+                    {
+                        player.IsActive = player.Seat == 0;
+                    }
                     gameStorage[gameState.GameId] = gameState;
                     return gameState;
                 });
@@ -60,12 +66,48 @@ namespace TrucoMineiro.Tests
                 .ReturnsAsync((GameState gameState) => {
                     gameStorage[gameState.GameId] = gameState;
                     return true;
+                });            // Configure mock GameFlowService to simulate real card playing behavior
+            mockGameFlowService.Setup(x => x.PlayCard(It.IsAny<GameState>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Returns((GameState game, int playerSeat, int cardIndex) => {
+                    var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
+                    if (player == null || !player.IsActive || cardIndex < 0 || cardIndex >= player.Hand.Count)
+                    {
+                        return false;
+                    }
+                    
+                    // Play the card (simulate the real behavior)
+                    var card = player.Hand[cardIndex];
+                    player.Hand.RemoveAt(cardIndex);
+                    
+                    // Update played cards
+                    var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == playerSeat);
+                    if (playedCard != null)
+                    {
+                        playedCard.Card = card;
+                    }
+                    
+                    // Move to next player (simple rotation)
+                    player.IsActive = false;
+                    var nextPlayerSeat = (playerSeat + 1) % 4;
+                    var nextPlayer = game.Players.FirstOrDefault(p => p.Seat == nextPlayerSeat);
+                    if (nextPlayer != null)
+                    {
+                        nextPlayer.IsActive = true;
+                    }
+                    
+                    return true;
                 });
+
+            mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
+                .Returns(Task.CompletedTask);
+
+            mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
+                .Returns(Task.CompletedTask);
 
             _gameService = new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
-                mockHandResolutionService.Object,
+                mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
@@ -134,12 +176,11 @@ namespace TrucoMineiro.Tests
                 PlayerSeat = humanPlayer.Seat,
                 CardIndex = invalidCardIndex
             };
-            
-            var result = _controller.PlayCardEnhanced(request);
+              var result = _controller.PlayCardEnhanced(request);
             
             // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var response = Assert.IsType<PlayCardResponseDto>(okResult.Value);
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+            var response = Assert.IsType<PlayCardResponseDto>(badRequestResult.Value);
             Assert.False(response.Success);
             
             // Get the updated game state
