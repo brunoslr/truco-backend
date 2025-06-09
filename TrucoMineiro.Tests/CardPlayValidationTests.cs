@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using TrucoMineiro.API.Controllers;
 using TrucoMineiro.API.DTOs;
+using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
 using TrucoMineiro.API.Services;
@@ -34,15 +35,14 @@ namespace TrucoMineiro.Tests
                 .Build();
 
             // Create a dictionary to store created games (simulating repository storage)
-            var gameStorage = new Dictionary<string, GameState>();
-
-            // Create mock services
+            var gameStorage = new Dictionary<string, GameState>();            // Create mock services
             var mockGameStateManager = new Mock<IGameStateManager>();
             var mockGameRepository = new Mock<IGameRepository>();
             var mockGameFlowService = new Mock<IGameFlowService>();
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
-            var mockScoreCalculationService = new Mock<IScoreCalculationService>();            // Configure mock GameStateManager to return a valid GameState and store it
+            var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+            var mockEventPublisher = new Mock<IEventPublisher>();// Configure mock GameStateManager to return a valid GameState and store it
             mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
                 .ReturnsAsync((string playerName) => {
                     var gameState = new GameState();
@@ -95,15 +95,14 @@ namespace TrucoMineiro.Tests
 
             mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
                 .Returns(Task.CompletedTask);            mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);
-
-            _gameService = new GameService(
+                .Returns(Task.CompletedTask);            _gameService = new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
                 mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockEventPublisher.Object,
                 configuration);
             _controller = new TrucoGameController(_gameService);
         }        [Fact]

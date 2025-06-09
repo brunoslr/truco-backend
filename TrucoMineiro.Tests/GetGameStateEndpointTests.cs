@@ -3,6 +3,7 @@ using TrucoMineiro.API.Services;
 using TrucoMineiro.API.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using TrucoMineiro.API.DTOs;
+using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
 using Moq;
@@ -37,6 +38,7 @@ namespace TrucoMineiro.Tests
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
             var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+            var mockEventPublisher = new Mock<IEventPublisher>();
 
             // Configure mock GameStateManager to return a valid GameState and store it
             mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
@@ -121,14 +123,14 @@ namespace TrucoMineiro.Tests
                     gameState.PlayedCards.Clear();
                     gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
                 });
-                
-            _gameService = new GameService(
+                  _gameService = new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
                 mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockEventPublisher.Object,
                 configuration);
             _controller = new TrucoGameController(_gameService);
         }private GameState CreateValidGameState(string? playerName = null)
@@ -246,6 +248,7 @@ namespace TrucoMineiro.Tests
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
             var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+            var mockEventPublisher = new Mock<IEventPublisher>();
 
             // Configure mock GameStateManager to return a valid GameState and store it
             mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
@@ -277,14 +280,14 @@ namespace TrucoMineiro.Tests
             // Configure mock TrucoRulesEngine
             mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
                 .Returns(1);
-                
-            var devGameService = new GameService(
+                  var devGameService = new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
                 mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockEventPublisher.Object,
                 devConfig);
             var devController = new TrucoGameController(devGameService);
             var game = devGameService.CreateGame("TestPlayer");

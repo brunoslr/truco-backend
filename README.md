@@ -150,6 +150,22 @@ public class ActionLogEntryDto
 }
 ```
 
+### PlayCardRequest
+```csharp
+public class PlayCardRequest
+{
+    public string PlayerId { get; set; } = string.Empty;
+    public int CardIndex { get; set; }
+    public bool IsFold { get; set; } = false;
+}
+```
+
+**PlayCardRequest Usage:**
+- **Normal Card Play**: `{ playerId: "player1", cardIndex: 0, isFold: false }`
+- **Fold Round**: `{ playerId: "player1", cardIndex: 0, isFold: true }` (cardIndex ignored)
+- When `IsFold: true`, the backend replaces the card with `{ Value: "FOLD", Suit: "NONE" }`
+- This allows the same endpoint to handle both regular plays and round folds
+
 **All DTOs are serialized as JSON and use camelCase for property names when sent over the wire.**
 
 ## API Endpoints
@@ -161,11 +177,26 @@ The backend exposes the following RESTful API endpoints:
 - `GET /api/game/{gameId}` — Returns the current `GameStateDto` for the specified game.
 
 ### Game Actions
-- `POST /api/game/{gameId}/play-card` — Plays a card. Body: `{ playerId, cardIndex }`.
-- `POST /api/game/{gameId}/truco` — Calls Truco. Body: `{ playerId }`.
-- `POST /api/game/{gameId}/raise` — Raises the stakes. Body: `{ playerId }`.
-- `POST /api/game/{gameId}/fold` — Folds the hand. Body: `{ playerId }`.
+- `POST /api/game/{gameId}/play-card` — Plays a card or folds round. Body: `{ playerId, cardIndex, isFold }`.
+- `POST /api/game/{gameId}/truco` — Calls Truco/Raise (unified action). Body: `{ playerId }`.
+- `POST /api/game/{gameId}/fold` — Folds entire hand (all remaining rounds). Body: `{ playerId }`.
 - `POST /api/game/{gameId}/new-hand` — Starts a new hand.
+
+#### Button Press Actions Explained
+
+##### Play Card / Fold Round
+- **Normal Play**: Send `{ playerId: "player1", cardIndex: 0, isFold: false }`
+- **Fold Round**: Send `{ playerId: "player1", cardIndex: 0, isFold: true }` (gives up current round only)
+
+##### Truco/Raise
+- **Single Button**: Frontend shows "Truco" or "Raise" based on current game state
+- **Backend Logic**: Determines if it's initial truco or raise based on current stakes
+- **Response Required**: Opposing team must accept, raise further, or fold entire hand
+
+##### Fold Hand
+- **Purpose**: Give up all remaining cards (entire hand, not just current round)
+- **Effect**: Opponent wins immediately with current stakes
+- **Usage**: When player wants to concede the entire hand
 
 ## Developer Instructions
 
@@ -215,9 +246,9 @@ docker run -p 8080:80 truco-backend
 
 ## Architecture
 
-### Event-Driven AI Player System
+### Event-Driven Game System
 
-The application implements a modern event-driven architecture for AI player interactions, providing reactive and scalable game flow management.
+The application implements a modern event-driven architecture for all game interactions, providing reactive and scalable game flow management with proper separation of concerns.
 
 #### Core Components
 
@@ -230,39 +261,77 @@ TrucoMineiro.API.Domain.Events/
 └── GameEvents/
     ├── PlayerTurnStartedEvent.cs  # Triggered when a player's turn begins
     ├── CardPlayedEvent.cs         # Triggered when a card is played
+    ├── TrucoRaiseEvent.cs         # Triggered when Truco/Raise is called
+    ├── FoldEvent.cs               # Triggered when a player folds
     └── RoundCompletedEvent.cs     # Triggered when a round finishes
 ```
 
 ##### Event Handlers
 ```
 TrucoMineiro.API.Domain.EventHandlers/
-├── AIPlayerEventHandler.cs    # Handles AI decision making and card playing
-└── GameFlowEventHandler.cs    # Manages game flow after card plays
+├── AIPlayerEventHandler.cs    # Handles AI decision making and actions
+├── GameFlowEventHandler.cs    # Manages game flow after events
+└── ActionLogEventHandler.cs   # Creates action log entries for frontend
 ```
 
 #### Event Flow Architecture
 
 ```mermaid
 graph TD
-    A[PlayerTurnStartedEvent] --> B[AIPlayerEventHandler]
-    B --> C[AI Decision Making]
-    C --> D[Game State Update]
-    D --> E[CardPlayedEvent Published]
-    E --> F[GameFlowEventHandler]
-    F --> G{Round Complete?}
-    G -->|Yes| H[RoundCompletedEvent]
-    G -->|No| I[Next PlayerTurnStartedEvent]
-    H --> J[Hand Complete Check]
-    I --> B
+    A[Frontend Button Press] --> B{Action Type}
+    B -->|Play Card| C[PlayCardRequest with IsFold flag]
+    B -->|Truco/Raise| D[TrucoRaiseEvent]
+    B -->|Fold All| E[FoldEvent]
+    
+    C --> F[Card replaced with FOLD card if IsFold=true]
+    F --> G[CardPlayedEvent Published]
+    D --> H[TrucoRaiseEventHandler]
+    E --> I[FoldEventHandler]
+    
+    G --> J[Multiple Event Handlers]
+    H --> J
+    I --> J
+    
+    J --> K[ActionLogEventHandler - Creates UI entries]
+    J --> L[GameFlowEventHandler - Game logic]
+    J --> M[AIPlayerEventHandler - AI responses]
+    
+    L --> N{Game State Check}
+    N -->|Continue| O[Next PlayerTurnStartedEvent]
+    N -->|Round Complete| P[RoundCompletedEvent]
+    O --> Q[AI or Human Turn]
+    P --> R[Hand Complete Check]
 ```
 
 #### Key Features
 
-1. **Reactive AI Players**: AI players respond to `PlayerTurnStartedEvent` rather than being called synchronously
-2. **Realistic Timing**: AI players have thinking delays (500-2000ms) for better user experience
-3. **Loose Coupling**: Event handlers are decoupled from direct service calls
-4. **Extensibility**: Easy to add new event handlers for additional game features
-5. **Comprehensive Testing**: Full integration tests with mock implementations
+1. **Unified Button Press Handling**: All frontend actions (card play, truco/raise, fold) flow through structured event system
+2. **Smart Card Replacement**: PlayCardRequest with IsFold flag replaces card with FOLD card in PlayedCard list
+3. **Event-Driven AI**: AI players respond to events rather than synchronous calls
+4. **Realistic Timing**: AI players have thinking delays (500-2000ms) for better user experience
+5. **Loose Coupling**: Event handlers are decoupled from direct service calls
+6. **Action Log Integration**: ActionLogEventHandler creates all frontend display entries from events
+7. **Extensibility**: Easy to add new event handlers for additional game features
+
+#### Button Press Event Specifications
+
+##### Card Play with Fold Option
+- **Frontend**: Sends `PlayCardRequest` with `IsFold: true` instead of card selection
+- **Backend**: Replaces player's card with FOLD card in `PlayedCard` list
+- **Event**: `CardPlayedEvent` published (fold status determined by checking if card is FOLD)
+- **Result**: Player gives up current round, opponent wins automatically
+
+##### Truco/Raise (Unified Action)
+- **Logic**: Since you can only raise after opponent's truco/raise, these are the same button
+- **Frontend**: Single "Truco/Raise" button that adapts based on game state
+- **Backend**: `TrucoRaiseEvent` published with current stakes information
+- **Event**: Opposing team must respond (accept, raise further, or fold entire hand)
+
+##### Fold All Cards
+- **Purpose**: Give up all remaining cards in the hand (not just current round)
+- **Frontend**: "Fold Hand" button (separate from round fold)
+- **Backend**: `FoldEvent` published, auto-plays FOLD for all remaining rounds
+- **Result**: Opponent wins the hand immediately, gets points based on current stakes
 
 #### Service Architecture
 
@@ -272,6 +341,52 @@ graph TD
 - **`IGameFlowService`**: Game flow control and turn management
 - **`IHandResolutionService`**: Card ranking and round winner determination
 - **`IGameRepository`**: Game state persistence and retrieval
+- **`IEventPublisher`**: Event publishing and distribution system
+
+##### Event Handler Architecture
+- **`ActionLogEventHandler`**: Creates `ActionLogEntry` records for frontend display from all game events
+- **`GameFlowEventHandler`**: Manages game progression, round completion, and turn advancement
+- **`AIPlayerEventHandler`**: Handles AI player decision making and automatic actions
+
+##### Request/Response Flow Validation
+
+###### PlayCardRequest with IsFold
+```csharp
+// Frontend sends:
+{
+  "playerId": "player1",
+  "cardIndex": 0,        // ignored when IsFold=true
+  "isFold": true         // indicates fold action
+}
+
+// Backend validation:
+1. If IsFold=true, replace card with new Card { Value="FOLD", Suit="NONE" }
+2. Add to PlayedCards list with FOLD card
+3. Publish CardPlayedEvent (IsFold property can be removed since card inspection determines fold)
+4. ActionLogEventHandler creates appropriate UI entry
+5. GameFlowEventHandler determines round winner (opponent wins automatically)
+```
+
+###### TrucoRaiseEvent Structure
+```csharp
+public class TrucoRaiseEvent : GameEventBase
+{
+    public string PlayerId { get; set; }
+    public int CurrentStakes { get; set; }
+    public int NewStakes { get; set; }
+    public bool IsInitialTruco { get; set; }  // true for first truco, false for raise
+}
+```
+
+###### FoldEvent Structure  
+```csharp
+public class FoldEvent : GameEventBase
+{
+    public string PlayerId { get; set; }
+    public int HandNumber { get; set; }
+    public int CurrentStakes { get; set; }
+}
+```
 
 ##### Dependency Injection
 All event handlers and services are registered in the DI container (`Program.cs`) with proper scoping:
@@ -279,6 +394,12 @@ All event handlers and services are registered in the DI container (`Program.cs`
 // Event Handlers
 services.AddScoped<IEventHandler<PlayerTurnStartedEvent>, AIPlayerEventHandler>();
 services.AddScoped<IEventHandler<CardPlayedEvent>, GameFlowEventHandler>();
+services.AddScoped<IEventHandler<CardPlayedEvent>, ActionLogEventHandler>();
+services.AddScoped<IEventHandler<TrucoRaiseEvent>, GameFlowEventHandler>();
+services.AddScoped<IEventHandler<FoldEvent>, GameFlowEventHandler>();
+
+// Event Publishing
+services.AddScoped<IEventPublisher, InMemoryEventPublisher>();
 
 // Core Services
 services.AddScoped<IAIPlayerService, AIPlayerService>();
@@ -290,8 +411,26 @@ services.AddScoped<IHandResolutionService, HandResolutionService>();
 
 The event-driven system includes comprehensive integration tests:
 - **`EventDrivenAIPlayerTests`**: Tests AI player event handling with realistic game scenarios
+- **`ActionLogEventHandlerTests`**: Validates proper ActionLog entry creation from events
+- **`ButtonPressEventTests`**: Tests Truco/Raise and Fold event handling workflows
 - **Mock Implementations**: Complete test doubles for all interfaces
 - **Event Validation**: Validates proper event publishing and chaining behavior
+- **Integration Tests**: End-to-end testing of button press → event → response workflows
+
+#### Implementation Requirements
+
+##### Phase 2: Structured Event Definitions (Current)
+1. **Remove IsFold property from CardPlayedEvent** - determine fold by card inspection
+2. **Create TrucoRaiseEvent and FoldEvent classes** with proper structure
+3. **Update PlayCardRequest handling** to replace card with FOLD card when IsFold=true
+4. **Implement event handlers** for TrucoRaiseEvent and FoldEvent
+5. **Add comprehensive tests** for all button press scenarios
+
+##### Phase 3: Event-Driven AI Integration (Next)
+1. **Expand AI decision making** to handle Truco/Raise/Fold responses via events
+2. **Add AI strategy patterns** for different game situations
+3. **Implement AI response delays** for realistic gameplay experience
+4. **Add AI personality traits** for varied playing styles
 
 ### Domain Models
 

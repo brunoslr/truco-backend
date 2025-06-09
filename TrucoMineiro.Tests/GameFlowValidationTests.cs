@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using TrucoMineiro.API.Services;
 using TrucoMineiro.API.DTOs;
+using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
 using Moq;
@@ -33,14 +34,14 @@ namespace TrucoMineiro.Tests
         {
             // Create a dictionary to store created games (simulating repository storage)
             var gameStorage = new Dictionary<string, GameState>();
-            
-            // Create mock services
+              // Create mock services
             var mockGameStateManager = new Mock<IGameStateManager>();
             var mockGameRepository = new Mock<IGameRepository>();
             var mockGameFlowService = new Mock<IGameFlowService>();
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
             var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+            var mockEventPublisher = new Mock<IEventPublisher>();
 
             // Configure mock GameStateManager to return a valid GameState and store it
             mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
@@ -99,14 +100,14 @@ namespace TrucoMineiro.Tests
                 .Returns(Task.CompletedTask);            // Configure ProcessAITurnsAsync to do nothing (AutoAiPlay is disabled)
             mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
                 .Returns(Task.CompletedTask);
-                
-            return new GameService(
+                  return new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
                 mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockEventPublisher.Object,
                 _configuration);
         }
 

@@ -21,101 +21,97 @@ This document provides a step-by-step execution plan for migrating from the curr
 
 #### 1.1.1 Create Event Interfaces and Base Classes
 **Status**: ✅ COMPLETED
-```bash
-# Create the Events folder structure
-mkdir TrucoMineiro.API/Domain/Events
-```
-
-**Files to Create:**
-1. `TrucoMineiro.API/Domain/Events/IGameEvent.cs`
-2. `TrucoMineiro.API/Domain/Events/GameEventBase.cs`
-3. `TrucoMineiro.API/Domain/Events/IEventPublisher.cs`
-4. `TrucoMineiro.API/Domain/Events/IEventHandler.cs`
 
 #### 1.1.2 Create Event Publisher Implementation
-**Files to Create:**
-1. `TrucoMineiro.API/Domain/Services/InMemoryEventPublisher.cs`
+**Status**: ✅ COMPLETED
 
 #### 1.1.3 Register Services in DI Container
-**File to Modify:**
-- `TrucoMineiro.API/Program.cs` or `Startup.cs`
+**Status**: ✅ COMPLETED
 
 **Validation Criteria:**
-- [ ] Build succeeds
-- [ ] Event interfaces are accessible
-- [ ] DI registration works
-- [ ] Can create and publish test events
+- [x] Build succeeds
+- [x] Event interfaces are accessible
+- [x] DI registration works
+- [x] Can create and publish test events
 
 ### Step 1.2: Create Core Game Events
 **Goal**: Define the essential events that will drive the game flow
+**Status**: ✅ COMPLETED
 
 #### 1.2.1 Create Game Events
-**Files to Create:**
-1. `TrucoMineiro.API/Domain/Events/GameEvents/CardPlayedEvent.cs`
-2. `TrucoMineiro.API/Domain/Events/GameEvents/PlayerTurnStartedEvent.cs`
-3. `TrucoMineiro.API/Domain/Events/GameEvents/GameStartedEvent.cs`
-4. `TrucoMineiro.API/Domain/Events/GameEvents/RoundCompletedEvent.cs`
-5. `TrucoMineiro.API/Domain/Events/GameEvents/GameCompletedEvent.cs`
+**Status**: ✅ COMPLETED
 
 **Validation Criteria:**
-- [ ] All events inherit from GameEventBase
-- [ ] Events contain necessary game state information
-- [ ] Events can be serialized/deserialized
-- [ ] Build succeeds
+- [x] All events inherit from GameEventBase
+- [x] Events contain necessary game state information
+- [x] Events can be serialized/deserialized
+- [x] Build succeeds
 
 ### Step 1.3: Create Test Infrastructure
 **Goal**: Ensure we can test event-driven functionality
+**Status**: ✅ COMPLETED
 
 #### 1.3.1 Create Event Testing Utilities
-**Files to Create:**
-1. `TrucoMineiro.Tests/TestUtilities/TestEventPublisher.cs`
-2. `TrucoMineiro.Tests/TestUtilities/TestEventHandler.cs`
-3. `TrucoMineiro.Tests/Events/EventPublisherTests.cs`
+**Status**: ✅ COMPLETED
 
 **Validation Criteria:**
-- [ ] Can publish and capture events in tests
-- [ ] Event handlers can be tested in isolation
-- [ ] All tests pass
+- [x] Can publish and capture events in tests
+- [x] Event handlers can be tested in isolation
+- [x] All tests pass
+
+### Step 1.4: Create ActionLog Event Handler
+**Goal**: Replace direct ActionLogEntry creation with event-driven approach
+**Status**: ✅ COMPLETED
+
+#### 1.4.1 Create ActionLogEventHandler
+**Status**: ✅ COMPLETED
+- ActionLogEventHandler creates ActionLogEntry records from events
+- Removed duplicate ActionLogEntry creation from GameService and GameFlowService
+- Handler registered for CardPlayedEvent, PlayerTurnStartedEvent, and RoundCompletedEvent
+
+**Validation Criteria:**
+- [x] ActionLogEventHandler creates proper ActionLogEntry records
+- [x] Duplicate ActionLogEntry creation removed from services
+- [x] Frontend action log displays correctly
+- [x] All tests pass
 
 ## Phase 2: Event-Driven AI Players
 **Estimated Time**: 2-3 days  
 **Risk Level**: Medium  
-**Status**: Pending Phase 1
+**Status**: 🔄 IN PROGRESS
 
 ### Step 2.1: Create AI Event Handlers
 **Goal**: Replace synchronous AI processing with event-driven handlers
+**Status**: ✅ COMPLETED
 
 #### 2.1.1 Create AI Player Event Handler
-**Files to Create:**
-1. `TrucoMineiro.API/Domain/EventHandlers/AIPlayerEventHandler.cs`
+**Status**: ✅ COMPLETED
 
 #### 2.1.2 Modify AI Service to be Event-Driven
-**Files to Modify:**
-- `TrucoMineiro.API/Domain/Services/AIService.cs`
+**Status**: ✅ COMPLETED
 
 **Validation Criteria:**
-- [ ] AI responds to CardPlayedEvent
-- [ ] AI responds to PlayerTurnStartedEvent
-- [ ] AI decisions are published as events
-- [ ] Original AI logic is preserved
-- [ ] Tests pass
+- [x] AI responds to CardPlayedEvent
+- [x] AI responds to PlayerTurnStartedEvent
+- [x] AI decisions are published as events
+- [x] Original AI logic is preserved
+- [x] Tests pass
 
 ### Step 2.2: Integrate AI with Event System
 **Goal**: Connect AI handlers to the event pipeline
+**Status**: ✅ COMPLETED
 
 #### 2.2.1 Modify Game Flow to Publish Events
-**Files to Modify:**
-- `TrucoMineiro.API/Domain/Services/GameFlowService.cs`
+**Status**: ✅ COMPLETED - GameService now publishes CardPlayedEvent
 
 #### 2.2.2 Create AI Integration Tests
-**Files to Create:**
-1. `TrucoMineiro.Tests/EventHandlers/AIPlayerEventHandlerTests.cs`
+**Status**: ✅ COMPLETED - Tests already exist and pass
 
 **Validation Criteria:**
-- [ ] AI players are triggered by events
-- [ ] AI decisions create new events
-- [ ] Game flow continues correctly
-- [ ] All existing tests still pass
+- [x] AI players are triggered by events
+- [x] AI decisions create new events
+- [x] Game flow continues correctly
+- [x] All existing tests still pass
 
 ## Phase 3: Game State Machine
 **Estimated Time**: 3-4 days  

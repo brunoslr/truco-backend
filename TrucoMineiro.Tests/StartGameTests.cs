@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Services;
+using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
 using Moq;
@@ -26,14 +27,14 @@ namespace TrucoMineiro.Tests
             var configuration = config ?? _configuration;
               // Create a dictionary to store created games (simulating repository storage)
             var gameStorage = new Dictionary<string, GameState>();
-            
-            // Create mock services
+              // Create mock services
             var mockGameStateManager = new Mock<IGameStateManager>();
             var mockGameRepository = new Mock<IGameRepository>();
             var mockGameFlowService = new Mock<IGameFlowService>();
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
             var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+            var mockEventPublisher = new Mock<IEventPublisher>();
 
             // Configure mock GameStateManager to return a valid GameState and store it
             mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
@@ -117,14 +118,14 @@ namespace TrucoMineiro.Tests
                     gameState.PlayedCards.Clear();
                     gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
                 });
-                
-            return new GameService(
+                  return new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
                 mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockEventPublisher.Object,
                 configuration);
         }        private GameState CreateValidGameState(string? playerName = null)
         {

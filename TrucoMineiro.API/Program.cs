@@ -47,6 +47,17 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMin
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.RoundCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.RoundCleanupEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.HandCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.HandCleanupEventHandler>();
 
+// Register action log event handlers
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.CardPlayedEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.PlayerTurnStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.RoundCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.TrucoRaiseEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.FoldHandEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
+
+// Register game flow event handlers for new events  
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.TrucoRaiseEvent>, TrucoMineiro.API.Domain.EventHandlers.GameFlowEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.FoldHandEvent>, TrucoMineiro.API.Domain.EventHandlers.GameFlowEventHandler>();
+
 // Register state machine
 builder.Services.AddScoped<TrucoMineiro.API.Domain.StateMachine.IGameStateMachine, TrucoMineiro.API.Domain.StateMachine.GameStateMachine>();
 

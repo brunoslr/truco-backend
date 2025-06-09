@@ -234,55 +234,89 @@ namespace TrucoMineiro.API.Domain.Services
 }
 ```
 
-### Step 1.3: Create Basic Event Handlers
+### Step 1.3: Create ActionLog Event Handler
 
-**Create**: `TrucoMineiro.API/Domain/EventHandlers/GameLoggingEventHandler.cs`
+**Create**: `TrucoMineiro.API/Domain/EventHandlers/ActionLogEventHandler.cs`
 ```csharp
 using Microsoft.Extensions.Logging;
 using TrucoMineiro.API.Domain.Events;
+using TrucoMineiro.API.Domain.Events.GameEvents;
+using TrucoMineiro.API.Domain.Interfaces;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.EventHandlers
 {
-    public class GameLoggingEventHandler : 
+    /// <summary>
+    /// Event handler for creating ActionLogEntry records from game events for frontend display
+    /// This handler ensures that game events are properly logged as ActionLogEntry records
+    /// that are displayed in the frontend's action log for players to see game history.
+    /// </summary>
+    public class ActionLogEventHandler : 
         IEventHandler<CardPlayedEvent>,
         IEventHandler<PlayerTurnStartedEvent>,
-        IEventHandler<RoundCompletedEvent>,
-        IEventHandler<TrucoCalledEvent>
+        IEventHandler<RoundCompletedEvent>
     {
-        private readonly ILogger<GameLoggingEventHandler> _logger;
+        private readonly IGameRepository _gameRepository;
+        private readonly ILogger<ActionLogEventHandler> _logger;
 
-        public GameLoggingEventHandler(ILogger<GameLoggingEventHandler> logger)
+        public ActionLogEventHandler(
+            IGameRepository gameRepository,
+            ILogger<ActionLogEventHandler> logger)
         {
+            _gameRepository = gameRepository;
             _logger = logger;
         }
 
-        public Task HandleAsync(CardPlayedEvent gameEvent, CancellationToken cancellationToken = default)
+        public async Task HandleAsync(CardPlayedEvent gameEvent, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Card played in game {GameId}: Player {PlayerSeat} played {Card}", 
-                gameEvent.GameId, gameEvent.PlayerSeat, 
-                gameEvent.IsFold ? "FOLD" : $"{gameEvent.Card.Value} of {gameEvent.Card.Suit}");
-            return Task.CompletedTask;
+            var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
+            if (game == null) return;
+
+            // Create action log entry for card played - this shows in frontend
+            var cardDisplay = gameEvent.IsFold ? "FOLD" : $"{gameEvent.Card.Value} of {gameEvent.Card.Suit}";
+            var actionLogEntry = new ActionLogEntry("card-played")
+            {
+                PlayerSeat = gameEvent.Player.Seat,
+                Card = cardDisplay
+            };
+
+            game.ActionLog.Add(actionLogEntry);
+            await _gameRepository.SaveGameAsync(game);
         }
 
-        public Task HandleAsync(PlayerTurnStartedEvent gameEvent, CancellationToken cancellationToken = default)
+        public async Task HandleAsync(PlayerTurnStartedEvent gameEvent, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Turn started in game {GameId}: Player {PlayerSeat}", 
-                gameEvent.GameId, gameEvent.PlayerSeat);
-            return Task.CompletedTask;
+            // Only log turn starts for human players to avoid cluttering action log
+            if (!gameEvent.Player.IsAI)
+            {
+                var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
+                if (game == null) return;
+
+                var actionLogEntry = new ActionLogEntry("turn-start")
+                {
+                    PlayerSeat = gameEvent.Player.Seat
+                };
+
+                game.ActionLog.Add(actionLogEntry);
+                await _gameRepository.SaveGameAsync(game);
+            }
         }
 
-        public Task HandleAsync(RoundCompletedEvent gameEvent, CancellationToken cancellationToken = default)
+        public async Task HandleAsync(RoundCompletedEvent gameEvent, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Round completed in game {GameId}: Winner is player {WinningSeat}", 
-                gameEvent.GameId, gameEvent.WinningSeat);
-            return Task.CompletedTask;
-        }
+            var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
+            if (game == null) return;
 
-        public Task HandleAsync(TrucoCalledEvent gameEvent, CancellationToken cancellationToken = default)
-        {
-            _logger.LogInformation("Truco called in game {GameId}: Player {CallerSeat} raised stakes to {NewStake}", 
-                gameEvent.GameId, gameEvent.CallerSeat, gameEvent.NewStake);
-            return Task.CompletedTask;
+            // Create action log entry for round result - shows who won the round
+            var winner = gameEvent.RoundWinner?.Name ?? "Draw";
+            var actionLogEntry = new ActionLogEntry("turn-result")
+            {
+                Winner = winner,
+                WinnerTeam = gameEvent.RoundWinner != null ? (gameEvent.RoundWinner.Seat % 2 == 0 ? "Team 1" : "Team 2") : null
+            };
+
+            game.ActionLog.Add(actionLogEntry);
+            await _gameRepository.SaveGameAsync(game);
         }
     }
 }
@@ -294,10 +328,9 @@ namespace TrucoMineiro.API.Domain.EventHandlers
 ```csharp
 // Add after existing service registrations
 builder.Services.AddScoped<IEventPublisher, InMemoryEventPublisher>();
-builder.Services.AddScoped<IEventHandler<CardPlayedEvent>, GameLoggingEventHandler>();
-builder.Services.AddScoped<IEventHandler<PlayerTurnStartedEvent>, GameLoggingEventHandler>();
-builder.Services.AddScoped<IEventHandler<RoundCompletedEvent>, GameLoggingEventHandler>();
-builder.Services.AddScoped<IEventHandler<TrucoCalledEvent>, GameLoggingEventHandler>();
+builder.Services.AddScoped<IEventHandler<CardPlayedEvent>, ActionLogEventHandler>();
+builder.Services.AddScoped<IEventHandler<PlayerTurnStartedEvent>, ActionLogEventHandler>();
+builder.Services.AddScoped<IEventHandler<RoundCompletedEvent>, ActionLogEventHandler>();
 ```
 
 ### Step 1.5: Add Events to Existing GameService (Parallel)

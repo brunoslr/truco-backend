@@ -52,17 +52,11 @@ namespace TrucoMineiro.API.Domain.Services
             {
                 playedCard.Card = card;
             }
-            else
-            {
+            else            {
                 game.PlayedCards.Add(new PlayedCard(player.Seat, card));
             }
 
-            // Add to the action log
-            game.ActionLog.Add(new ActionLogEntry("card-played")
-            {
-                PlayerSeat = player.Seat,
-                Card = $"{card.Value} of {card.Suit}"
-            });
+            // ActionLog entry will be created by ActionLogEventHandler when CardPlayedEvent is published
 
             // Move to the next player's turn
             AdvanceToNextPlayer(game);
@@ -228,18 +222,13 @@ namespace TrucoMineiro.API.Domain.Services
                 }
             }
 
-            if (roundWinner != null)
-            {
+            if (roundWinner != null)            {
                 // Set the winner and add to log
                 game.TurnWinner = roundWinner.Team;
-                game.ActionLog.Add(new ActionLogEntry("turn-result")
-                {
-                    Winner = roundWinner.Name,
-                    WinnerTeam = roundWinner.Team
-                });
+                // ActionLog entry will be created by ActionLogEventHandler when RoundCompletedEvent is published
 
                 // Add the points to the winner's team
-                game.AddScore(roundWinner.Team, game.Stakes);                // Publish round started event for the next round (which will trigger cleanup)
+                game.AddScore(roundWinner.Team, game.Stakes);// Publish round started event for the next round (which will trigger cleanup)
                 await _eventPublisher.PublishAsync(new RoundStartedEvent(
                     Guid.Parse(game.Id),
                     game.CurrentRound + 1,
