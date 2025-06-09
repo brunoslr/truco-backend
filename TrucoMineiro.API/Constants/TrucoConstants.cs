@@ -99,5 +99,26 @@ namespace TrucoMineiro.API.Constants
             /// </summary>
             public const string OpponentTeam = "Opponent Team";
         }
+
+        /// <summary>
+        /// Card and fold constants
+        /// </summary>
+        public static class Cards
+        {
+            /// <summary>
+            /// Special card value used to represent a fold (lowest possible value)
+            /// </summary>
+            public const string FoldValue = "FOLD";
+
+            /// <summary>
+            /// Special suit used to represent a fold
+            /// </summary>
+            public const string FoldSuit = "FOLD";
+
+            /// <summary>
+            /// Card strength value for a fold (guaranteed lowest)
+            /// </summary>
+            public const int FoldStrength = -1;
+        }
     }
 }

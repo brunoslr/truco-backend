@@ -18,7 +18,7 @@ namespace TrucoMineiro.API.Domain.Services
             // Clear played cards for the completed round
             foreach (var playedCard in game.PlayedCards)
             {
-                playedCard.Card = null;
+                playedCard.Card = Card.CreateFoldCard();
             }
         }
 
@@ -31,6 +31,7 @@ namespace TrucoMineiro.API.Domain.Services
             // Clear all hand-related state
             game.PlayedCards.Clear();
             game.RoundWinners.Clear();
+            game.RoundHistory.Clear();
             game.CurrentRound = TrucoConstants.Game.FirstRound;
             
             // Reset stakes and truco state
@@ -46,13 +47,13 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return Task.CompletedTask;
-        }        /// <summary>
+        }/// <summary>
         /// Clean up when game is completed
         /// </summary>
         /// <param name="game">The current game state</param>
         public void CleanupAfterGame(GameState game)
         {
-            game.GameStatus = "completed";
+            game.Status = GameStatus.Completed;
             
             // Clear all active states
             foreach (var player in game.Players)
@@ -70,14 +71,13 @@ namespace TrucoMineiro.API.Domain.Services
             // Ensure we have played card slots for all players
             for (int seat = 0; seat < TrucoConstants.Game.MaxPlayers; seat++)
             {
-                var existingSlot = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == seat);
-                if (existingSlot == null)
+                var existingSlot = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == seat);                if (existingSlot == null)
                 {
                     game.PlayedCards.Add(new PlayedCard(seat));
                 }
                 else
                 {
-                    existingSlot.Card = null;
+                    existingSlot.Card = Card.CreateFoldCard();
                 }
             }
         }

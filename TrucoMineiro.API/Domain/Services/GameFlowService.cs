@@ -52,8 +52,7 @@ namespace TrucoMineiro.API.Domain.Services
             var card = player.PlayCard(cardIndex);
 
             // Find the player's played card slot
-            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);
-            if (playedCard != null)
+            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);            if (playedCard != null)
             {
                 playedCard.Card = card;
             }
@@ -79,7 +78,9 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return true;
-        }        /// <summary>
+        }        
+        
+        /// <summary>
         /// Executes AI player turns in sequence with appropriate delays
         /// </summary>
         public async Task ProcessAITurnsAsync(GameState game, int aiPlayDelayMs)
@@ -185,26 +186,38 @@ namespace TrucoMineiro.API.Domain.Services
                 nextPlayer.IsActive = true;
                 game.CurrentPlayerIndex = nextPlayer.Seat;
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Checks if all players have played their cards for the current round
         /// </summary>
         public bool IsRoundComplete(GameState game)
         {
-            return game.PlayedCards.All(pc => pc.Card != null);
-        }        /// <summary>
+            // Ensure we have exactly 4 PlayedCard slots (one per player seat)
+            if (game.PlayedCards.Count != TrucoConstants.Game.MaxPlayers)
+            {
+                return false;
+            }            // Check if each player seat (0-3) has played a card in this round
+            for (int seat = 0; seat < TrucoConstants.Game.MaxPlayers; seat++)
+            {
+                var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == seat);
+                if (playedCard?.Card == null || playedCard.Card.IsFold)
+                {
+                    return false; // This player hasn't played yet (still fold card)
+                }
+            }
+
+            return true; // All players have played
+        }
+        
+        /// <summary>
         /// Determine the winner of the current round using proper card strength calculation
         /// </summary>
         private async void DetermineRoundWinner(GameState game)
         {
             // Use the proper hand resolution service for card strength determination
             Player? roundWinner = null;
-            var strongestCardStrength = -1;
-
-            foreach (var playedCard in game.PlayedCards)
+            var strongestCardStrength = -1;            foreach (var playedCard in game.PlayedCards)
             {
-                if (playedCard.Card != null)
+                if (!playedCard.Card.IsFold)
                 {
                     var player = game.Players.FirstOrDefault(p => p.Seat == playedCard.PlayerSeat);
                     if (player != null)

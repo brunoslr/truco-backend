@@ -114,7 +114,7 @@ namespace TrucoMineiro.API.Domain.Services
                 int strongestStrength = -1;
                 int strongestPlayerSeat = -1;
 
-                foreach (var playedCard in game.PlayedCards.Where(pc => pc.Card != null))
+                foreach (var playedCard in game.PlayedCards.Where(pc => !pc.Card.IsFold))
                 {
                     var strength = _handResolutionService.GetCardStrength(playedCard.Card!);
                     if (strength > strongestStrength)
@@ -147,7 +147,7 @@ namespace TrucoMineiro.API.Domain.Services
             /// </summary>
             private int GetPlayerRoundPosition(int playerSeat, List<Card> currentRoundCards, GameState game)
             {
-                var playedCount = game.PlayedCards.Count(pc => pc.Card != null);
+                var playedCount = game.PlayedCards.Count(pc => !pc.Card.IsFold);
                 return playedCount + 1; // Position is 1-based
             }
 
@@ -165,15 +165,13 @@ namespace TrucoMineiro.API.Domain.Services
                     3 => 1, // Player 3's partner is player 1
                     _ => -1
                 };
-            }
-
-            /// <summary>
+            }        /// <summary>
             /// Get seats that have already played in current round
             /// </summary>
             private List<int> GetPlayedSeats(GameState game)
             {
                 return game.PlayedCards
-                    .Where(pc => pc.Card != null)
+                    .Where(pc => !pc.Card.IsFold)
                     .Select(pc => pc.PlayerSeat)
                     .ToList();
             }
@@ -386,14 +384,12 @@ namespace TrucoMineiro.API.Domain.Services
             public bool IsAIPlayer(Player player)
             {
                 return player.IsAI || player.Seat != 0; // Seat 0 is typically human player
-            }
-
-            private List<Card> GetCurrentRoundPlayedCards(GameState gameState)
+            }        private List<Card> GetCurrentRoundPlayedCards(GameState gameState)
             {
                 // Get cards played in the current round only
                 var currentRoundCards = gameState.PlayedCards
-                    .Where(pc => pc.Card != null)
-                    .Select(pc => pc.Card!)
+                    .Where(pc => !pc.Card.IsFold)
+                    .Select(pc => pc.Card)
                     .ToList();
 
                 return currentRoundCards;

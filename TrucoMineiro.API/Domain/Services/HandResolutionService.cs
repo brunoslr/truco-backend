@@ -50,20 +50,18 @@ namespace TrucoMineiro.API.Domain.Services
             
             // Default strength for cards not in hierarchy (shouldn't happen with proper deck)
             return 0;
-        }
-
-        public Player? DetermineRoundWinner(List<PlayedCard> playedCards, List<Player> players)
+        }        public Player? DetermineRoundWinner(List<PlayedCard> playedCards, List<Player> players)
         {
-            if (!playedCards.Any(pc => pc.Card != null))
+            if (!playedCards.Any(pc => !pc.Card.IsFold))
                 return null;
 
             Player? winner = null;
             int highestStrength = -1;
             bool hasDraw = false;
-            foreach (var playedCard in playedCards.Where(pc => pc.Card != null))
+            foreach (var playedCard in playedCards.Where(pc => !pc.Card.IsFold))
             {
                 var player = players.FirstOrDefault(p => p.Seat == playedCard.PlayerSeat);
-                if (player != null && playedCard.Card != null)
+                if (player != null && !playedCard.Card.IsFold)
                 {
                     var strength = GetCardStrength(playedCard.Card);
 
@@ -81,12 +79,10 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return hasDraw ? null : winner;
-        }
-
-        public bool IsRoundDraw(List<PlayedCard> playedCards, List<Player> players)
+        }        public bool IsRoundDraw(List<PlayedCard> playedCards, List<Player> players)
         {
             return DetermineRoundWinner(playedCards, players) == null && 
-                   playedCards.Any(pc => pc.Card != null);
+                   playedCards.Any(pc => !pc.Card.IsFold);
         }
 
         public string? HandleDrawResolution(GameState game, int roundNumber)

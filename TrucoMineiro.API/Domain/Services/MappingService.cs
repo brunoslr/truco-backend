@@ -52,16 +52,14 @@ namespace TrucoMineiro.API.Services
                 IsActive = player.IsActive,
                 Seat = player.Seat
             };
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Map a PlayedCard model to a PlayedCardDto
         /// </summary>
         public static PlayedCardDto MapPlayedCardToDto(PlayedCard playedCard)
         {            return new PlayedCardDto
             {
                 PlayerSeat = playedCard.PlayerSeat,
-                Card = playedCard.Card != null ? MapCardToDto(playedCard.Card) : null
+                Card = playedCard.Card.IsFold ? null : MapCardToDto(playedCard.Card)
             };
         }
 

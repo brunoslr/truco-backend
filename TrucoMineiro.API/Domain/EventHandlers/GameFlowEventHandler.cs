@@ -83,12 +83,10 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     else
                     {
                         _logger.LogDebug("Starting new round in game {GameId}, winner {WinnerName} plays first", 
-                            gameEvent.GameId, winner?.Name ?? "Draw");
-
-                        // Clear played cards for next round
+                            gameEvent.GameId, winner?.Name ?? "Draw");                        // Clear played cards for next round
                         foreach (var pc in game.PlayedCards)
                         {
-                            pc.Card = null;
+                            pc.Card = Card.CreateFoldCard();
                         }
 
                         // Winner of round plays first in next round (or first player if draw)

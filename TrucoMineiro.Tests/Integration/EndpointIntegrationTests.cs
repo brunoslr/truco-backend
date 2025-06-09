@@ -197,8 +197,10 @@ namespace TrucoMineiro.Tests.Integration
                 PlayerSeat = 0,
                 CardIndex = 0,
                 IsFold = false
-            };            var playCardJson = JsonSerializer.Serialize(playCardRequest, _jsonOptions);
-            var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");            var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
+            };            
+            var playCardJson = JsonSerializer.Serialize(playCardRequest, _jsonOptions);
+            var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");            
+            var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
             playCardResponse.EnsureSuccessStatusCode();
             
             var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
