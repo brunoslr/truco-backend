@@ -103,7 +103,8 @@ namespace TrucoMineiro.Tests.Integration
             var game = CreateTestGame();
             var aiPlayer = game.Players[1];
             game.PendingTrucoCall = true;
-            game.TrucoCallerSeat = 0; // Human called Truco            // Test with strong hand - should not fold
+            game.TrucoCallerSeat = 0; // Human called Truco            
+            // Test with strong hand - should not fold
             aiPlayer.Hand = new List<Card>
             {
                 new Card("4", "♣"), // Zap

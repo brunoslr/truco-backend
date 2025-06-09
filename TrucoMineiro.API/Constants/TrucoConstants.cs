@@ -47,12 +47,41 @@ namespace TrucoMineiro.API.Constants
             /// <summary>
             /// Number of cards dealt to each player per hand
             /// </summary>
-            public const int CardsPerPlayer = 3;
-
-            /// <summary>
+            public const int CardsPerPlayer = 3;            /// <summary>
             /// Maximum number of rounds per hand
             /// </summary>
             public const int MaxRoundsPerHand = 3;
+
+            /// <summary>
+            /// First round number
+            /// </summary>
+            public const int FirstRound = 1;
+
+            /// <summary>
+            /// Minimum rounds needed to win a hand (best of 3)
+            /// </summary>
+            public const int RoundsToWinHand = 2;
+
+            /// <summary>
+            /// Human player seat number
+            /// </summary>
+            public const int HumanPlayerSeat = 0;
+        }
+
+        /// <summary>
+        /// AI and automation constants
+        /// </summary>
+        public static class AI
+        {
+            /// <summary>
+            /// Maximum iterations to prevent infinite loops in AI processing
+            /// </summary>
+            public const int MaxIterations = 10;
+
+            /// <summary>
+            /// Default delay in milliseconds before starting a new hand
+            /// </summary>
+            public const int NewHandDelayMs = 1000;
         }
 
         /// <summary>
