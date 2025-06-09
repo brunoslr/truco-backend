@@ -17,7 +17,7 @@ namespace TrucoMineiro.API.Services
         private readonly ITrucoRulesEngine _trucoRulesEngine;
         private readonly IAIPlayerService _aiPlayerService;
         private readonly IScoreCalculationService _scoreCalculationService;
-        private readonly IGameFlowReactionService _gameFlowReactionService;
+
 
         private readonly bool _devMode;
         private readonly bool _autoAiPlay;
@@ -32,9 +32,7 @@ namespace TrucoMineiro.API.Services
         /// <param name="gameFlowService">Game flow service</param>
         /// <param name="trucoRulesEngine">Truco rules engine</param>
         /// <param name="aiPlayerService">AI player service</param>
-        /// <param name="scoreCalculationService">Score calculation service</param>
-        /// <param name="gameFlowReactionService">Game flow reaction service</param>
-        /// <param name="configuration">Application configuration</param>
+        /// <param name="scoreCalculationService">Score calculation service</param>        /// <param name="configuration">Application configuration</param>
         public GameService(
             IGameStateManager gameStateManager,
             IGameRepository gameRepository,
@@ -42,16 +40,13 @@ namespace TrucoMineiro.API.Services
             ITrucoRulesEngine trucoRulesEngine,
             IAIPlayerService aiPlayerService,
             IScoreCalculationService scoreCalculationService,
-            IGameFlowReactionService gameFlowReactionService,
             IConfiguration configuration)
         {
-            _gameStateManager = gameStateManager;
-            _gameRepository = gameRepository;
+            _gameStateManager = gameStateManager;            _gameRepository = gameRepository;
             _gameFlowService = gameFlowService;
             _trucoRulesEngine = trucoRulesEngine;
             _aiPlayerService = aiPlayerService;
             _scoreCalculationService = scoreCalculationService;
-            _gameFlowReactionService = gameFlowReactionService;
 
             // Read configuration from appsettings.json
             _devMode = configuration.GetValue<bool>("FeatureFlags:DevMode", false);
@@ -134,11 +129,18 @@ namespace TrucoMineiro.API.Services
                 {
                     return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Invalid card play");
                 }
-            }
+            }            // Process post-card-play reactions directly using GameFlowService
+            // 1. Check if round is complete and determine winner (handled in GameFlowService.PlayCard)
+            // 2. Process hand completion if needed
+            var handCompletionTask = _gameFlowService.ProcessHandCompletionAsync(game, _newHandDelayMs);
+            handCompletionTask.GetAwaiter().GetResult();
 
-            // Process post-card-play reactions using the new flow mechanism
-            var reactionTask = _gameFlowReactionService.ProcessCardPlayReactionsAsync(game, _autoAiPlay, _aiPlayDelayMs, _newHandDelayMs);
-            reactionTask.GetAwaiter().GetResult();
+            // 3. Process AI turns if enabled
+            if (_autoAiPlay)
+            {
+                var aiTurnsTask = _gameFlowService.ProcessAITurnsAsync(game, _aiPlayDelayMs);
+                aiTurnsTask.GetAwaiter().GetResult();
+            }
 
             // Save the game state
             var saveTask = _gameRepository.SaveGameAsync(game);
@@ -345,24 +347,6 @@ namespace TrucoMineiro.API.Services
             });
 
             return true;
-        }
-
-        /// <summary>
-        /// Enhanced play card method that handles human players, AI players, and fold scenarios
-        /// </summary>
-        /// <param name="gameId">The unique identifier of the game</param>
-        /// <param name="playerSeat">The seat of the player making the move (0-3)</param>
-        /// <param name="cardIndex">The index of the card in the player's hand</param>
-        /// <param name="isFold">Whether this is a fold action</param>
-        /// <param name="requestingPlayerSeat">The seat of the player making the request (for response visibility)</param>
-        /// <returns>PlayCardResponseDto with the updated game state</returns>        /// <summary>
-        /// Enhanced play card method that now just forwards to the simplified PlayCard method
-        /// This is kept for backwards compatibility with tests
-        /// </summary>
-        public PlayCardResponseDto PlayCardEnhanced(string gameId, int playerSeat, int cardIndex, bool isFold = false, int requestingPlayerSeat = 0)
-        {
-            // Simply forward to the new PlayCard method for consistency
-            return PlayCard(gameId, playerSeat, cardIndex, isFold, requestingPlayerSeat);
         }
     }
 }

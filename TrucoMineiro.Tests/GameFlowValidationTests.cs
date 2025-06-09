@@ -96,14 +96,8 @@ namespace TrucoMineiro.Tests
 
             // Configure ProcessHandCompletionAsync to do nothing (no hand completion logic needed for this test)
             mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);
-
-            // Configure ProcessAITurnsAsync to do nothing (AutoAiPlay is disabled)
+                .Returns(Task.CompletedTask);            // Configure ProcessAITurnsAsync to do nothing (AutoAiPlay is disabled)
             mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);            // Create mock GameFlowReactionService
-            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
-            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
-                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
                 .Returns(Task.CompletedTask);
                 
             return new GameService(
@@ -113,7 +107,6 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
-                mockGameFlowReactionService.Object,
                 _configuration);
         }
 

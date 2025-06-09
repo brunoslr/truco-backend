@@ -103,22 +103,7 @@ namespace TrucoMineiro.Tests
                         }
                     }
                     return Task.CompletedTask;
-                });
-
-            mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);            // Create mock GameFlowReactionService
-            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
-            
-            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
-                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
-                .Callback((GameState gameState, bool autoAiPlay, int aiPlayDelayMs, int newHandDelayMs) => {
-                    // If autoAiPlay is true, process AI turns
-                    if (autoAiPlay)
-                    {
-                        // Use the already mocked ProcessAITurnsAsync to process AI turns
-                        mockGameFlowService.Object.ProcessAITurnsAsync(gameState, aiPlayDelayMs).GetAwaiter().GetResult();
-                    }
-                })
+                });            mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
                 .Returns(Task.CompletedTask);
 
             _gameService = new GameService(
@@ -128,7 +113,6 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
-                mockGameFlowReactionService.Object,
                 configuration);
             _controller = new TrucoGameController(_gameService);
         }        [Fact]

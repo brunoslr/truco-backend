@@ -195,21 +195,9 @@ namespace TrucoMineiro.Tests.Events
         public bool ShouldRaise(Player player, GameState game)
         {
             return false; // Never raise in tests
-        }
-
-        public bool ShouldFold(Player player, GameState game)
+        }        public bool ShouldFold(Player player, GameState game)
         {
             return false; // Never fold in tests
-        }
-
-        public bool ProcessAITurn(Player player, GameState game)
-        {
-            return true; // Always process successfully
-        }
-
-        public int ProcessAllAITurns(GameState game)
-        {
-            return 0; // No AI turns processed
         }
 
         public bool IsAIPlayer(Player player)

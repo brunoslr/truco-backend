@@ -117,23 +117,9 @@ namespace TrucoMineiro.Tests
 
             mockGameFlowService.Setup(x => x.StartNewHand(It.IsAny<GameState>()))
                 .Callback((GameState gameState) => {
-                    // Reset for new hand
-                    gameState.PlayedCards.Clear();
+                    // Reset for new hand                gameState.PlayedCards.Clear();
                     gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
-                });            // Create mock GameFlowReactionService
-            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
-            
-            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
-                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
-                .Callback((GameState gameState, bool autoAiPlay, int aiPlayDelayMs, int newHandDelayMs) => {
-                    // If autoAiPlay is true, process AI turns
-                    if (autoAiPlay)
-                    {
-                        // Use the already mocked ProcessAITurnsAsync to process AI turns
-                        mockGameFlowService.Object.ProcessAITurnsAsync(gameState, aiPlayDelayMs).GetAwaiter().GetResult();
-                    }
-                })
-                .Returns(Task.CompletedTask);
+                });
 
             return new GameService(
                 mockGameStateManager.Object,
@@ -142,9 +128,8 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
-                mockGameFlowReactionService.Object,
                 configuration);
-        }        private GameState CreateValidGameState(string? playerName = null)
+        }private GameState CreateValidGameState(string? playerName = null)
         {
             var gameState = new GameState();
             gameState.InitializeGame(playerName ?? "TestPlayer");

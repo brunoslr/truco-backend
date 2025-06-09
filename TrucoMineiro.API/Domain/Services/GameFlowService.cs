@@ -6,8 +6,7 @@ using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Services
-{
-    /// <summary>
+{    /// <summary>
     /// Service responsible for managing game flow and turn sequence
     /// </summary>
     public class GameFlowService : IGameFlowService
@@ -16,20 +15,17 @@ namespace TrucoMineiro.API.Domain.Services
         private readonly IGameRepository _gameRepository;
         private readonly IHandResolutionService _handResolutionService;
         private readonly IEventPublisher _eventPublisher;
-        private readonly IGameCleanupService _gameCleanupService;
 
         public GameFlowService(
             IAIPlayerService aiPlayerService, 
             IGameRepository gameRepository,
             IHandResolutionService handResolutionService,
-            IEventPublisher eventPublisher,
-            IGameCleanupService gameCleanupService)
+            IEventPublisher eventPublisher)
         {
             _aiPlayerService = aiPlayerService;
             _gameRepository = gameRepository;
             _handResolutionService = handResolutionService;
             _eventPublisher = eventPublisher;
-            _gameCleanupService = gameCleanupService;
         }
 
         /// <summary>

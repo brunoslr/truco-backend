@@ -75,31 +75,12 @@ namespace TrucoMineiro.Tests.TestUtilities
         {
             if (EventCount != expectedCount)
                 throw new InvalidOperationException($"Handler {GetType().Name} was called {EventCount} times, expected {expectedCount}");
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Asserts that the handler was not called
         /// </summary>
         public void AssertWasNotCalled()
         {
             if (WasCalled)
                 throw new InvalidOperationException($"Handler {GetType().Name} was called {EventCount} times, expected 0");
-        }
-    }    /// <summary>
-    /// Simple test event handler that just captures events
-    /// </summary>
-    public class SimpleTestEventHandler<T> : TestEventHandler<T> where T : IGameEvent
-    {
-        private readonly Func<T, Task>? _onHandle;
-
-        public SimpleTestEventHandler(Func<T, Task>? onHandle = null)
-        {
-            _onHandle = onHandle;
-        }
-
-        protected override Task OnHandleAsync(T gameEvent, CancellationToken cancellationToken = default)
-        {
-            return _onHandle?.Invoke(gameEvent) ?? Task.CompletedTask;
-        }
-    }
+        }    }
 }

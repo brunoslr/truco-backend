@@ -128,39 +128,9 @@ namespace TrucoMineiro.API.Domain.Services
             }
             
             return null; // Game not complete
-        }
-
-        public int CalculateTotalGamePoints(int team1Score, int team2Score)
+        }        public int CalculateTotalGamePoints(int team1Score, int team2Score)
         {
             return team1Score + team2Score;
-        }
-
-        public double CalculateWinPercentage(int teamScore, int opponentScore)
-        {
-            if (teamScore >= WinningScore)
-                return 100.0;
-            
-            if (opponentScore >= WinningScore)
-                return 0.0;
-
-            // Simple calculation based on score difference and proximity to winning
-            var scoreAdvantage = teamScore - opponentScore;
-            var progressToWin = (double)teamScore / WinningScore;
-            var opponentProgress = (double)opponentScore / WinningScore;
-            
-            // Base percentage on current score
-            var basePercentage = progressToWin * 50; // 0-50% based on progress
-            
-            // Adjust based on score difference
-            var advantageAdjustment = scoreAdvantage * 5; // +/- 5% per point difference
-            
-            // Penalty if opponent is close to winning
-            var opponentThreatPenalty = opponentProgress > 0.8 ? (opponentProgress - 0.8) * 50 : 0;
-            
-            var finalPercentage = basePercentage + advantageAdjustment - opponentThreatPenalty;
-            
-            // Clamp between 5% and 95%
-            return Math.Max(5, Math.Min(95, finalPercentage));
         }
 
         public bool IsMaoDe10Active(int team1Score, int team2Score)
@@ -172,90 +142,5 @@ namespace TrucoMineiro.API.Domain.Services
         {
             return Math.Max(0, WinningScore - teamScore);
         }
-
-        public int GetMaxPossibleHandPoints(int team1Score, int team2Score)
-        {
-            if (IsMaoDe10Active(team1Score, team2Score))
-            {
-                return 4; // Mão de 10 is active, all hands worth 4 points
-            }
-            
-            return 12; // Maximum possible points from a hand (Doze)
-        }
-
-        public bool CanTeamWinInOneHand(int teamScore, int opponentScore)
-        {
-            var pointsNeeded = GetPointsUntilWin(teamScore);
-            var maxHandPoints = GetMaxPossibleHandPoints(teamScore, opponentScore);
-            
-            return pointsNeeded <= maxHandPoints;
-        }
-
-        public GameRiskLevel CalculateGameRiskLevel(int team1Score, int team2Score, int currentStake)
-        {
-            var isMaoDe10 = IsMaoDe10Active(team1Score, team2Score);
-            var pointsAtRisk = CalculateHandPoints(currentStake, team1Score, team2Score);
-            
-            // High risk if either team can win with current hand
-            if (CanTeamWinInOneHand(team1Score, team2Score) || CanTeamWinInOneHand(team2Score, team1Score))
-            {
-                return GameRiskLevel.High;
-            }
-            
-            // Medium risk if in Mão de 10 or high stakes
-            if (isMaoDe10 || pointsAtRisk >= 6)
-            {
-                return GameRiskLevel.Medium;
-            }
-            
-            // Low risk for early game low stakes
-            return GameRiskLevel.Low;
-        }
-
-        public ScoreAnalysis AnalyzeGameState(int team1Score, int team2Score, int currentStake)
-        {
-            return new ScoreAnalysis
-            {
-                Team1Score = team1Score,
-                Team2Score = team2Score,
-                CurrentStake = currentStake,
-                IsGameComplete = IsGameComplete(team1Score, team2Score),
-                WinningTeam = GetWinningTeam(team1Score, team2Score),
-                IsMaoDe10Active = IsMaoDe10Active(team1Score, team2Score),
-                HandPoints = CalculateHandPoints(currentStake, team1Score, team2Score),
-                Team1WinPercentage = CalculateWinPercentage(team1Score, team2Score),
-                Team2WinPercentage = CalculateWinPercentage(team2Score, team1Score),
-                RiskLevel = CalculateGameRiskLevel(team1Score, team2Score, currentStake),
-                Team1PointsToWin = GetPointsUntilWin(team1Score),
-                Team2PointsToWin = GetPointsUntilWin(team2Score),
-                Team1CanWinInOneHand = CanTeamWinInOneHand(team1Score, team2Score),
-                Team2CanWinInOneHand = CanTeamWinInOneHand(team2Score, team1Score)
-            };
-        }
-    }
-
-    public enum GameRiskLevel
-    {
-        Low,
-        Medium,
-        High
-    }
-
-    public class ScoreAnalysis
-    {
-        public int Team1Score { get; set; }
-        public int Team2Score { get; set; }
-        public int CurrentStake { get; set; }
-        public bool IsGameComplete { get; set; }
-        public int? WinningTeam { get; set; }
-        public bool IsMaoDe10Active { get; set; }
-        public int HandPoints { get; set; }
-        public double Team1WinPercentage { get; set; }
-        public double Team2WinPercentage { get; set; }
-        public GameRiskLevel RiskLevel { get; set; }
-        public int Team1PointsToWin { get; set; }
-        public int Team2PointsToWin { get; set; }
-        public bool Team1CanWinInOneHand { get; set; }
-        public bool Team2CanWinInOneHand { get; set; }
     }
 }

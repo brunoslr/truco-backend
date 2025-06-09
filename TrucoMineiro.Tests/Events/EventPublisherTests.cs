@@ -88,14 +88,12 @@ namespace TrucoMineiro.Tests.Events
             Assert.Single(testPublisher.PublishedEvents);
             Assert.Contains(gameEvent, testPublisher.PublishedEvents);
             testPublisher.AssertEventPublished<GameStartedEvent>();
-        }
-
-        [Fact]
+        }        [Fact]
         public async Task TestEventPublisher_WithHandler_ShouldExecuteHandler()
         {
             // Arrange
             var testPublisher = new TestEventPublisher();
-            var testHandler = new SimpleTestEventHandler<GameStartedEvent>();
+            var testHandler = new ConcreteTestEventHandler<GameStartedEvent>();
             testPublisher.RegisterHandler(testHandler);
 
             var gameId = Guid.NewGuid();
@@ -111,6 +109,12 @@ namespace TrucoMineiro.Tests.Events
             testHandler.AssertCallCount(1);
             Assert.Single(testHandler.HandledEvents);
             Assert.Equal(gameEvent, testHandler.HandledEvents.First());
+        }
+
+        // Simple concrete implementation for testing purposes
+        private class ConcreteTestEventHandler<T> : TestEventHandler<T> where T : IGameEvent
+        {
+            // No additional implementation needed - base class provides all required functionality
         }
 
         [Fact]
@@ -199,21 +203,9 @@ namespace TrucoMineiro.Tests.Events
             Assert.Equal(gameId, mockEvent.GameId);
             Assert.Equal("MockGameEvent", mockEvent.EventType);
             Assert.True(mockEvent.OccurredAt > DateTime.UtcNow.AddMinutes(-1));
-        }
-
-        public void Dispose()
+        }        public void Dispose()
         {
             _serviceProvider?.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Simple mock event for testing
-    /// </summary>
-    public class MockGameEvent : GameEventBase
-    {
-        public MockGameEvent(Guid gameId) : base(gameId)
-        {
         }
     }
 }

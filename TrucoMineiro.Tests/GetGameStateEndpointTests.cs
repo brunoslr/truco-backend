@@ -117,15 +117,10 @@ namespace TrucoMineiro.Tests
                 });
 
             mockGameFlowService.Setup(x => x.StartNewHand(It.IsAny<GameState>()))
-                .Callback((GameState gameState) => {
-                    // Reset for new hand
+                .Callback((GameState gameState) => {                // Reset for new hand
                     gameState.PlayedCards.Clear();
                     gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
-                });            // Create mock GameFlowReactionService
-            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
-            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
-                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);
+                });
                 
             _gameService = new GameService(
                 mockGameStateManager.Object,
@@ -134,10 +129,9 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
-                mockGameFlowReactionService.Object,
                 configuration);
             _controller = new TrucoGameController(_gameService);
-        }        private GameState CreateValidGameState(string? playerName = null)
+        }private GameState CreateValidGameState(string? playerName = null)
         {
             var gameState = new GameState();
             gameState.InitializeGame(playerName ?? "TestPlayer");
@@ -270,9 +264,7 @@ namespace TrucoMineiro.Tests
 
             // Configure mock GameRepository to return games from storage
             mockGameRepository.Setup(x => x.GetGameAsync(It.IsAny<string>()))
-                .ReturnsAsync((string gameId) => gameStorage.ContainsKey(gameId) ? gameStorage[gameId] : null);
-
-            mockGameRepository.Setup(x => x.SaveGameAsync(It.IsAny<GameState>()))
+                .ReturnsAsync((string gameId) => gameStorage.ContainsKey(gameId) ? gameStorage[gameId] : null);            mockGameRepository.Setup(x => x.SaveGameAsync(It.IsAny<GameState>()))
                 .ReturnsAsync((GameState gameState) => {
                     gameStorage[gameState.GameId] = gameState;
                     return true;
@@ -280,15 +272,11 @@ namespace TrucoMineiro.Tests
 
             // Configure mock ScoreCalculationService
             mockScoreCalculationService.Setup(x => x.IsGameComplete(It.IsAny<GameState>()))
-                .Returns(false);            // Configure mock TrucoRulesEngine
+                .Returns(false);
+
+            // Configure mock TrucoRulesEngine
             mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
                 .Returns(1);
-                
-            // Create mock GameFlowReactionService
-            var mockGameFlowReactionService = new Mock<IGameFlowReactionService>();
-            mockGameFlowReactionService.Setup(x => x.ProcessCardPlayReactionsAsync(
-                It.IsAny<GameState>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);
                 
             var devGameService = new GameService(
                 mockGameStateManager.Object,
@@ -297,7 +285,6 @@ namespace TrucoMineiro.Tests
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
-                mockGameFlowReactionService.Object,
                 devConfig);
             var devController = new TrucoGameController(devGameService);
             var game = devGameService.CreateGame("TestPlayer");
