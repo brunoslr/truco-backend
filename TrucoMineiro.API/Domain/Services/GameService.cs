@@ -4,27 +4,27 @@ using TrucoMineiro.API.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
 using System.Threading;
 using TrucoMineiro.API.Domain.Models;
+using TrucoMineiro.API.Domain.Events;
+using TrucoMineiro.API.Domain.Events.GameEvents;
 
 namespace TrucoMineiro.API.Services
 {    /// <summary>
      /// Service for managing Truco game logic (legacy wrapper around domain services)
      /// </summary>
     public class GameService
-    {
-        private readonly IGameStateManager _gameStateManager;
+    {        private readonly IGameStateManager _gameStateManager;
         private readonly IGameRepository _gameRepository;
         private readonly IGameFlowService _gameFlowService;
         private readonly ITrucoRulesEngine _trucoRulesEngine;
         private readonly IAIPlayerService _aiPlayerService;
         private readonly IScoreCalculationService _scoreCalculationService;
+        private readonly IEventPublisher _eventPublisher;
 
 
         private readonly bool _devMode;
         private readonly bool _autoAiPlay;
         private readonly int _aiPlayDelayMs;
-        private readonly int _newHandDelayMs;
-
-        /// <summary>
+        private readonly int _newHandDelayMs;        /// <summary>
         /// Constructor for GameService
         /// </summary>
         /// <param name="gameStateManager">Game state management service</param>
@@ -32,7 +32,9 @@ namespace TrucoMineiro.API.Services
         /// <param name="gameFlowService">Game flow service</param>
         /// <param name="trucoRulesEngine">Truco rules engine</param>
         /// <param name="aiPlayerService">AI player service</param>
-        /// <param name="scoreCalculationService">Score calculation service</param>        /// <param name="configuration">Application configuration</param>
+        /// <param name="scoreCalculationService">Score calculation service</param>
+        /// <param name="eventPublisher">Event publisher service</param>
+        /// <param name="configuration">Application configuration</param>
         public GameService(
             IGameStateManager gameStateManager,
             IGameRepository gameRepository,
@@ -40,18 +42,17 @@ namespace TrucoMineiro.API.Services
             ITrucoRulesEngine trucoRulesEngine,
             IAIPlayerService aiPlayerService,
             IScoreCalculationService scoreCalculationService,
-            IConfiguration configuration)
-        {
+            IEventPublisher eventPublisher,
+            IConfiguration configuration)        {
             _gameStateManager = gameStateManager;            _gameRepository = gameRepository;
             _gameFlowService = gameFlowService;
             _trucoRulesEngine = trucoRulesEngine;
             _aiPlayerService = aiPlayerService;
             _scoreCalculationService = scoreCalculationService;
-
-            // Read configuration from appsettings.json
+            _eventPublisher = eventPublisher;            // Read configuration from appsettings.json
             _devMode = configuration.GetValue<bool>("FeatureFlags:DevMode", false);
             _autoAiPlay = configuration.GetValue<bool>("FeatureFlags:AutoAiPlay", true);
-            _aiPlayDelayMs = configuration.GetValue<int>("GameSettings:AIPlayDelayMs", GameConfiguration.DefaultAIPlayDelayMs);
+            _aiPlayDelayMs = configuration.GetValue<int>("GameSettings:AIPlayDelayMs", GameConfiguration.DefaultMaxAIPlayDelayMs);
             _newHandDelayMs = configuration.GetValue<int>("GameSettings:NewHandDelayMs", GameConfiguration.DefaultNewHandDelayMs);
         }
 
@@ -110,15 +111,28 @@ namespace TrucoMineiro.API.Services
             if (game == null)
             {
                 return MappingService.MapGameStateToPlayCardResponse(new GameState(), requestingPlayerSeat, _devMode, false, "Game not found");
-            }
-
-            // Handle fold action with special card creation (value=0, empty suit)
+            }            // Handle fold action with special card creation (value=0, empty suit)
             if (isFold)
             {
                 var foldSuccess = HandleFoldAction(game, playerSeat);
                 if (!foldSuccess)
                 {
                     return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Cannot fold at this time");
+                }                // Publish fold event
+                var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
+                if (player != null)
+                {
+                    var foldCard = Card.CreateFoldCard();
+                    _ = Task.Run(async () => await _eventPublisher.PublishAsync(new CardPlayedEvent(
+                        Guid.Parse(gameId),
+                        Guid.Parse(player.Id),
+                        foldCard,
+                        player,
+                        game.CurrentRound,
+                        game.CurrentHand,
+                        player.IsAI,
+                        game
+                    )));
                 }
             }
             else
@@ -129,7 +143,24 @@ namespace TrucoMineiro.API.Services
                 {
                     return MappingService.MapGameStateToPlayCardResponse(game, requestingPlayerSeat, _devMode, false, "Invalid card play");
                 }
-            }            // Process post-card-play reactions directly using GameFlowService
+
+                // Publish card played event
+                var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
+                var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == playerSeat);
+                if (player != null && playedCard?.Card != null)
+                {
+                    _ = Task.Run(async () => await _eventPublisher.PublishAsync(new CardPlayedEvent(
+                        Guid.Parse(gameId),
+                        Guid.Parse(player.Id),
+                        playedCard.Card,
+                        player,
+                        game.CurrentRound,
+                        game.CurrentHand,
+                        player.IsAI,
+                        game
+                    )));
+                }
+            }// Process post-card-play reactions directly using GameFlowService
             // 1. Check if round is complete and determine winner (handled in GameFlowService.PlayCard)
             // 2. Process hand completion if needed
             var handCompletionTask = _gameFlowService.ProcessHandCompletionAsync(game, _newHandDelayMs);
@@ -158,12 +189,8 @@ namespace TrucoMineiro.API.Services
             if (player == null || !player.IsActive)
             {
                 return false;
-            }
-
-            // Create special fold card with value=0 and empty suit
-            var foldCard = new Card { Value = "0", Suit = "" };
-
-            // Find the player's played card slot and set the fold card
+            }            // Create fold card using proper method
+            var foldCard = Card.CreateFoldCard();// Find the player's played card slot and set the fold card
             var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);
             if (playedCard != null)
             {
@@ -174,12 +201,7 @@ namespace TrucoMineiro.API.Services
                 game.PlayedCards.Add(new PlayedCard(player.Seat, foldCard));
             }
 
-            // Add to the action log
-            game.ActionLog.Add(new ActionLogEntry("card-played")
-            {
-                PlayerSeat = player.Seat,
-                Card = "Fold"
-            });
+            // ActionLog entry will be created by ActionLogEventHandler when CardPlayedEvent is published
 
             // Move to the next player's turn
             _gameFlowService.AdvanceToNextPlayer(game);
@@ -225,8 +247,7 @@ namespace TrucoMineiro.API.Services
                 newStakes = game.Stakes + TrucoConstants.Stakes.RaiseAmount; if (newStakes > TrucoConstants.Stakes.Maximum)
                 {
                     return false;
-                }
-            }
+                }            }
 
             game.Stakes = newStakes;
 
@@ -236,6 +257,18 @@ namespace TrucoMineiro.API.Services
                 PlayerSeat = player.Seat,
                 Action = $"Raised stakes to {newStakes}"
             });
+
+            // Publish TrucoRaiseEvent
+            var trucoRaiseEvent = new TrucoRaiseEvent(
+                Guid.Parse(gameId),
+                Guid.Parse(player.Id),
+                player,
+                game.Stakes - (newStakes - game.Stakes), // currentStakes before the change
+                newStakes,
+                !game.IsTrucoCalled, // isInitialTruco
+                game
+            );
+            _ = Task.Run(async () => await _eventPublisher.PublishAsync(trucoRaiseEvent));
 
             return true;
         }        
@@ -269,8 +302,7 @@ namespace TrucoMineiro.API.Services
             if (newStakes > TrucoConstants.Stakes.Maximum)
             {
                 return false;
-            }
-            game.Stakes = newStakes;
+            }            game.Stakes = newStakes;
 
             // Add to the action log
             game.ActionLog.Add(new ActionLogEntry("button-pressed")
@@ -278,6 +310,18 @@ namespace TrucoMineiro.API.Services
                 PlayerSeat = player.Seat,
                 Action = $"Raised stakes to {newStakes}"
             });
+
+            // Publish TrucoRaiseEvent
+            var trucoRaiseEvent = new TrucoRaiseEvent(
+                Guid.Parse(gameId),
+                Guid.Parse(player.Id),
+                player,
+                game.Stakes - TrucoConstants.Stakes.RaiseAmount, // currentStakes before the raise
+                newStakes,
+                false, // isInitialTruco (this is always a raise, not initial truco)
+                game
+            );
+            _ = Task.Run(async () => await _eventPublisher.PublishAsync(trucoRaiseEvent));
 
             return true;
         }        
@@ -317,6 +361,18 @@ namespace TrucoMineiro.API.Services
                 Winner = opposingTeam,
                 WinnerTeam = opposingTeam
             });
+
+            // Publish FoldHandEvent
+            var foldHandEvent = new FoldHandEvent(
+                Guid.Parse(gameId),
+                Guid.Parse(player.Id),
+                player,
+                game.CurrentHand,
+                game.Stakes,
+                opposingTeam,
+                game
+            );
+            _ = Task.Run(async () => await _eventPublisher.PublishAsync(foldHandEvent));
 
             // Reset for the next hand
             _gameFlowService.StartNewHand(game);

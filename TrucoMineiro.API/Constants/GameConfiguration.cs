@@ -21,11 +21,15 @@ namespace TrucoMineiro.API.Constants
         /// Number of players in the game
         /// </summary>
         public const int MaxPlayers = 4;
+          /// <summary>
+        /// Minimum delay in milliseconds between AI player actions if not set in configuration
+        /// </summary>
+        public const int DefaultMinAIPlayDelayMs = 500;
         
         /// <summary>
-        /// Default delay in milliseconds between AI player actions if not set in configuration
+        /// Maximum delay in milliseconds between AI player actions if not set in configuration
         /// </summary>
-        public const int DefaultAIPlayDelayMs = 2000;
+        public const int DefaultMaxAIPlayDelayMs = 2000;
         
         /// <summary>
         /// Default delay in milliseconds before starting a new hand if not set in configuration

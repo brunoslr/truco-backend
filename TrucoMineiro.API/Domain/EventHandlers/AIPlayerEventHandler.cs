@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Events.GameEvents;
 using TrucoMineiro.API.Domain.Interfaces;
@@ -67,17 +68,11 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     {
                         playedCard.Card = card;
                     }
-                    else
-                    {
+                    else                    {
                         game.PlayedCards.Add(new PlayedCard(player.Seat, card));
                     }
 
-                    // Add to action log
-                    game.ActionLog.Add(new ActionLogEntry("card-played")
-                    {
-                        PlayerSeat = player.Seat,
-                        Card = $"{card.Value} of {card.Suit}"
-                    });
+                    // ActionLog entry will be created by ActionLogEventHandler when CardPlayedEvent is published
 
                     // Save game state
                     await _gameRepository.SaveGameAsync(game);
@@ -110,16 +105,14 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 _logger.LogError(ex, "Error processing AI turn for player {PlayerName} (seat {PlayerSeat}) in game {GameId}", 
                     gameEvent.Player?.Name, gameEvent.Player?.Seat, gameEvent.GameId);
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Generate realistic AI thinking delay
         /// </summary>
         private TimeSpan GetAIThinkingDelay()
         {
-            // Random delay between 500ms and 2000ms for realism
+            // Random delay between min and max AI play delay for realism
             var random = new Random();
-            return TimeSpan.FromMilliseconds(random.Next(500, 2000));
+            return TimeSpan.FromMilliseconds(random.Next(GameConfiguration.DefaultMinAIPlayDelayMs, GameConfiguration.DefaultMaxAIPlayDelayMs));
         }
     }
 }

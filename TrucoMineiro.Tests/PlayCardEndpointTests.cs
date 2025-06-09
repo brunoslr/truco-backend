@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using TrucoMineiro.API.Services;
 using TrucoMineiro.API.DTOs;
+using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
 using Moq;
@@ -28,14 +29,14 @@ namespace TrucoMineiro.Tests
             var configuration = config ?? _configuration;
               // Create a dictionary to store created games (simulating repository storage)
             var gameStorage = new Dictionary<string, GameState>();
-            
-            // Create mock services
+              // Create mock services
             var mockGameStateManager = new Mock<IGameStateManager>();
             var mockGameRepository = new Mock<IGameRepository>();
             var mockGameFlowService = new Mock<IGameFlowService>();
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
             var mockScoreCalculationService = new Mock<IScoreCalculationService>();
+            var mockEventPublisher = new Mock<IEventPublisher>();
 
             // Configure mock GameStateManager to return a valid GameState and store it
             mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
@@ -119,15 +120,14 @@ namespace TrucoMineiro.Tests
                 .Callback((GameState gameState) => {
                     // Reset for new hand                gameState.PlayedCards.Clear();
                     gameState.CurrentPlayerIndex = gameState.FirstPlayerSeat;
-                });
-
-            return new GameService(
+                });            return new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
                 mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
                 mockAIPlayerService.Object,
                 mockScoreCalculationService.Object,
+                mockEventPublisher.Object,
                 configuration);
         }private GameState CreateValidGameState(string? playerName = null)
         {
@@ -222,12 +222,11 @@ namespace TrucoMineiro.Tests
             Assert.Equal("Card played successfully", response.Message);
             Assert.NotNull(response.GameState);
               // Verify a special fold card was created (value=0, empty suit)
-            var updatedGame = gameService.GetGame(game.GameId);
-            var playedCard = updatedGame!.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == activePlayer.Seat);
+            var updatedGame = gameService.GetGame(game.GameId);            var playedCard = updatedGame!.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == activePlayer.Seat);
             Assert.NotNull(playedCard);
             Assert.NotNull(playedCard.Card);
-            Assert.Equal("0", playedCard.Card.Value);
-            Assert.Equal("", playedCard.Card.Suit);
+            Assert.Equal("FOLD", playedCard.Card.Value);
+            Assert.Equal("FOLD", playedCard.Card.Suit);
         }[Fact]
         public void PlayCard_ShouldReturnError_WhenGameNotFound()
         {
