@@ -1,3 +1,5 @@
+using TrucoMineiro.API.Constants;
+
 namespace TrucoMineiro.API.Domain.Models
 {
     /// <summary>
@@ -11,14 +13,14 @@ namespace TrucoMineiro.API.Domain.Models
         public string Value { get; set; } = string.Empty;
 
         /// <summary>
-        /// The suit of the card (e.g., "Clubs", "Hearts", "Spades", "Diamonds")
+        /// The suit of the card (e.g., "♣", "♥", "♠", "♦")
         /// </summary>
         public string Suit { get; set; } = string.Empty;
 
         public Card(string value, string suit)
         {
             Value = value;
-            Suit = suit;
+            Suit = SuitConstants.NormalizeSuit(suit); // Auto-normalize suit to standard format
         }
 
         public Card() { }

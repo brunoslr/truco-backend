@@ -1,3 +1,4 @@
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 
@@ -7,35 +8,34 @@ namespace TrucoMineiro.API.Domain.Services
     /// Implementation of hand resolution logic for Truco Mineiro
     /// </summary>
     public class HandResolutionService : IHandResolutionService
-    {
-        // Truco Mineiro card hierarchy (higher values = stronger cards)
+    {        // Truco Mineiro card hierarchy (higher values = stronger cards)
         private readonly Dictionary<string, Dictionary<string, int>> _cardStrengths = new()
         {
             // Special cards (manilhas)
-            ["4"] = new Dictionary<string, int> { ["Clubs"] = 14 }, // Zap (highest)
+            ["4"] = new Dictionary<string, int> { [SuitConstants.Clubs] = 14 }, // Zap (highest)
             ["7"] = new Dictionary<string, int> 
             { 
-                ["Hearts"] = 13,    // Copas (second highest)
-                ["Diamonds"] = 11,  // Espadinha (fourth highest)
-                ["Spades"] = 4,     // Regular 7
-                ["Clubs"] = 4       // Regular 7
+                [SuitConstants.Hearts] = 13,    // Copas (second highest)
+                [SuitConstants.Diamonds] = 11,  // Espadinha (fourth highest)
+                [SuitConstants.Spades] = 4,     // Regular 7
+                [SuitConstants.Clubs] = 4       // Regular 7
             },
             ["A"] = new Dictionary<string, int> 
             { 
-                ["Spades"] = 12,    // Espadão (third highest)
-                ["Hearts"] = 8,     // Regular Ace
-                ["Diamonds"] = 8,   // Regular Ace
-                ["Clubs"] = 8       // Regular Ace
+                [SuitConstants.Spades] = 12,    // Espadão (third highest)
+                [SuitConstants.Hearts] = 8,     // Regular Ace
+                [SuitConstants.Diamonds] = 8,   // Regular Ace
+                [SuitConstants.Clubs] = 8       // Regular Ace
             },
             
             // Regular cards in order
-            ["3"] = new Dictionary<string, int> { ["Hearts"] = 10, ["Diamonds"] = 10, ["Spades"] = 10, ["Clubs"] = 10 },
-            ["2"] = new Dictionary<string, int> { ["Hearts"] = 9, ["Diamonds"] = 9, ["Spades"] = 9, ["Clubs"] = 9 },
-            ["K"] = new Dictionary<string, int> { ["Hearts"] = 7, ["Diamonds"] = 7, ["Spades"] = 7, ["Clubs"] = 7 },
-            ["J"] = new Dictionary<string, int> { ["Hearts"] = 6, ["Diamonds"] = 6, ["Spades"] = 6, ["Clubs"] = 6 },
-            ["Q"] = new Dictionary<string, int> { ["Hearts"] = 5, ["Diamonds"] = 5, ["Spades"] = 5, ["Clubs"] = 5 },
-            ["6"] = new Dictionary<string, int> { ["Hearts"] = 3, ["Diamonds"] = 3, ["Spades"] = 3, ["Clubs"] = 3 },
-            ["5"] = new Dictionary<string, int> { ["Hearts"] = 2, ["Diamonds"] = 2, ["Spades"] = 2, ["Clubs"] = 2 }
+            ["3"] = new Dictionary<string, int> { [SuitConstants.Hearts] = 10, [SuitConstants.Diamonds] = 10, [SuitConstants.Spades] = 10, [SuitConstants.Clubs] = 10 },
+            ["2"] = new Dictionary<string, int> { [SuitConstants.Hearts] = 9, [SuitConstants.Diamonds] = 9, [SuitConstants.Spades] = 9, [SuitConstants.Clubs] = 9 },
+            ["K"] = new Dictionary<string, int> { [SuitConstants.Hearts] = 7, [SuitConstants.Diamonds] = 7, [SuitConstants.Spades] = 7, [SuitConstants.Clubs] = 7 },
+            ["J"] = new Dictionary<string, int> { [SuitConstants.Hearts] = 6, [SuitConstants.Diamonds] = 6, [SuitConstants.Spades] = 6, [SuitConstants.Clubs] = 6 },
+            ["Q"] = new Dictionary<string, int> { [SuitConstants.Hearts] = 5, [SuitConstants.Diamonds] = 5, [SuitConstants.Spades] = 5, [SuitConstants.Clubs] = 5 },
+            ["6"] = new Dictionary<string, int> { [SuitConstants.Hearts] = 3, [SuitConstants.Diamonds] = 3, [SuitConstants.Spades] = 3, [SuitConstants.Clubs] = 3 },
+            ["5"] = new Dictionary<string, int> { [SuitConstants.Hearts] = 2, [SuitConstants.Diamonds] = 2, [SuitConstants.Spades] = 2, [SuitConstants.Clubs] = 2 }
         };
 
         public int GetCardStrength(Card card)
