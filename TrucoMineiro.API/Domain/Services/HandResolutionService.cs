@@ -50,22 +50,21 @@ namespace TrucoMineiro.API.Domain.Services
             
             // Default strength for cards not in hierarchy (shouldn't happen with proper deck)
             return 0;
-        }
-
-        public Player? DetermineRoundWinner(List<PlayedCard> playedCards, List<Player> players)
+        }        public Player? DetermineRoundWinner(List<PlayedCard> playedCards, List<Player> players)
         {
-            if (!playedCards.Any(pc => pc.Card != null))
+            if (!playedCards.Any(pc => !pc.Card.IsFold))
                 return null;
 
             Player? winner = null;
             int highestStrength = -1;
-            bool hasDraw = false;            foreach (var playedCard in playedCards.Where(pc => pc.Card != null))
+            bool hasDraw = false;
+            foreach (var playedCard in playedCards.Where(pc => !pc.Card.IsFold))
             {
                 var player = players.FirstOrDefault(p => p.Seat == playedCard.PlayerSeat);
-                if (player != null && playedCard.Card != null)
+                if (player != null && !playedCard.Card.IsFold)
                 {
                     var strength = GetCardStrength(playedCard.Card);
-                    
+
                     if (strength > highestStrength)
                     {
                         highestStrength = strength;
@@ -80,12 +79,10 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return hasDraw ? null : winner;
-        }
-
-        public bool IsRoundDraw(List<PlayedCard> playedCards, List<Player> players)
+        }        public bool IsRoundDraw(List<PlayedCard> playedCards, List<Player> players)
         {
             return DetermineRoundWinner(playedCards, players) == null && 
-                   playedCards.Any(pc => pc.Card != null);
+                   playedCards.Any(pc => !pc.Card.IsFold);
         }
 
         public string? HandleDrawResolution(GameState game, int roundNumber)
@@ -109,11 +106,12 @@ namespace TrucoMineiro.API.Domain.Services
                 }
                 return null;
             }
-        }        public bool IsHandComplete(GameState game)
+        }
+        public bool IsHandComplete(GameState game)
         {
             // Hand is complete when a team wins 2 out of 3 rounds
             var teamWins = new Dictionary<int, int>();
-            
+
             foreach (var winningTeam in game.RoundWinners)
             {
                 teamWins[winningTeam] = teamWins.GetValueOrDefault(winningTeam, 0) + 1;
@@ -122,20 +120,21 @@ namespace TrucoMineiro.API.Domain.Services
                     return true;
                 }
             }
-            
+
             return false;
-        }        public string? GetHandWinner(GameState game)
+        }
+        public string? GetHandWinner(GameState game)
         {
             if (!IsHandComplete(game))
                 return null;
 
             var teamWins = new Dictionary<int, int>();
-            
+
             foreach (var winningTeam in game.RoundWinners)
             {
                 teamWins[winningTeam] = teamWins.GetValueOrDefault(winningTeam, 0) + 1;
             }
-            
+
             var winningTeamNumber = teamWins.FirstOrDefault(kvp => kvp.Value >= 2).Key;
             return winningTeamNumber == 0 ? null : $"Team{winningTeamNumber}";
         }

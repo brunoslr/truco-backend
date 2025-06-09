@@ -80,8 +80,7 @@ namespace TrucoMineiro.API.Domain.Services
             Player? roundWinner = null;
 
             foreach (var playedCard in game.PlayedCards)
-            {
-                if (playedCard.Card != null)
+            {                if (!playedCard.Card.IsFold)
                 {
                     var player = game.Players.FirstOrDefault(p => p.Seat == playedCard.PlayerSeat);
                     if (player != null)
@@ -110,17 +109,16 @@ namespace TrucoMineiro.API.Domain.Services
                 game.AddScore(roundWinner.Team, game.Stakes);
 
                 // Clear the played cards for the next round or hand
-                if (game.PlayedCards.Any(pc => pc.Card != null && game.Players.Any(p => p.Hand.Count == 0)))
+                if (game.PlayedCards.Any(pc => !pc.Card.IsFold && game.Players.Any(p => p.Hand.Count == 0)))
                 {
                     // If any player has no cards left, move to the next hand
                     game.NextHand();
                 }
                 else
-                {
-                    // Otherwise, clear for the next round in the same hand
+                {                    // Otherwise, clear for the next round in the same hand
                     foreach (var pc in game.PlayedCards)
                     {
-                        pc.Card = null;
+                        pc.Card = Card.CreateFoldCard();
                     }
                 }
             }

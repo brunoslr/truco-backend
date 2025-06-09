@@ -26,8 +26,21 @@ namespace TrucoMineiro.API.Domain.Models
         public Card() { }
 
         /// <summary>
+        /// Creates a fold card (represents a player folding)
+        /// </summary>
+        public static Card CreateFoldCard()
+        {
+            return new Card(TrucoConstants.Cards.FoldValue, TrucoConstants.Cards.FoldSuit);
+        }
+
+        /// <summary>
+        /// Checks if this card represents a fold
+        /// </summary>
+        public bool IsFold => Value == TrucoConstants.Cards.FoldValue && Suit == TrucoConstants.Cards.FoldSuit;
+
+        /// <summary>
         /// Returns a string representation of the card
         /// </summary>
-        public override string ToString() => $"{Value} of {Suit}";
+        public override string ToString() => IsFold ? "FOLD" : $"{Value} of {Suit}";
     }
 }

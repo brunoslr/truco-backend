@@ -34,6 +34,7 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IAIPlayerService, 
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameStateManager, TrucoMineiro.API.Domain.Services.GameStateManager>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameFlowService, TrucoMineiro.API.Domain.Services.GameFlowService>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameFlowReactionService, TrucoMineiro.API.Domain.Services.GameFlowReactionService>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameCleanupService, TrucoMineiro.API.Domain.Services.GameStateCleanupService>();
 
 // Register application services
 builder.Services.AddScoped<TrucoMineiro.API.Services.GameService>();
@@ -45,6 +46,8 @@ builder.Services.AddSingleton<TrucoMineiro.API.Domain.Events.IEventPublisher, Tr
 // Register event handlers
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.PlayerTurnStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.AIPlayerEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.CardPlayedEvent>, TrucoMineiro.API.Domain.EventHandlers.GameFlowEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.RoundCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.RoundCleanupEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.HandCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.HandCleanupEventHandler>();
 
 // Register state machine
 builder.Services.AddScoped<TrucoMineiro.API.Domain.StateMachine.IGameStateMachine, TrucoMineiro.API.Domain.StateMachine.GameStateMachine>();
@@ -92,3 +95,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Make the implicit Program class public for integration testing
+public partial class Program { }

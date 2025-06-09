@@ -1,4 +1,7 @@
+using System;
 using TrucoMineiro.API.Constants;
+using TrucoMineiro.API.Domain.Events;
+using TrucoMineiro.API.Domain.Events.GameEvents;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 
@@ -11,11 +14,22 @@ namespace TrucoMineiro.API.Domain.Services
     {
         private readonly IAIPlayerService _aiPlayerService;
         private readonly IGameRepository _gameRepository;
+        private readonly IHandResolutionService _handResolutionService;
+        private readonly IEventPublisher _eventPublisher;
+        private readonly IGameCleanupService _gameCleanupService;
 
-        public GameFlowService(IAIPlayerService aiPlayerService, IGameRepository gameRepository)
+        public GameFlowService(
+            IAIPlayerService aiPlayerService, 
+            IGameRepository gameRepository,
+            IHandResolutionService handResolutionService,
+            IEventPublisher eventPublisher,
+            IGameCleanupService gameCleanupService)
         {
             _aiPlayerService = aiPlayerService;
             _gameRepository = gameRepository;
+            _handResolutionService = handResolutionService;
+            _eventPublisher = eventPublisher;
+            _gameCleanupService = gameCleanupService;
         }
 
         /// <summary>
@@ -38,8 +52,7 @@ namespace TrucoMineiro.API.Domain.Services
             var card = player.PlayCard(cardIndex);
 
             // Find the player's played card slot
-            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);
-            if (playedCard != null)
+            var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);            if (playedCard != null)
             {
                 playedCard.Card = card;
             }
@@ -65,24 +78,23 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return true;
-        }
-
+        }        
+        
         /// <summary>
         /// Executes AI player turns in sequence with appropriate delays
         /// </summary>
         public async Task ProcessAITurnsAsync(GameState game, int aiPlayDelayMs)
         {
             // Continue playing for AI players until it's a human player's turn or round is complete
-            var maxIterations = 10; // Prevent infinite loops
             var iterations = 0;
 
-            while (iterations < maxIterations)
+            while (iterations < TrucoConstants.AI.MaxIterations)
             {
                 var activePlayer = game.Players.FirstOrDefault(p => p.IsActive);
                 if (activePlayer == null) break;
 
-                // Check if it's a human player (seat 0 typically) or if round is complete
-                if (activePlayer.Seat == 0 || IsRoundComplete(game))
+                // Check if it's a human player or if round is complete
+                if (activePlayer.Seat == TrucoConstants.Game.HumanPlayerSeat || IsRoundComplete(game))
                 {
                     break;
                 }
@@ -102,21 +114,43 @@ namespace TrucoMineiro.API.Domain.Services
 
                 iterations++;
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Checks if a hand is complete and processes end-of-hand logic
         /// </summary>
         public async Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs)
         {
-            // Check if all players have no cards left (hand is complete)
-            if (game.Players.All(p => p.Hand.Count == 0))
+            // Use the proper hand resolution service to check completion
+            if (_handResolutionService.IsHandComplete(game))
             {
+                // Determine the winning team and round information
+                var winningTeam = game.TurnWinner ?? TrucoConstants.Teams.PlayerTeam;
+                var roundWinners = new List<int>(); // This would need to be tracked throughout the hand
+                var pointsAwarded = game.Stakes;
+
+                // Publish hand completed event which will trigger cleanup
+                await _eventPublisher.PublishAsync(new HandCompletedEvent(
+                    Guid.Parse(game.Id), 
+                    game.CurrentHand, 
+                    winningTeam,
+                    roundWinners,
+                    pointsAwarded,
+                    game));
+
                 // Add delay before starting a new hand
                 await Task.Delay(newHandDelayMs);
 
-                // Reset for the next hand
-                ResetForNewHand(game);
+                // Determine new dealer and first player for next hand
+                var currentDealerSeat = game.Players.FindIndex(p => p.IsDealer);
+                var newDealerSeat = (currentDealerSeat + 1) % TrucoConstants.Game.MaxPlayers;
+                var newFirstPlayerSeat = (newDealerSeat + 1) % TrucoConstants.Game.MaxPlayers;
+
+                // Publish hand started event for the new hand
+                await _eventPublisher.PublishAsync(new HandStartedEvent(
+                    Guid.Parse(game.Id), 
+                    game.CurrentHand + 1,
+                    newDealerSeat,
+                    newFirstPlayerSeat,
+                    game));
             }
         }
 
@@ -152,46 +186,46 @@ namespace TrucoMineiro.API.Domain.Services
                 nextPlayer.IsActive = true;
                 game.CurrentPlayerIndex = nextPlayer.Seat;
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Checks if all players have played their cards for the current round
         /// </summary>
         public bool IsRoundComplete(GameState game)
         {
-            return game.PlayedCards.All(pc => pc.Card != null);
+            // Ensure we have exactly 4 PlayedCard slots (one per player seat)
+            if (game.PlayedCards.Count != TrucoConstants.Game.MaxPlayers)
+            {
+                return false;
+            }            // Check if each player seat (0-3) has played a card in this round
+            for (int seat = 0; seat < TrucoConstants.Game.MaxPlayers; seat++)
+            {
+                var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == seat);
+                if (playedCard?.Card == null || playedCard.Card.IsFold)
+                {
+                    return false; // This player hasn't played yet (still fold card)
+                }
+            }
+
+            return true; // All players have played
         }
-
+        
         /// <summary>
-        /// Determine the winner of the current round
+        /// Determine the winner of the current round using proper card strength calculation
         /// </summary>
-        private void DetermineRoundWinner(GameState game)
+        private async void DetermineRoundWinner(GameState game)
         {
-            // In a real implementation, this would use Truco card ranking rules
-            // For now, we'll use a simple value comparison for demonstration
-
-            // Define card strength (Truco Mineiro uses different card strengths than traditional decks)
-            var cardStrength = new Dictionary<string, int>
-            {
-                { "4", 1 }, { "5", 2 }, { "6", 3 }, { "7", 4 },
-                { "Q", 5 }, { "J", 6 }, { "K", 7 }, { "A", 8 },
-                { "2", 9 }, { "3", 10 }
-            };
-
-            var strongestCard = -1;
+            // Use the proper hand resolution service for card strength determination
             Player? roundWinner = null;
-
-            foreach (var playedCard in game.PlayedCards)
+            var strongestCardStrength = -1;            foreach (var playedCard in game.PlayedCards)
             {
-                if (playedCard.Card != null)
+                if (!playedCard.Card.IsFold)
                 {
                     var player = game.Players.FirstOrDefault(p => p.Seat == playedCard.PlayerSeat);
                     if (player != null)
                     {
-                        var cardValue = cardStrength.GetValueOrDefault(playedCard.Card.Value, 0);
-                        if (cardValue > strongestCard)
+                        var cardStrength = _handResolutionService.GetCardStrength(playedCard.Card);
+                        if (cardStrength > strongestCardStrength)
                         {
-                            strongestCard = cardValue;
+                            strongestCardStrength = cardStrength;
                             roundWinner = player;
                         }
                     }
@@ -209,81 +243,38 @@ namespace TrucoMineiro.API.Domain.Services
                 });
 
                 // Add the points to the winner's team
-                game.AddScore(roundWinner.Team, game.Stakes);
+                game.AddScore(roundWinner.Team, game.Stakes);                // Publish round started event for the next round (which will trigger cleanup)
+                await _eventPublisher.PublishAsync(new RoundStartedEvent(
+                    Guid.Parse(game.Id),
+                    game.CurrentRound + 1,
+                    game.CurrentHand,
+                    roundWinner.Seat,
+                    game));
 
-                // Clear the played cards for the next round or hand
-                if (game.PlayedCards.Any(pc => pc.Card != null && game.Players.Any(p => p.Hand.Count == 0)))
+                // Check if hand is complete, otherwise prepare for next round
+                if (_handResolutionService.IsHandComplete(game))
                 {
-                    // If any player has no cards left, move to the next hand
-                    game.NextHand();
+                    // Hand completion will be handled by ProcessHandCompletionAsync
+                    return;
                 }
-                else
-                {
-                    // Otherwise, clear for the next round in the same hand
-                    foreach (var pc in game.PlayedCards)
-                    {
-                        pc.Card = null;
-                    }
-                }
-            }
-        }
+            }        }
 
         /// <summary>
-        /// Resets the game state for a new hand
+        /// Starts a new hand by using event-driven cleanup
         /// </summary>
-        private void ResetForNewHand(GameState game)
+        public async void StartNewHand(GameState game)
         {
-            // Increment hand number
-            game.CurrentHand++;
+            // Publish hand started event which will trigger proper cleanup
+            var currentDealerSeat = game.Players.FindIndex(p => p.IsDealer);
+            var newDealerSeat = (currentDealerSeat + 1) % TrucoConstants.Game.MaxPlayers;
+            var newFirstPlayerSeat = (newDealerSeat + 1) % TrucoConstants.Game.MaxPlayers;
 
-            // Reset stakes and flags
-            game.Stakes = TrucoConstants.Stakes.Initial;
-            game.IsTrucoCalled = false;
-            game.IsRaiseEnabled = true;
-
-            // Rotate the dealer
-            int currentDealerIndex = game.Players.FindIndex(p => p.IsDealer);
-            int newDealerIndex = (currentDealerIndex + 1) % game.Players.Count;
-
-            foreach (var player in game.Players)
-            {
-                player.IsDealer = false;
-                player.IsActive = false;
-                player.Hand.Clear();
-            }
-
-            game.Players[newDealerIndex].IsDealer = true;
-
-            // Set the first player (left of dealer)
-            int firstPlayerIndex = (newDealerIndex + 1) % game.Players.Count;
-            game.Players[firstPlayerIndex].IsActive = true;
-            game.FirstPlayerSeat = firstPlayerIndex;
-
-            // Deal new cards
-            var deck = new Deck();
-            deck.Shuffle();
-            foreach (var player in game.Players)
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    player.Hand.Add(deck.DrawCard());
-                }
-            }
-
-            // Reset played cards
-            game.PlayedCards.Clear();
-            for (int i = 0; i < game.Players.Count; i++)
-            {
-                game.PlayedCards.Add(new PlayedCard(game.Players[i].Seat));
-            }
-        }
-
-        /// <summary>
-        /// Starts a new hand by resetting the game state
-        /// </summary>
-        public void StartNewHand(GameState game)
-        {
-            ResetForNewHand(game);
+            await _eventPublisher.PublishAsync(new HandStartedEvent(
+                Guid.Parse(game.Id),
+                game.CurrentHand + 1,
+                newDealerSeat,
+                newFirstPlayerSeat,
+                game));
         }
     }
 }

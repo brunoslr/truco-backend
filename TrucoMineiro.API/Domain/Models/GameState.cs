@@ -10,7 +10,8 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// The type of action (e.g., "card-played", "button-pressed", "hand-result", "turn-result")
         /// </summary>
-        public string Type { get; set; } = string.Empty;        /// <summary>
+        public string Type { get; set; } = string.Empty;        
+        /// <summary>
         /// The seat of the player who performed the action (optional, depending on type)
         /// </summary>
         public int? PlayerSeat { get; set; }
@@ -46,7 +47,8 @@ namespace TrucoMineiro.API.Domain.Models
         }
 
         public ActionLogEntry() { }
-    }    /// <summary>
+    }    
+      /// <summary>
     /// Represents a card played by a player during a round
     /// </summary>
     public class PlayedCard
@@ -57,14 +59,18 @@ namespace TrucoMineiro.API.Domain.Models
         public int PlayerSeat { get; set; }
 
         /// <summary>
-        /// The card that was played
+        /// The card that was played (never null - use Card.CreateFoldCard() for empty slots)
         /// </summary>
-        public Card? Card { get; set; }
-
-        public PlayedCard(int playerSeat, Card? card = null)
+        public Card Card { get; set; } = Card.CreateFoldCard();        public PlayedCard(int playerSeat, Card card)
         {
             PlayerSeat = playerSeat;
             Card = card;
+        }
+
+        public PlayedCard(int playerSeat)
+        {
+            PlayerSeat = playerSeat;
+            Card = Card.CreateFoldCard();
         }
 
         public PlayedCard() { }
@@ -201,28 +207,44 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// Timestamp of the last activity in the game
         /// </summary>
-        public DateTime LastActivity { get; set; } = DateTime.UtcNow;
-
-        /// <summary>
+        public DateTime LastActivity { get; set; } = DateTime.UtcNow;        /// <summary>
         /// Current round number within the hand (1, 2, or 3)
         /// </summary>
-        public int CurrentRound { get; set; } = 1;        /// <summary>
+        public int CurrentRound { get; set; } = 1;
+
+        /// <summary>
+        /// Track cards played in each round of the current hand
+        /// Key: Round number (1-3), Value: PlayedCards for that round
+        /// </summary>
+        public Dictionary<int, List<PlayedCard>> RoundHistory { get; set; } = new();
+
+        /// <summary>
         /// Winners of each round in the current hand (by team number)
         /// </summary>
-        public List<int> RoundWinners { get; set; } = new List<int>();
-
-        /// <summary>
+        public List<int> RoundWinners { get; set; } = new List<int>();        /// <summary>
         /// Whether the game is completed (someone reached 12 points)
         /// </summary>
-        public bool IsCompleted { get; set; } = false;        /// <summary>
-        /// The winning team if the game is completed (1 or 2)
-        /// </summary>
-        public int? WinningTeam { get; set; }
+        public bool IsCompleted { get; set; } = false;
 
         /// <summary>
-        /// Current game status (waiting, active, completed)
+        /// The winning team if the game is completed (1 or 2)
         /// </summary>
-        public string GameStatus { get; set; } = "waiting";
+        public int? WinningTeam { get; set; }        /// <summary>
+        /// Current game status using proper enum
+        /// </summary>
+        public TrucoMineiro.API.Domain.Models.GameStatus Status { get; set; } = TrucoMineiro.API.Domain.Models.GameStatus.Waiting;
+
+        /// <summary>
+        /// Current game status as string (for backward compatibility)
+        /// </summary>
+        public string GameStatus 
+        { 
+            get => Status.ToString().ToLower();            set 
+            { 
+                if (Enum.TryParse<TrucoMineiro.API.Domain.Models.GameStatus>(value, true, out var status))
+                    Status = status;
+            }
+        }
 
         /// <summary>
         /// Current Truco level (1 = Truco, 3 = Seis, 6 = Nove, 9 = Doze, 12 = maximum)
@@ -321,12 +343,10 @@ namespace TrucoMineiro.API.Domain.Models
             foreach (var player in Players)
             {
                 player.ClearHand();
-            }
-
-            // Reset the played cards
+            }            // Reset the played cards
             foreach (var playedCard in PlayedCards)
             {
-                playedCard.Card = null;
+                playedCard.Card = Card.CreateFoldCard();
             }
 
             // Reset the deck and shuffle
