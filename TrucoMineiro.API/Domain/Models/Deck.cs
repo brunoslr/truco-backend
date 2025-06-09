@@ -1,3 +1,5 @@
+using TrucoMineiro.API.Constants;
+
 namespace TrucoMineiro.API.Domain.Models
 {
     /// <summary>
@@ -20,7 +22,7 @@ namespace TrucoMineiro.API.Domain.Models
         {
             // Truco Mineiro typically uses a 40-card deck without 8, 9, 10, and Jokers
             var values = new[] { "A", "2", "3", "4", "5", "6", "7", "Q", "J", "K" };
-            var suits = new[] { "Clubs", "Hearts", "Spades", "Diamonds" };
+            var suits = SuitConstants.StandardSuits; // Use standardized Unicode symbols
 
             foreach (var suit in suits)
             {

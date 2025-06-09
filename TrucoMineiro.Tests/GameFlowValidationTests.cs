@@ -188,10 +188,9 @@ namespace TrucoMineiro.Tests
             {
                 Console.WriteLine($"Player {player.Seat}: {player.Hand.Count} cards in hand");
             }
-            
-            foreach (var playedCard in finalGameState.PlayedCards)
+              foreach (var playedCard in finalGameState.PlayedCards)
             {
-                Console.WriteLine($"Played card - Player {playedCard.PlayerSeat}: {playedCard.Card.Value} of {playedCard.Card.Suit}");
+                Console.WriteLine($"Played card - Player {playedCard.PlayerSeat}: {playedCard.Card!.Value} of {playedCard.Card.Suit}");
             }
             
             // Verify hand counts: Players who played should have 2 cards, others should have 3

@@ -140,10 +140,9 @@ namespace TrucoMineiro.Tests
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var response = Assert.IsType<PlayCardResponseDto>(okResult.Value);
             Assert.True(response.Success);
-            
-            // Get the updated game state
+              // Get the updated game state
             var updatedGame = _gameService.GetGame(game.GameId);
-            var updatedPlayer = updatedGame.Players.First(p => p.Seat == 0);
+            var updatedPlayer = updatedGame!.Players.First(p => p.Seat == 0);
             
             // Verify that the card was removed from the player's hand
             Assert.Equal(originalHandSize - 1, updatedPlayer.Hand.Count);
@@ -181,10 +180,9 @@ namespace TrucoMineiro.Tests
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
             var response = Assert.IsType<PlayCardResponseDto>(badRequestResult.Value);
             Assert.False(response.Success);
-            
-            // Get the updated game state
+              // Get the updated game state
             var updatedGame = _gameService.GetGame(game.GameId);
-            var updatedPlayer = updatedGame.Players.First(p => p.Seat == 0);
+            var updatedPlayer = updatedGame!.Players.First(p => p.Seat == 0);
             
             // Verify that the player's hand was not modified
             Assert.Equal(originalHandSize, updatedPlayer.Hand.Count);
@@ -216,10 +214,9 @@ namespace TrucoMineiro.Tests
             };
             
             var result1 = _controller.PlayCard(request1);
-            
-            // Get updated state after first card
+              // Get updated state after first card
             var gameAfterFirst = _gameService.GetGame(game.GameId);
-            var playerAfterFirst = gameAfterFirst.Players.First(p => p.Seat == 0);
+            var playerAfterFirst = gameAfterFirst!.Players.First(p => p.Seat == 0);
             
             // Make the human player active again for the second card (simulate game flow)
             playerAfterFirst.IsActive = true;
@@ -242,10 +239,9 @@ namespace TrucoMineiro.Tests
             var okResult2 = Assert.IsType<OkObjectResult>(result2.Result);
             var response2 = Assert.IsType<PlayCardResponseDto>(okResult2.Value);
             Assert.True(response2.Success);
-            
-            // Get final game state
+              // Get final game state
             var finalGame = _gameService.GetGame(game.GameId);
-            var finalPlayer = finalGame.Players.First(p => p.Seat == 0);
+            var finalPlayer = finalGame!.Players.First(p => p.Seat == 0);
             
             // Verify that the player's hand size decreased correctly
             Assert.Equal(originalHandSize - 2, finalPlayer.Hand.Count);

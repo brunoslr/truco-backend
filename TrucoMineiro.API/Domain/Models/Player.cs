@@ -45,6 +45,11 @@ namespace TrucoMineiro.API.Domain.Models
         /// </summary>
         public bool IsAI { get; set; }
 
+        /// <summary>
+        /// Whether this player has folded in the current hand
+        /// </summary>
+        public bool HasFolded { get; set; } = false;
+
         public Player(string name, string team, int seat)
         {
             Name = name;

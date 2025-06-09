@@ -190,9 +190,8 @@ namespace TrucoMineiro.Tests
             var response = Assert.IsType<PlayCardResponseDto>(okResult.Value);
               // Verify that AI players have also played cards (since AutoAiPlay is enabled)
             var updatedGame = _gameService.GetGame(game.GameId);
-            
-            // With AutoAiPlay enabled, AI should play automatically, so at least one AI player should have a card played
-            var aiPlayedCards = updatedGame.PlayedCards
+              // With AutoAiPlay enabled, AI should play automatically, so at least one AI player should have a card played
+            var aiPlayedCards = updatedGame!.PlayedCards
                 .Where(pc => pc.PlayerSeat != humanPlayer.Seat && pc.Card != null)
                 .ToList();
                 
