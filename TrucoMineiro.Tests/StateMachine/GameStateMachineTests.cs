@@ -57,7 +57,7 @@ public class GameStateMachineTests
             GameId = gameId,
             PlayerSeat = 1
         };
-          _mockGameRepository.Setup(x => x.GetGameAsync(It.IsAny<string>()))
+          _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
             .ReturnsAsync((GameState?)null);
         
         // Act
@@ -97,11 +97,13 @@ public class GameStateMachineTests
         Assert.Equal("active", gameState.GameStatus);
         
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<GameStartedEvent>()), Times.Once);
-        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<PlayerTurnStartedEvent>()), Times.Once);
-    }    [Fact]
+        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<PlayerTurnStartedEvent>()), Times.Once);    }
+
+    [Fact]
     public async Task ProcessCommandAsync_PlayCardCommand_WithValidCard_ShouldPlayCardAndPublishEvent()
     {
-        // Arrange        var gameId = Guid.NewGuid().ToString();
+        // Arrange        
+        var gameId = Guid.NewGuid().ToString();
         var playerId = Guid.NewGuid();
         var card = new Card("A", "hearts");
         
@@ -125,7 +127,8 @@ public class GameStateMachineTests
             GameStatus = "active",
             Players = new List<Player> { player }
         };
-          _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
+          
+        _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
             .ReturnsAsync(gameState);
         
         _mockGameFlowService.Setup(x => x.PlayCard(gameState, 1, 0))
@@ -133,17 +136,18 @@ public class GameStateMachineTests
         
         // Act
         var result = await _gameStateMachine.ProcessCommandAsync(command);
-          // Assert
+          
+        // Assert
         Assert.True(result.IsSuccess);
         
         _mockGameFlowService.Verify(x => x.PlayCard(gameState, 1, 0), Times.Once);
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<CardPlayedEvent>()), Times.Once);
-    }    [Fact]
+    }[Fact]
     public async Task ProcessCommandAsync_PlayCardCommand_WithInvalidCard_ShouldReturnFailure()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
-        var playerId = Guid.NewGuid().ToString();
+        var playerId = Guid.NewGuid();
         var card = new Card("A", "hearts");
         var invalidCard = new Card("2", "spades");
         
@@ -176,14 +180,12 @@ public class GameStateMachineTests
         // Assert
         Assert.False(result.IsSuccess);
         Assert.Equal("Card not found in player's hand", result.ErrorMessage);
-    }
-
-    [Fact]
+    }    [Fact]
     public async Task ProcessCommandAsync_CallTrucoCommand_ShouldPublishTrucoCalledEvent()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
-        var playerId = Guid.NewGuid().ToString();
+        var playerId = Guid.NewGuid();
         
         var command = new CallTrucoCommand
         {
@@ -216,15 +218,13 @@ public class GameStateMachineTests
         Assert.True(gameState.WaitingForTrucoResponse);
         
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoCalledEvent>()), Times.Once);
-    }
-
-    [Fact]
+    }    [Fact]
     public async Task ProcessCommandAsync_RespondToTrucoCommand_Accept_ShouldPublishTrucoAcceptedEvent()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
-        var playerId = Guid.NewGuid().ToString();
-        var trucoCallerId = Guid.NewGuid().ToString();
+        var playerId = Guid.NewGuid();
+        var trucoCallerId = Guid.NewGuid();
           var command = new RespondToTrucoCommand
         {
             GameId = gameId,
@@ -263,8 +263,8 @@ public class GameStateMachineTests
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
-        var playerId = Guid.NewGuid().ToString();
-        var trucoCallerId = Guid.NewGuid().ToString();
+        var playerId = Guid.NewGuid();
+        var trucoCallerId = Guid.NewGuid();
           var command = new RespondToTrucoCommand
         {
             GameId = gameId,
@@ -304,14 +304,12 @@ public class GameStateMachineTests
         Assert.Equal("active", gameState.GameStatus); // Game remains active after Truco rejection
         
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoRejectedEvent>()), Times.Once);
-    }
-
-    [Fact]
+    }    [Fact]
     public async Task ProcessCommandAsync_FoldCommand_ShouldMarkPlayerAsFoldedAndPublishEvent()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
-        var playerId = Guid.NewGuid().ToString();
+        var playerId = Guid.NewGuid();
           var command = new FoldCommand
         {
             GameId = gameId,
@@ -341,14 +339,12 @@ public class GameStateMachineTests
         Assert.True(player.HasFolded);
         
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<PlayerFoldedEvent>()), Times.Once);
-    }
-
-    [Fact]
+    }    [Fact]
     public async Task ProcessCommandAsync_WrongPlayerTurn_ShouldReturnFailure()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
-        var playerId = Guid.NewGuid().ToString();
+        var playerId = Guid.NewGuid();
         var card = new Card("A", "hearts");
           var command = new PlayCardCommand
         {
