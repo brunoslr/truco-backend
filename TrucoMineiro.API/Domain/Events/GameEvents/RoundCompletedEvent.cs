@@ -37,11 +37,9 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
 
         public RoundCompletedEvent() : base()
         {
-        }
-
-        private static Guid? GetPlayerGuid(Player? player)
+        }        private static Guid? GetPlayerGuid(Player? player)
         {
-            return player != null && Guid.TryParse(player.Id, out var playerId) ? playerId : null;
+            return player?.Id;  // player.Id is already a Guid
         }
     }
 }

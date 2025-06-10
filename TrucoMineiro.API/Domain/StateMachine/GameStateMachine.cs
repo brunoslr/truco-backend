@@ -123,25 +123,33 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 {
                     game.GameStatus = "active";
                     game.StartGame();                    // Publish game started event
-                    await _eventPublisher.PublishAsync(new GameStartedEvent(
-                        Guid.Parse(command.GameId),
-                        game,
-                        game.Players,
-                        null, // startedBy player
-                        null  // gameConfiguration
-                    ));
-
-                    // Start first player's turn
-                    var firstPlayer = game.GetCurrentPlayer();
-                    if (firstPlayer != null)
-                    {                        await _eventPublisher.PublishAsync(new PlayerTurnStartedEvent(
-                            Guid.Parse(command.GameId),
-                            firstPlayer,
-                            game.CurrentRound,
-                            game.CurrentHand,
+                    if (Guid.TryParse(command.GameId, out var gameGuid))
+                    {
+                        await _eventPublisher.PublishAsync(new GameStartedEvent(
+                            gameGuid,
                             game,
-                            GetAvailableActions(firstPlayer, game)
+                            game.Players,
+                            null, // startedBy player
+                            null  // gameConfiguration
                         ));
+
+                        // Start first player's turn
+                        var firstPlayer = game.GetCurrentPlayer();
+                        if (firstPlayer != null)
+                        {
+                            await _eventPublisher.PublishAsync(new PlayerTurnStartedEvent(
+                                gameGuid,
+                                firstPlayer,
+                                game.CurrentRound,
+                                game.CurrentHand,
+                                game,
+                                GetAvailableActions(firstPlayer, game)
+                            ));
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to parse GameId '{GameId}' for GameStartedEvent", command.GameId);
                     }
                 }
 
@@ -186,16 +194,25 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 {
                     return CommandResult.Failure("Failed to play card");
                 }                // Publish card played event
-                await _eventPublisher.PublishAsync(new CardPlayedEvent(
-                    Guid.Parse(command.GameId),
-                    Guid.Parse(player.Id),
-                    card,
-                    player,
-                    game.CurrentRound,
-                    game.CurrentHand,
-                    player.IsAI,
-                    game
-                ));
+                if (Guid.TryParse(command.GameId, out var gameGuid))
+                {
+                    await _eventPublisher.PublishAsync(new CardPlayedEvent(
+                        gameGuid,
+                        player.Id,  // Already a Guid
+                        card,
+                        player,
+                        game.CurrentRound,
+                        game.CurrentHand,
+                        player.IsAI,
+                        game
+                    ));
+                }
+                else
+                {
+                    // Log the issue but don't fail the card play
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for event publishing", 
+                        command.GameId);
+                }
 
                 return CommandResult.Success("Card played successfully");
             }
@@ -219,12 +236,19 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 game.TrucoLevel++;
                 game.TrucoCalledBy = player.Id;
                 game.WaitingForTrucoResponse = true;                // Publish Truco called event
-                await _eventPublisher.PublishAsync(new TrucoCalledEvent(
-                    Guid.Parse(command.GameId),
-                    player,
-                    game.TrucoLevel,
-                    game
-                ));
+                if (Guid.TryParse(command.GameId, out var gameGuid))
+                {
+                    await _eventPublisher.PublishAsync(new TrucoCalledEvent(
+                        gameGuid,
+                        player,
+                        game.TrucoLevel,
+                        game
+                    ));
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoCalledEvent", command.GameId);
+                }
 
                 return CommandResult.Success("Truco called successfully");
             }
@@ -244,29 +268,40 @@ namespace TrucoMineiro.API.Domain.StateMachine
                     return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
                 }
 
-                game.WaitingForTrucoResponse = false;
-
-                if (command.Accept)
-                {                    // Truco accepted, continue game with higher stakes
-                    await _eventPublisher.PublishAsync(new TrucoAcceptedEvent(
-                        Guid.Parse(command.GameId),
-                        player,
-                        game.TrucoLevel,
-                        game
-                    ));
+                game.WaitingForTrucoResponse = false;                if (command.Accept)
+                {
+                    // Truco accepted, continue game with higher stakes
+                    if (Guid.TryParse(command.GameId, out var gameGuid))
+                    {
+                        await _eventPublisher.PublishAsync(new TrucoAcceptedEvent(
+                            gameGuid,
+                            player,
+                            game.TrucoLevel,
+                            game
+                        ));
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoAcceptedEvent", command.GameId);
+                    }
                 }
                 else
                 {
                     // Truco rejected, calling team wins the hand
                     var callingPlayer = game.Players.FirstOrDefault(p => p.Id == game.TrucoCalledBy);
-                    if (callingPlayer != null)
-                    {                        await _eventPublisher.PublishAsync(new TrucoRejectedEvent(
-                            Guid.Parse(command.GameId),
+                    if (callingPlayer != null && Guid.TryParse(command.GameId, out var gameGuid))
+                    {
+                        await _eventPublisher.PublishAsync(new TrucoRejectedEvent(
+                            gameGuid,
                             player,
                             callingPlayer,
                             game.TrucoLevel - 1, // Points awarded for rejection
                             game
                         ));
+                    }
+                    else if (callingPlayer != null)
+                    {
+                        _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoRejectedEvent", command.GameId);
                     }
                 }
 
@@ -290,16 +325,22 @@ namespace TrucoMineiro.API.Domain.StateMachine
 
                 // Mark player as folded
                 player.HasFolded = true;
-                game.GameStatus = "completed";
-
-                // Determine winning team (opponent team wins)
+                game.GameStatus = "completed";                // Determine winning team (opponent team wins)
                 var winningTeam = player.Team == "team1" ? "team2" : "team1";
-                  await _eventPublisher.PublishAsync(new PlayerFoldedEvent(
-                    Guid.Parse(command.GameId),
-                    player,
-                    winningTeam,
-                    game
-                ));
+                
+                if (Guid.TryParse(command.GameId, out var gameGuid))
+                {
+                    await _eventPublisher.PublishAsync(new PlayerFoldedEvent(
+                        gameGuid,
+                        player,
+                        winningTeam,
+                        game
+                    ));
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for PlayerFoldedEvent", command.GameId);
+                }
 
                 return CommandResult.Success("Player folded successfully");
             }

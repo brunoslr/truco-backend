@@ -101,9 +101,8 @@ public class GameStateMachineTests
     }    [Fact]
     public async Task ProcessCommandAsync_PlayCardCommand_WithValidCard_ShouldPlayCardAndPublishEvent()
     {
-        // Arrange
-        var gameId = Guid.NewGuid().ToString();
-        var playerId = Guid.NewGuid().ToString();
+        // Arrange        var gameId = Guid.NewGuid().ToString();
+        var playerId = Guid.NewGuid();
         var card = new Card("A", "hearts");
         
         var command = new PlayCardCommand

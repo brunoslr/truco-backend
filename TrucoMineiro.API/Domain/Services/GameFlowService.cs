@@ -69,10 +69,10 @@ namespace TrucoMineiro.API.Domain.Services
 
             return true;
         }        
-        
-        /// <summary>
+          /// <summary>
         /// Executes AI player turns in sequence with appropriate delays
         /// </summary>
+        [Obsolete("This method is deprecated. AI turns are now handled by event-driven architecture via CardPlayedEvent -> PlayerTurnStartedEvent -> AIPlayerEventHandler. This will be removed in a future version.")]
         public async Task ProcessAITurnsAsync(GameState game, int aiPlayDelayMs)
         {
             // Continue playing for AI players until it's a human player's turn or round is complete

@@ -249,12 +249,10 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// Current Truco level (1 = Truco, 3 = Seis, 6 = Nove, 9 = Doze, 12 = maximum)
         /// </summary>
-        public int TrucoLevel { get; set; } = 1;
-
-        /// <summary>
+        public int TrucoLevel { get; set; } = 1;        /// <summary>
         /// ID of the player who called Truco
         /// </summary>
-        public string? TrucoCalledBy { get; set; }
+        public Guid? TrucoCalledBy { get; set; }
 
         /// <summary>
         /// Whether we're waiting for a Truco response

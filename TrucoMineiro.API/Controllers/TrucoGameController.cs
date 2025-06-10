@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Services;
+using TrucoMineiro.API.Domain.StateMachine;
+using TrucoMineiro.API.Domain.StateMachine.Commands;
+using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Controllers
 {
@@ -9,14 +12,15 @@ namespace TrucoMineiro.API.Controllers
     /// </summary>
     [Route("api/game")]
     [ApiController]
-    [Produces("application/json")]
-    public class TrucoGameController : ControllerBase
+    [Produces("application/json")]    public class TrucoGameController : ControllerBase
     {
         private readonly GameService _gameService;
+        private readonly IGameStateMachine _gameStateMachine;
 
-        public TrucoGameController(GameService gameService)
+        public TrucoGameController(GameService gameService, IGameStateMachine gameStateMachine)
         {
             _gameService = gameService;
+            _gameStateMachine = gameStateMachine;
         }
 
         /// <summary>
@@ -137,8 +141,7 @@ namespace TrucoMineiro.API.Controllers
         [HttpPost("press-button")]
         [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<GameStateDto> PressButton([FromBody] ButtonPressRequest request)
+        [ProducesResponseType(StatusCodes.Status404NotFound)]        public async Task<ActionResult<GameStateDto>> PressButton([FromBody] ButtonPressRequest request)
         {
             if (string.IsNullOrEmpty(request.GameId) || 
                 request.PlayerSeat < 0 || request.PlayerSeat > 3 ||
@@ -147,73 +150,37 @@ namespace TrucoMineiro.API.Controllers
                 return BadRequest("Invalid request parameters. PlayerSeat must be 0-3.");
             }
 
-            bool success;
-            string errorMessage;
+            CommandResult result;
 
             switch (request.Action.ToLower())
             {
                 case ButtonPressActions.Truco:
-                    success = _gameService.CallTruco(request.GameId, request.PlayerSeat);
-                    errorMessage = "Invalid Truco call";
+                    var trucoCommand = new CallTrucoCommand(request.GameId, request.PlayerSeat);
+                    result = await _gameStateMachine.ProcessCommandAsync(trucoCommand);
                     break;
                 case ButtonPressActions.Raise:
-                    success = _gameService.RaiseStakes(request.GameId, request.PlayerSeat);
-                    errorMessage = "Invalid raise";
+                    // For "raise", we need to respond to an existing Truco with a counter-raise
+                    var raiseCommand = new RespondToTrucoCommand(request.GameId, request.PlayerSeat, TrucoResponse.Raise);
+                    result = await _gameStateMachine.ProcessCommandAsync(raiseCommand);
                     break;
                 case ButtonPressActions.Fold:
-                    success = _gameService.Fold(request.GameId, request.PlayerSeat);
-                    errorMessage = "Invalid fold";
+                    var foldCommand = new FoldCommand(request.GameId, request.PlayerSeat);
+                    result = await _gameStateMachine.ProcessCommandAsync(foldCommand);
                     break;
                 default:
                     return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.Truco}, {ButtonPressActions.Raise}, {ButtonPressActions.Fold}");
             }
 
-            if (!success)
+            if (!result.IsSuccess)
             {
-                return BadRequest(errorMessage);
+                return BadRequest(result.ErrorMessage);
             }
 
             var game = _gameService.GetGame(request.GameId);
             if (game == null)
             {
                 return NotFound("Game not found");
-            }
-
-            var gameStateDto = MappingService.MapGameStateToDto(game);
-            return Ok(gameStateDto);
-        }
-        
-        /// <summary>
-        /// Starts a new hand in the current game
-        /// </summary>
-        /// <remarks>
-        /// Sample request:
-        /// 
-        ///     POST /api/game/{gameId}/new-hand
-        ///     
-        /// This will deal new cards and start a new hand in the game.
-        /// </remarks>
-        /// <param name="gameId">The unique identifier of the game</param>
-        /// <response code="200">Returns the updated game state with the new hand</response>
-        /// <response code="404">If the game with the specified ID doesn't exist</response>
-        [HttpPost("{gameId}/new-hand")]
-        [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<GameStateDto> StartNewHand(string gameId)
-        {
-            var success = _gameService.StartNewHand(gameId);
-            if (!success)
-            {
-                return NotFound("Game not found");
-            }
-
-            var game = _gameService.GetGame(gameId);
-            if (game == null)
-            {
-                return NotFound("Game not found");
-            }
-
-            var gameStateDto = MappingService.MapGameStateToDto(game);
+            }            var gameStateDto = MappingService.MapGameStateToDto(game);
             return Ok(gameStateDto);
         }
 
@@ -235,20 +202,34 @@ namespace TrucoMineiro.API.Controllers
         /// <response code="400">If the request is invalid</response>
         [HttpPost("start")]
         [ProducesResponseType(typeof(StartGameResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<StartGameResponse> StartGame([FromBody] StartGameRequest request)
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]        public async Task<ActionResult<StartGameResponse>> StartGame([FromBody] StartGameRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.PlayerName))
             {
                 return BadRequest("Player name is required");
+            }            // First create the game using GameService
+            var game = _gameService.CreateGame(request.PlayerName);
+            if (game == null)
+            {
+                return BadRequest("Failed to create game");
+            }            // Then activate it using the StartGameCommand through the state machine
+            var command = new StartGameCommand(game.GameId, request.PlayerName);
+            var result = await _gameStateMachine.ProcessCommandAsync(command);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result.ErrorMessage);
             }
 
-            var game = _gameService.CreateGame(request.PlayerName);
-            var response = MappingService.MapGameStateToStartGameResponse(game, 0, _gameService.IsDevMode());
-            return Ok(response);
-        }
+            // Get the updated game state
+            var updatedGame = _gameService.GetGame(game.GameId);
+            if (updatedGame == null)
+            {
+                return BadRequest("Failed to retrieve started game");
+            }
 
-        /// <summary>
+            var response = MappingService.MapGameStateToStartGameResponse(updatedGame, 0, _gameService.IsDevMode());
+            return Ok(response);
+        }/// <summary>
         /// Play a card from a player's hand (new endpoint with enhanced features)
         /// </summary>
         /// <remarks>
@@ -270,7 +251,7 @@ namespace TrucoMineiro.API.Controllers
         [HttpPost("play-card")]
         [ProducesResponseType(typeof(PlayCardResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<PlayCardResponseDto> PlayCard([FromBody] PlayCardRequestDto request)
+        public async Task<ActionResult<PlayCardResponseDto>> PlayCard([FromBody] PlayCardRequestDto request)
         {
             if (string.IsNullOrWhiteSpace(request.GameId) || 
                 request.PlayerSeat < 0 || request.PlayerSeat > 3 ||
@@ -285,19 +266,94 @@ namespace TrucoMineiro.API.Controllers
                     PlayerHands = new List<PlayerHandDto>()
                 };
                 return BadRequest(errorResponse);
-            }            
-            var response = _gameService.PlayCard(
-                request.GameId, 
-                request.PlayerSeat, 
-                request.CardIndex, 
-                request.IsFold, 
-                request.PlayerSeat
-            );
-
-            if (!response.Success)
-            {
-                return BadRequest(response);
             }
+
+            CommandResult result;
+
+            if (request.IsFold)
+            {
+                // Handle fold scenario using FoldCommand
+                var foldCommand = new FoldCommand(request.GameId, request.PlayerSeat, "Player folded");
+                result = await _gameStateMachine.ProcessCommandAsync(foldCommand);
+            }            else
+            {
+                // Handle regular card play using PlayCardCommand
+                // First, get the game state to retrieve the actual card being played
+                var gameState = _gameService.GetGame(request.GameId);
+                if (gameState == null)
+                {
+                    var errorResponse = new PlayCardResponseDto
+                    {
+                        Success = false,
+                        Message = "Game not found",
+                        GameState = new GameStateDto(),
+                        Hand = new List<CardDto>(),
+                        PlayerHands = new List<PlayerHandDto>()
+                    };
+                    return BadRequest(errorResponse);
+                }
+
+                var player = gameState.Players.FirstOrDefault(p => p.Seat == request.PlayerSeat);
+                if (player == null || request.CardIndex < 0 || request.CardIndex >= player.Hand.Count)
+                {
+                    var errorResponse = new PlayCardResponseDto
+                    {
+                        Success = false,
+                        Message = "Invalid card index or player not found",
+                        GameState = new GameStateDto(),
+                        Hand = new List<CardDto>(),
+                        PlayerHands = new List<PlayerHandDto>()
+                    };
+                    return BadRequest(errorResponse);
+                }
+
+                // Get the actual card being played
+                var cardToPlay = player.Hand[request.CardIndex];
+                var playCardCommand = new PlayCardCommand(request.GameId, request.PlayerSeat, request.CardIndex, cardToPlay);
+                result = await _gameStateMachine.ProcessCommandAsync(playCardCommand);
+            }
+
+            if (!result.IsSuccess)
+            {
+                var errorResponse = new PlayCardResponseDto
+                {
+                    Success = false,
+                    Message = result.ErrorMessage,
+                    GameState = new GameStateDto(),
+                    Hand = new List<CardDto>(),
+                    PlayerHands = new List<PlayerHandDto>()
+                };
+                return BadRequest(errorResponse);
+            }
+
+            // Get the updated game state and return the appropriate response
+            var game = _gameService.GetGame(request.GameId);
+            if (game == null)
+            {
+                var errorResponse = new PlayCardResponseDto
+                {
+                    Success = false,
+                    Message = "Game not found after processing command",
+                    GameState = new GameStateDto(),
+                    Hand = new List<CardDto>(),
+                    PlayerHands = new List<PlayerHandDto>()
+                };
+                return BadRequest(errorResponse);
+            }            // Use the same mapping logic that was previously in GameService.PlayCard
+            var response = new PlayCardResponseDto
+            {
+                Success = true,
+                Message = "Card played successfully",
+                GameState = MappingService.MapGameStateToDto(game, request.PlayerSeat, _gameService.IsDevMode()),
+                Hand = game.Players.First(p => p.Seat == request.PlayerSeat).Hand.Select(card => MappingService.MapCardToDto(card, false)).ToList(),
+                PlayerHands = game.Players.Select(p => new PlayerHandDto
+                {
+                    Seat = p.Seat,
+                    Cards = p.Seat == request.PlayerSeat || _gameService.IsDevMode() 
+                        ? p.Hand.Select(card => MappingService.MapCardToDto(card, false)).ToList()
+                        : p.Hand.Select(_ => new CardDto { Value = null, Suit = null }).ToList()
+                }).ToList()
+            };
 
             return Ok(response);
         }

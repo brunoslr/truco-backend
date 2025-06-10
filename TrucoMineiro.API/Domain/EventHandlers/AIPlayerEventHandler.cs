@@ -75,12 +75,10 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     // ActionLog entry will be created by ActionLogEventHandler when CardPlayedEvent is published
 
                     // Save game state
-                    await _gameRepository.SaveGameAsync(game);
-
-                    // Publish card played event to trigger game flow
+                    await _gameRepository.SaveGameAsync(game);                    // Publish card played event to trigger game flow
                     var cardPlayedEvent = new CardPlayedEvent(
                         gameEvent.GameId,
-                        Guid.Parse(player.Id),
+                        player.Id,  // Already a Guid
                         card,
                         player,
                         gameEvent.Round,

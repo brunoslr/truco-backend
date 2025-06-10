@@ -89,29 +89,12 @@ namespace TrucoMineiro.Tests
                     {
                         PlayerSeat = playerSeat,
                         Card = $"{card.Value} of {card.Suit}"
-                    });
-
-                    gameState.CurrentPlayerIndex = (playerSeat + 1) % 4;
+                    });                    gameState.CurrentPlayerIndex = (playerSeat + 1) % 4;
                     return true;
                 });
 
-            mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns((GameState gameState, int aiPlayDelayMs) =>
-                {
-                    // Simple AI logic for testing - make AI players play their first card
-                    while (gameState.CurrentPlayerIndex != 0 && gameState.Players[gameState.CurrentPlayerIndex].Hand.Count > 0)
-                    {
-                        var aiPlayer = gameState.Players[gameState.CurrentPlayerIndex];
-                        if (aiPlayer.Hand.Count > 0)
-                        {
-                            var card = aiPlayer.Hand[0];
-                            aiPlayer.Hand.RemoveAt(0);
-                            gameState.PlayedCards.Add(new PlayedCard(gameState.CurrentPlayerIndex, card));
-                            gameState.CurrentPlayerIndex = (gameState.CurrentPlayerIndex + 1) % 4;
-                        }
-                    }
-                    return Task.CompletedTask;
-                });
+            // NOTE: ProcessAITurnsAsync is obsolete - AI processing is now event-driven
+            // No need to mock this obsolete method as tests should use real event handlers
 
             mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
                 .Returns((GameState gameState, int newHandDelayMs) =>

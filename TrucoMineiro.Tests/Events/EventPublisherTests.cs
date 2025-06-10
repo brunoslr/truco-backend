@@ -49,11 +49,10 @@ namespace TrucoMineiro.Tests.Events
         {
             // Arrange
             var gameId = Guid.NewGuid();
-            var gameState = new GameState { Id = gameId.ToString() };
-            var players = new List<Player>
+            var gameState = new GameState { Id = gameId.ToString() };            var players = new List<Player>
             {
-                new Player { Id = Guid.NewGuid().ToString(), Name = "Player 1", IsAI = false },
-                new Player { Id = Guid.NewGuid().ToString(), Name = "Player 2", IsAI = true }
+                new Player { Id = Guid.NewGuid(), Name = "Player 1", IsAI = false },
+                new Player { Id = Guid.NewGuid(), Name = "Player 2", IsAI = true }
             };
             var gameEvent = new GameStartedEvent(gameId, gameState, players);
 
@@ -74,10 +73,9 @@ namespace TrucoMineiro.Tests.Events
             // Arrange
             var testPublisher = new TestEventPublisher();
             var gameId = Guid.NewGuid();
-            var gameState = new GameState { Id = gameId.ToString() };
-            var players = new List<Player>
+            var gameState = new GameState { Id = gameId.ToString() };            var players = new List<Player>
             {
-                new Player { Id = Guid.NewGuid().ToString(), Name = "Player 1", IsAI = false }
+                new Player { Id = Guid.NewGuid(), Name = "Player 1", IsAI = false }
             };
             var gameEvent = new GameStartedEvent(gameId, gameState, players);
 
@@ -174,7 +172,7 @@ namespace TrucoMineiro.Tests.Events
             var gameState = new GameState { Id = gameId.ToString() };
             var players = new List<Player>
             {
-                new Player { Id = Guid.NewGuid().ToString(), Name = "Test Player", IsAI = false }
+                new Player { Id = Guid.NewGuid(), Name = "Test Player", IsAI = false }
             };
             var startedBy = players.First();
 

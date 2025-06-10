@@ -1,6 +1,5 @@
 namespace TrucoMineiro.API.Domain.Models
-{
-    /// <summary>
+{    /// <summary>
     /// Represents a player in the Truco game
     /// </summary>
     public class Player
@@ -8,7 +7,7 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// Unique identifier for the player
         /// </summary>
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public Guid Id { get; set; } = Guid.NewGuid();
 
         /// <summary>
         /// Player's name (e.g., "You", "AI 1", "Partner", "AI 2")

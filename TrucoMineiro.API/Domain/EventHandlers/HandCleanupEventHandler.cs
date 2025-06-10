@@ -77,14 +77,12 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 
                 // Get winning player (first player from winning team)
                 var winningPlayer = GetWinningPlayer(game);
-                
-                // Convert team scores to player scores dictionary
+                  // Convert team scores to player scores dictionary
                 var finalScores = new Dictionary<Guid, int>();
                 foreach (var player in game.Players)
                 {
-                    var playerGuid = Guid.Parse(player.Id);
                     var teamScore = game.TeamScores.ContainsKey(player.Team) ? game.TeamScores[player.Team] : 0;
-                    finalScores[playerGuid] = teamScore;
+                    finalScores[player.Id] = teamScore;  // player.Id is already a Guid
                 }
                 
                 // Publish game completed event

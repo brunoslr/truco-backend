@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using TrucoMineiro.API;
 using TrucoMineiro.API.DTOs;
+using TrucoMineiro.Tests.Integration;
 using Xunit;
 
 namespace TrucoMineiro.Tests.Integration
@@ -11,13 +12,22 @@ namespace TrucoMineiro.Tests.Integration
     /// <summary>
     /// Integration tests for complete hand flow with real HTTP endpoints
     /// Tests 1 human player + 3 AI players through actual API calls
+    /// Uses real event publisher to test the event-driven AI architecture
+    /// 
+    /// MIGRATION NOTES:
+    /// - These tests favor real modules over mocking to test the complete event-driven flow
+    /// - AI auto-play timing issues may require investigation (asynchronous event processing)
+    /// - TODO: Move more complex multi-component scenarios to integration tests
+    /// - TODO: Reduce unit test mocking in favor of testing real component interactions
+    /// - TODO: Add comprehensive integration tests for edge cases and error scenarios
+    /// - TODO: Consider adding integration tests for event-driven race conditions
     /// </summary>
-    public class EndpointIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+    public class EndpointIntegrationTests : IClassFixture<TestWebApplicationFactory>
     {
-        private readonly WebApplicationFactory<Program> _factory;
+        private readonly TestWebApplicationFactory _factory;
         private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-        public EndpointIntegrationTests(WebApplicationFactory<Program> factory)
+        public EndpointIntegrationTests(TestWebApplicationFactory factory)
         {
             _factory = factory;
         }
@@ -106,13 +116,18 @@ namespace TrucoMineiro.Tests.Integration
             
             var startGameRequest = new StartGameRequest { PlayerName = "AITest" };
             var startGameJson = JsonSerializer.Serialize(startGameRequest, _jsonOptions);
-            var startGameContent = new StringContent(startGameJson, Encoding.UTF8, "application/json");
-
-            var startResponse = await client.PostAsync("/api/game/start", startGameContent);
+            var startGameContent = new StringContent(startGameJson, Encoding.UTF8, "application/json");            var startResponse = await client.PostAsync("/api/game/start", startGameContent);
             var startGameResponseJson = await startResponse.Content.ReadAsStringAsync();
+            
+            // TODO: Remove debug logging after event-driven AI timing issues are resolved
+            Console.WriteLine($"Start game response: {startGameResponseJson}");
+            
             var gameState = JsonSerializer.Deserialize<StartGameResponse>(startGameResponseJson, _jsonOptions);
             var gameId = gameState!.GameId;
-
+            
+            // TODO: Remove debug logging after event-driven AI timing issues are resolved
+            Console.WriteLine($"Parsed GameId: '{gameId}' (length: {gameId?.Length})");
+            
             // Act - Human player makes a move
             var playCardRequest = new PlayCardRequestDto
             {
@@ -126,6 +141,15 @@ namespace TrucoMineiro.Tests.Integration
             var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");
 
             var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
+            
+            // Debug: Check the response before asserting success
+            if (!playCardResponse.IsSuccessStatusCode)
+            {
+                var errorContent = await playCardResponse.Content.ReadAsStringAsync();
+                Console.WriteLine($"AIAutoPlay PlayCard failed with status: {playCardResponse.StatusCode}");
+                Console.WriteLine($"Error content: {errorContent}");
+            }
+            
             playCardResponse.EnsureSuccessStatusCode();
 
             var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();

@@ -93,13 +93,12 @@ namespace TrucoMineiro.Tests
                     }
                     
                     return true;
-                });
-
-            // Configure ProcessHandCompletionAsync to do nothing (no hand completion logic needed for this test)
+                });            // Configure ProcessHandCompletionAsync to do nothing (no hand completion logic needed for this test)
             mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);            // Configure ProcessAITurnsAsync to do nothing (AutoAiPlay is disabled)
-            mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
                 .Returns(Task.CompletedTask);
+            
+            // NOTE: ProcessAITurnsAsync is obsolete - AI processing is now event-driven
+            // No need to mock this obsolete method as tests should use real event handlers
                   return new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,

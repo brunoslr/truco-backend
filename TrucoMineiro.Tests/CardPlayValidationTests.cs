@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using TrucoMineiro.API.Controllers;
 using TrucoMineiro.API.DTOs;
@@ -10,6 +11,8 @@ using TrucoMineiro.API.Services;
 using Moq;
 using Xunit;
 using TrucoMineiro.API.Domain.Models;
+using TrucoMineiro.API.Domain.StateMachine;
+using TrucoMineiro.API.Domain.StateMachine.Commands;
 
 namespace TrucoMineiro.Tests
 {
@@ -89,12 +92,13 @@ namespace TrucoMineiro.Tests
                     {
                         nextPlayer.IsActive = true;
                     }
-                    
-                    return true;
+                      return true;
                 });
 
-            mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);            mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
+            // NOTE: ProcessAITurnsAsync is obsolete - AI processing is now event-driven
+            // No need to mock this obsolete method as tests should use real event handlers
+
+            mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
                 .Returns(Task.CompletedTask);            _gameService = new GameService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
@@ -104,12 +108,66 @@ namespace TrucoMineiro.Tests
                 mockScoreCalculationService.Object,
                 mockEventPublisher.Object,
                 configuration);
-            _controller = new TrucoGameController(_gameService);
-        }        [Fact]
-        public void PlayCard_ShouldRemoveCardFromPlayerHandAndAddToPlayedCards()
+
+            // Create real GameStateMachine with required dependencies
+            var mockHandResolutionService = new Mock<IHandResolutionService>();
+            mockHandResolutionService.Setup(x => x.GetCardStrength(It.IsAny<Card>())).Returns(5);
+            mockHandResolutionService.Setup(x => x.DetermineRoundWinner(It.IsAny<List<PlayedCard>>(), It.IsAny<List<Player>>()))
+                .Returns((List<PlayedCard> playedCards, List<Player> players) => players.FirstOrDefault());
+            mockHandResolutionService.Setup(x => x.IsRoundDraw(It.IsAny<List<PlayedCard>>(), It.IsAny<List<Player>>())).Returns(false);
+            mockHandResolutionService.Setup(x => x.HandleDrawResolution(It.IsAny<GameState>(), It.IsAny<int>())).Returns((string?)null);
+            mockHandResolutionService.Setup(x => x.IsHandComplete(It.IsAny<GameState>())).Returns(false);
+            mockHandResolutionService.Setup(x => x.GetHandWinner(It.IsAny<GameState>())).Returns((string?)null);
+            
+            var mockLogger = new Mock<ILogger<GameStateMachine>>();
+            
+            var gameStateMachine = new GameStateMachine(
+                mockGameRepository.Object,
+                mockGameFlowService.Object,
+                mockEventPublisher.Object,
+                mockAIPlayerService.Object,
+                mockHandResolutionService.Object,
+                mockLogger.Object);            _controller = new TrucoGameController(_gameService, gameStateMachine);
+        }        /// <summary>
+        /// Helper method to create and start a game, making it active for card play
+        /// </summary>
+        private async Task<GameState> CreateAndStartGameAsync(string playerName)
+        {            // Start the game using the controller (this creates and starts the game in one step)
+            var startRequest = new StartGameRequest { PlayerName = playerName };
+            var startResult = await _controller.StartGame(startRequest);
+            
+            // Verify the game started successfully
+            if (startResult.Result is not OkObjectResult okResult)
+            {
+                // Get the error message for debugging
+                string errorMessage = "Unknown error";
+                if (startResult.Result is BadRequestObjectResult badRequestResult)
+                {
+                    errorMessage = badRequestResult.Value?.ToString() ?? "Bad request with no message";
+                }
+                throw new Exception($"Failed to start game for test: {errorMessage}");
+            }
+            
+            // Extract the game ID from the response
+            var startResponse = okResult.Value as StartGameResponse;
+            if (startResponse == null)
+            {
+                throw new Exception("Failed to get start game response");
+            }
+            
+            // Return the game state
+            var game = _gameService.GetGame(startResponse.GameId);
+            if (game == null)
+            {
+                throw new Exception("Failed to retrieve created game");
+            }
+            
+            return game;
+        }[Fact]
+        public async Task PlayCard_ShouldRemoveCardFromPlayerHandAndAddToPlayedCards()
         {
             // Arrange
-            var game = _gameService.CreateGame("TestPlayer");
+            var game = await CreateAndStartGameAsync("TestPlayer");
             var humanPlayer = game.Players.First(p => p.Seat == 0);
             var cardIndex = 0;
             
@@ -124,14 +182,15 @@ namespace TrucoMineiro.Tests
                 PlayerSeat = humanPlayer.Seat,
                 CardIndex = cardIndex
             };
-            
-            var result = _controller.PlayCard(request);
+
+            var result = await _controller.PlayCard(request);
             
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var response = Assert.IsType<PlayCardResponseDto>(okResult.Value);
             Assert.True(response.Success);
-              // Get the updated game state
+
+            // Get the updated game state
             var updatedGame = _gameService.GetGame(game.GameId);
             var updatedPlayer = updatedGame!.Players.First(p => p.Seat == 0);
             
@@ -145,13 +204,11 @@ namespace TrucoMineiro.Tests
             Assert.NotNull(playedCard.Card);
             Assert.Equal(cardToPlay.Suit, playedCard.Card.Suit);
             Assert.Equal(cardToPlay.Value, playedCard.Card.Value);
-        }
-
-        [Fact]
-        public void PlayCard_WithInvalidCardIndex_ShouldNotModifyGameState()
+        }        [Fact]
+        public async Task PlayCard_WithInvalidCardIndex_ShouldNotModifyGameState()
         {
             // Arrange
-            var game = _gameService.CreateGame("TestPlayer");
+            var game = await CreateAndStartGameAsync("TestPlayer");
             var humanPlayer = game.Players.First(p => p.Seat == 0);
             var invalidCardIndex = 999; // Invalid index
             
@@ -165,28 +222,29 @@ namespace TrucoMineiro.Tests
                 PlayerSeat = humanPlayer.Seat,
                 CardIndex = invalidCardIndex
             };
-              var result = _controller.PlayCard(request);
+
+            var result = await _controller.PlayCard(request);
             
             // Assert
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
             var response = Assert.IsType<PlayCardResponseDto>(badRequestResult.Value);
             Assert.False(response.Success);
-              // Get the updated game state
+
+            // Get the updated game state
             var updatedGame = _gameService.GetGame(game.GameId);
             var updatedPlayer = updatedGame!.Players.First(p => p.Seat == 0);
             
             // Verify that the player's hand was not modified
             Assert.Equal(originalHandSize, updatedPlayer.Hand.Count);
-              // Verify that the played cards array was not modified (should remain empty)
+
+            // Verify that the played cards array was not modified (should remain empty)
             var playedCard = updatedGame.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == humanPlayer.Seat);
             Assert.Null(playedCard); // Should be null since no card was played
-        }
-
-        [Fact]
-        public void PlayCard_MultipleCards_ShouldMaintainCorrectHandSizes()
+        }        [Fact]
+        public async Task PlayCard_MultipleCards_ShouldMaintainCorrectHandSizes()
         {
             // Arrange
-            var game = _gameService.CreateGame("TestPlayer");
+            var game = await CreateAndStartGameAsync("TestPlayer");
             var humanPlayer = game.Players.First(p => p.Seat == 0);
             
             var originalHandSize = humanPlayer.Hand.Count;
@@ -204,8 +262,9 @@ namespace TrucoMineiro.Tests
                 CardIndex = 0
             };
             
-            var result1 = _controller.PlayCard(request1);
-              // Get updated state after first card
+            var result1 = await _controller.PlayCard(request1);
+
+            // Get updated state after first card
             var gameAfterFirst = _gameService.GetGame(game.GameId);
             var playerAfterFirst = gameAfterFirst!.Players.First(p => p.Seat == 0);
             
@@ -220,7 +279,7 @@ namespace TrucoMineiro.Tests
                 CardIndex = 0
             };
             
-            var result2 = _controller.PlayCard(request2);
+            var result2 = await _controller.PlayCard(request2);
             
             // Assert
             var okResult1 = Assert.IsType<OkObjectResult>(result1.Result);
@@ -230,7 +289,8 @@ namespace TrucoMineiro.Tests
             var okResult2 = Assert.IsType<OkObjectResult>(result2.Result);
             var response2 = Assert.IsType<PlayCardResponseDto>(okResult2.Value);
             Assert.True(response2.Success);
-              // Get final game state
+
+            // Get final game state
             var finalGame = _gameService.GetGame(game.GameId);
             var finalPlayer = finalGame!.Players.First(p => p.Seat == 0);
             
@@ -240,7 +300,8 @@ namespace TrucoMineiro.Tests
             // Verify that neither of the played cards are still in the hand
             Assert.DoesNotContain(cardsToPlay[0], finalPlayer.Hand);
             Assert.DoesNotContain(cardsToPlay[1], finalPlayer.Hand);
-              // Verify that the last played card is in the played cards array
+
+            // Verify that the last played card is in the played cards array
             var playedCard = finalGame.PlayedCards.LastOrDefault(pc => pc.PlayerSeat == humanPlayer.Seat);
             Assert.NotNull(playedCard);
             Assert.NotNull(playedCard.Card);

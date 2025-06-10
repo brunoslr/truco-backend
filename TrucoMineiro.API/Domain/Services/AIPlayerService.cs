@@ -320,6 +320,7 @@ namespace TrucoMineiro.API.Domain.Services
                 return _random.NextDouble() < foldProbability;
             }
 
+            [Obsolete("This method is deprecated. AI turns are now handled by event-driven architecture via PlayerTurnStartedEvent -> AIPlayerEventHandler. This will be removed in a future version.")]
             public bool ProcessAITurn(Player player, GameState game)
             {
                 if (!IsAIPlayer(player) || !player.IsActive)
@@ -357,6 +358,7 @@ namespace TrucoMineiro.API.Domain.Services
                 return false;
             }
 
+            [Obsolete("This method is deprecated. AI turns are now handled by event-driven architecture via PlayerTurnStartedEvent -> AIPlayerEventHandler. This will be removed in a future version.")]
             public int ProcessAllAITurns(GameState game)
             {
                 int processedTurns = 0;

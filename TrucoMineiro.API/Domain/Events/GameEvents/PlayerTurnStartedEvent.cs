@@ -33,11 +33,9 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
 
         public PlayerTurnStartedEvent() : base()
         {
-        }
-
-        private static Guid? GetPlayerGuid(Player player)
+        }        private static Guid? GetPlayerGuid(Player player)
         {
-            return Guid.TryParse(player.Id, out var playerId) ? playerId : null;
+            return player?.Id;  // player.Id is already a Guid
         }
     }
 }

@@ -122,10 +122,9 @@ namespace TrucoMineiro.API.Services
                 var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
                 if (player != null)
                 {
-                    var foldCard = Card.CreateFoldCard();
-                    _ = Task.Run(async () => await _eventPublisher.PublishAsync(new CardPlayedEvent(
+                    var foldCard = Card.CreateFoldCard();                    _ = Task.Run(async () => await _eventPublisher.PublishAsync(new CardPlayedEvent(
                         Guid.Parse(gameId),
-                        Guid.Parse(player.Id),
+                        player.Id,  // Already a Guid
                         foldCard,
                         player,
                         game.CurrentRound,
@@ -148,10 +147,9 @@ namespace TrucoMineiro.API.Services
                 var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
                 var playedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == playerSeat);
                 if (player != null && playedCard?.Card != null)
-                {
-                    _ = Task.Run(async () => await _eventPublisher.PublishAsync(new CardPlayedEvent(
+                {                    _ = Task.Run(async () => await _eventPublisher.PublishAsync(new CardPlayedEvent(
                         Guid.Parse(gameId),
-                        Guid.Parse(player.Id),
+                        player.Id,  // Already a Guid
                         playedCard.Card,
                         player,
                         game.CurrentRound,
@@ -159,21 +157,17 @@ namespace TrucoMineiro.API.Services
                         player.IsAI,
                         game
                     )));
-                }
-            }// Process post-card-play reactions directly using GameFlowService
-            // 1. Check if round is complete and determine winner (handled in GameFlowService.PlayCard)
-            // 2. Process hand completion if needed
-            var handCompletionTask = _gameFlowService.ProcessHandCompletionAsync(game, _newHandDelayMs);
-            handCompletionTask.GetAwaiter().GetResult();
-
-            // 3. Process AI turns if enabled
-            if (_autoAiPlay)
-            {
-                var aiTurnsTask = _gameFlowService.ProcessAITurnsAsync(game, _aiPlayDelayMs);
-                aiTurnsTask.GetAwaiter().GetResult();
-            }
-
-            // Save the game state
+                }            }            // NOTE: Post-card-play reactions are now handled by the event-driven architecture:
+            // 1. CardPlayedEvent is published above
+            // 2. GameFlowEventHandler processes the event and advances to next player
+            // 3. PlayerTurnStartedEvent is published for the next player
+            // 4. AIPlayerEventHandler processes AI turns automatically
+            // 5. Round/Hand completion is handled by respective event handlers
+            //
+            // OLD APPROACH (REMOVED): Previously, we called ProcessAITurnsAsync() and ProcessHandCompletionAsync() 
+            // synchronously here, but this caused race conditions and inconsistencies with the event-driven flow.
+            
+            // Save the game state (events will be processed asynchronously)
             var saveTask = _gameRepository.SaveGameAsync(game);
             saveTask.GetAwaiter().GetResult();
 
@@ -256,12 +250,10 @@ namespace TrucoMineiro.API.Services
             {
                 PlayerSeat = player.Seat,
                 Action = $"Raised stakes to {newStakes}"
-            });
-
-            // Publish TrucoRaiseEvent
+            });            // Publish TrucoRaiseEvent
             var trucoRaiseEvent = new TrucoRaiseEvent(
                 Guid.Parse(gameId),
-                Guid.Parse(player.Id),
+                player.Id,  // Already a Guid
                 player,
                 game.Stakes - (newStakes - game.Stakes), // currentStakes before the change
                 newStakes,
@@ -309,12 +301,10 @@ namespace TrucoMineiro.API.Services
             {
                 PlayerSeat = player.Seat,
                 Action = $"Raised stakes to {newStakes}"
-            });
-
-            // Publish TrucoRaiseEvent
+            });            // Publish TrucoRaiseEvent
             var trucoRaiseEvent = new TrucoRaiseEvent(
                 Guid.Parse(gameId),
-                Guid.Parse(player.Id),
+                player.Id,  // Already a Guid
                 player,
                 game.Stakes - TrucoConstants.Stakes.RaiseAmount, // currentStakes before the raise
                 newStakes,
@@ -360,12 +350,10 @@ namespace TrucoMineiro.API.Services
                 HandNumber = game.CurrentHand,
                 Winner = opposingTeam,
                 WinnerTeam = opposingTeam
-            });
-
-            // Publish FoldHandEvent
+            });            // Publish FoldHandEvent
             var foldHandEvent = new FoldHandEvent(
                 Guid.Parse(gameId),
-                Guid.Parse(player.Id),
+                player.Id,  // Already a Guid
                 player,
                 game.CurrentHand,
                 game.Stakes,

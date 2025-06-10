@@ -116,7 +116,7 @@ namespace TrucoMineiro.Tests.Events
 
             gameRepo.AddGame(game);            var cardPlayedEvent = new CardPlayedEvent(
                 gameId,
-                Guid.Parse(game.Players[1].Id), // Player ID as Guid
+                game.Players[1].Id, // Player ID as Guid (already a Guid)
                 new Card("♠", "A"),
                 game.Players[1], // AI player who just played
                 game.CurrentRound,

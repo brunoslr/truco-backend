@@ -17,15 +17,13 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
             CallingPlayer = callingPlayer;
             TrucoLevel = trucoLevel;
             GameState = gameState;
-        }
-
-        public TrucoCalledEvent() : base()
+        }        public TrucoCalledEvent() : base()
         {
         }
 
         private static Guid? GetPlayerGuid(Player? player)
         {
-            return player != null && Guid.TryParse(player.Id, out var playerId) ? playerId : null;
+            return player?.Id;  // player.Id is already a Guid
         }
     }
 
@@ -44,15 +42,13 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
             RespondingPlayer = respondingPlayer;
             TrucoLevel = trucoLevel;
             GameState = gameState;
-        }
-
-        public TrucoAcceptedEvent() : base()
+        }        public TrucoAcceptedEvent() : base()
         {
         }
 
         private static Guid? GetPlayerGuid(Player? player)
         {
-            return player != null && Guid.TryParse(player.Id, out var playerId) ? playerId : null;
+            return player?.Id;  // player.Id is already a Guid
         }
     }
 
@@ -73,15 +69,13 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
             CallingPlayer = callingPlayer;
             PointsAwarded = pointsAwarded;
             GameState = gameState;
-        }
-
-        public TrucoRejectedEvent() : base()
+        }        public TrucoRejectedEvent() : base()
         {
         }
 
         private static Guid? GetPlayerGuid(Player? player)
         {
-            return player != null && Guid.TryParse(player.Id, out var playerId) ? playerId : null;
+            return player?.Id;  // player.Id is already a Guid
         }
     }
 
@@ -100,15 +94,13 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
             FoldingPlayer = foldingPlayer;
             WinningTeam = winningTeam;
             GameState = gameState;
-        }
-
-        public PlayerFoldedEvent() : base()
+        }        public PlayerFoldedEvent() : base()
         {
         }
 
         private static Guid? GetPlayerGuid(Player? player)
         {
-            return player != null && Guid.TryParse(player.Id, out var playerId) ? playerId : null;
+            return player?.Id;  // player.Id is already a Guid
         }
     }
 }

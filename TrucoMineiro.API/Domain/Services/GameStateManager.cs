@@ -249,16 +249,14 @@ namespace TrucoMineiro.API.Domain.Services
             });
 
             return Task.CompletedTask;
-        }
-
-        private List<Player> CreatePlayers(string? playerName = null)
+        }        private List<Player> CreatePlayers(string? playerName = null)
         {
             return new List<Player>
             {
-                new Player { Id = "player1", Name = playerName ?? "Human", Seat = 0, IsAI = false, Hand = new List<Card>() },
-                new Player { Id = "ai1", Name = "AI 1", Seat = 1, IsAI = true, Hand = new List<Card>() },
-                new Player { Id = "ai2", Name = "AI 2", Seat = 2, IsAI = true, Hand = new List<Card>() },
-                new Player { Id = "ai3", Name = "AI 3", Seat = 3, IsAI = true, Hand = new List<Card>() }
+                new Player { Id = Guid.NewGuid(), Name = playerName ?? "Human", Seat = 0, IsAI = false, Hand = new List<Card>() },
+                new Player { Id = Guid.NewGuid(), Name = "AI 1", Seat = 1, IsAI = true, Hand = new List<Card>() },
+                new Player { Id = Guid.NewGuid(), Name = "AI 2", Seat = 2, IsAI = true, Hand = new List<Card>() },
+                new Player { Id = Guid.NewGuid(), Name = "AI 3", Seat = 3, IsAI = true, Hand = new List<Card>() }
             };
         }
 

@@ -10,12 +10,12 @@ namespace TrucoMineiro.API.Domain.Services
     /// </summary>
     public class InMemoryEventPublisher : IEventPublisher
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<InMemoryEventPublisher> _logger;
 
-        public InMemoryEventPublisher(IServiceProvider serviceProvider, ILogger<InMemoryEventPublisher> logger)
+        public InMemoryEventPublisher(IServiceScopeFactory serviceScopeFactory, ILogger<InMemoryEventPublisher> logger)
         {
-            _serviceProvider = serviceProvider;
+            _serviceScopeFactory = serviceScopeFactory;
             _logger = logger;
         }
 
@@ -25,9 +25,7 @@ namespace TrucoMineiro.API.Domain.Services
         public async Task PublishAsync<T>(T gameEvent) where T : IGameEvent
         {
             await PublishAsync(gameEvent, CancellationToken.None);
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Publishes an event to all registered handlers with cancellation support
         /// </summary>
         public async Task PublishAsync<T>(T gameEvent, CancellationToken cancellationToken = default) where T : IGameEvent
@@ -43,8 +41,11 @@ namespace TrucoMineiro.API.Domain.Services
                 _logger.LogDebug("Publishing event {EventType} for game {GameId} (EventId: {EventId})", 
                     gameEvent.EventType, gameEvent.GameId, gameEvent.EventId);
 
+                // Create a scope to resolve scoped services
+                using var scope = _serviceScopeFactory.CreateScope();
+                
                 // Get all handlers for this event type
-                var handlers = _serviceProvider.GetServices<IEventHandler<T>>().ToList();
+                var handlers = scope.ServiceProvider.GetServices<IEventHandler<T>>().ToList();
 
                 if (!handlers.Any())
                 {
@@ -88,16 +89,15 @@ namespace TrucoMineiro.API.Domain.Services
                     gameEvent.EventType, gameEvent.GameId);
                 throw;
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Gets the number of registered handlers for a specific event type
         /// </summary>
         public int GetHandlerCount<T>() where T : IGameEvent
         {
             try
             {
-                var handlers = _serviceProvider.GetServices<IEventHandler<T>>();
+                using var scope = _serviceScopeFactory.CreateScope();
+                var handlers = scope.ServiceProvider.GetServices<IEventHandler<T>>();
                 return handlers.Count();
             }
             catch (Exception ex)

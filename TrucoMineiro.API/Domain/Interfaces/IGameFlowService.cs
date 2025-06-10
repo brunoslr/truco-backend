@@ -15,13 +15,13 @@ namespace TrucoMineiro.API.Domain.Interfaces
         /// <param name="cardIndex">The index of the card in the player's hand</param>
         /// <returns>True if the card was played successfully</returns>
         bool PlayCard(GameState game, int playerSeat, int cardIndex);
-        
-        /// <summary>
+          /// <summary>
         /// Executes AI player turns in sequence with appropriate delays
         /// </summary>
         /// <param name="game">The current game state</param>
         /// <param name="aiPlayDelayMs">Delay between AI plays in milliseconds</param>
         /// <returns>Task representing the async operation</returns>
+        [Obsolete("This method is deprecated. AI turns are now handled by event-driven architecture via CardPlayedEvent -> PlayerTurnStartedEvent -> AIPlayerEventHandler. This will be removed in a future version.")]
         Task ProcessAITurnsAsync(GameState game, int aiPlayDelayMs);
         
         /// <summary>

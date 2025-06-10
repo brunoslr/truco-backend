@@ -6,6 +6,7 @@ using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Services;
+using TrucoMineiro.API.Domain.StateMachine;
 using Moq;
 using System.Collections.Generic;
 using Xunit;
@@ -86,24 +87,8 @@ namespace TrucoMineiro.Tests
                     gameState.PlayedCards.Add(new PlayedCard(playerSeat, card));
                     gameState.CurrentPlayerIndex = (playerSeat + 1) % 4;
                     return true;
-                });
-
-            mockGameFlowService.Setup(x => x.ProcessAITurnsAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns((GameState gameState, int aiPlayDelayMs) => {
-                    // Simple AI logic for testing - make AI players play their first card
-                    while (gameState.CurrentPlayerIndex != 0 && gameState.Players[gameState.CurrentPlayerIndex].Hand.Count > 0)
-                    {
-                        var aiPlayer = gameState.Players[gameState.CurrentPlayerIndex];
-                        if (aiPlayer.Hand.Count > 0)
-                        {
-                            var card = aiPlayer.Hand[0];
-                            aiPlayer.Hand.RemoveAt(0);
-                            gameState.PlayedCards.Add(new PlayedCard(gameState.CurrentPlayerIndex, card));
-                            gameState.CurrentPlayerIndex = (gameState.CurrentPlayerIndex + 1) % 4;
-                        }
-                    }
-                    return Task.CompletedTask;
-                });
+                });            // NOTE: ProcessAITurnsAsync is obsolete - AI processing is now event-driven
+            // No need to mock this obsolete method as tests should use real event handlers
 
             mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
                 .Returns((GameState gameState, int newHandDelayMs) => {
@@ -128,11 +113,13 @@ namespace TrucoMineiro.Tests
                 mockGameRepository.Object,
                 mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
-                mockAIPlayerService.Object,
-                mockScoreCalculationService.Object,
+                mockAIPlayerService.Object,                mockScoreCalculationService.Object,
                 mockEventPublisher.Object,
                 configuration);
-            _controller = new TrucoGameController(_gameService);
+            
+            // Create a mock GameStateMachine for the controller
+            var mockGameStateMachine = new Mock<IGameStateMachine>();
+            _controller = new TrucoGameController(_gameService, mockGameStateMachine.Object);
         }private GameState CreateValidGameState(string? playerName = null)
         {
             var gameState = new GameState();
@@ -285,11 +272,13 @@ namespace TrucoMineiro.Tests
                 mockGameRepository.Object,
                 mockGameFlowService.Object,
                 mockTrucoRulesEngine.Object,
-                mockAIPlayerService.Object,
-                mockScoreCalculationService.Object,
+                mockAIPlayerService.Object,                mockScoreCalculationService.Object,
                 mockEventPublisher.Object,
                 devConfig);
-            var devController = new TrucoGameController(devGameService);
+            
+            // Create a mock GameStateMachine for the dev controller
+            var mockDevGameStateMachine = new Mock<IGameStateMachine>();
+            var devController = new TrucoGameController(devGameService, mockDevGameStateMachine.Object);
             var game = devGameService.CreateGame("TestPlayer");
             
             // Act

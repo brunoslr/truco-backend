@@ -83,65 +83,137 @@ If either team reaches 10 points, the next hand is automatically worth 4 points 
 ### Exclusions
 - The game does not include Envido or Flor, as they are not used in the Truco Mineiro variant.
 
-## API and Data Transfer Objects (DTOs)
+## API Data Transfer Objects (DTOs)
 
 The backend exposes the following DTOs (Data Transfer Objects) which define the contract between frontend and backend:
 
-### PlayerDto
+### Game Management DTOs
+
+#### StartGameRequest
 ```csharp
-public class PlayerDto
+public class StartGameRequest
 {
-    public string PlayerId { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Team { get; set; } = string.Empty;
-    public List<CardDto> Hand { get; set; } = new List<CardDto>();
-    public bool IsDealer { get; set; }
-    public bool IsActive { get; set; }
-    public int Seat { get; set; }
-    public int FirstPlayerSeat { get; set; }
+    public string PlayerName { get; set; } = string.Empty;
 }
 ```
 
-### CardDto
+#### StartGameResponse
+```csharp
+public class StartGameResponse
+{
+    public string GameId { get; set; } = string.Empty;
+    public int PlayerSeat { get; set; }
+    public List<TeamDto> Teams { get; set; } = new();
+    public List<PlayerDto> Players { get; set; } = new();
+    public List<CardDto> Hand { get; set; } = new();
+    public List<PlayerHandDto> PlayerHands { get; set; } = new();
+    public int DealerSeat { get; set; }
+    public Dictionary<string, int> TeamScores { get; set; } = new();
+    public int Stakes { get; set; }
+    public int CurrentHand { get; set; }
+    public List<ActionLogEntryDto> Actions { get; set; } = new();
+}
+```
+
+### Card and Player DTOs
+
+#### CardDto
 ```csharp
 public class CardDto
 {
-    public string Value { get; set; } = string.Empty;
-    public string Suit { get; set; } = string.Empty;
+    public string? Value { get; set; }  // null for hidden cards
+    public string? Suit { get; set; }   // null for hidden cards
 }
 ```
 
-### PlayedCardDto
+#### PlayerDto
+```csharp
+public class PlayerDto
+{
+    public int Seat { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Team { get; set; } = string.Empty;
+    public List<CardDto> Hand { get; set; } = new();
+}
+```
+
+#### PlayerHandDto
+```csharp
+public class PlayerHandDto
+{
+    public int Seat { get; set; }
+    public List<CardDto> Cards { get; set; } = new();
+}
+```
+
+#### PlayedCardDto
 ```csharp
 public class PlayedCardDto
 {
-    public string PlayerId { get; set; } = string.Empty;
-    public CardDto? Card { get; set; }
+    public int PlayerSeat { get; set; }
+    public CardDto Card { get; set; } = new();
 }
 ```
 
-### GameStateDto
+### Action DTOs
+
+#### PlayCardRequestDto
+```csharp
+public class PlayCardRequestDto
+{
+    public string GameId { get; set; } = string.Empty;
+    public int PlayerSeat { get; set; }      // 0-3
+    public int CardIndex { get; set; }       // 0-based index
+    public bool IsFold { get; set; } = false; // true to fold round
+}
+```
+
+#### PlayCardResponseDto
+```csharp
+public class PlayCardResponseDto
+{
+    public GameStateDto GameState { get; set; } = new();
+    public List<CardDto> Hand { get; set; } = new();
+    public List<PlayerHandDto> PlayerHands { get; set; } = new();
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+```
+
+#### ButtonPressRequest
+```csharp
+public class ButtonPressRequest
+{
+    public string GameId { get; set; } = string.Empty;
+    public int PlayerSeat { get; set; }      // 0-3
+    public string Action { get; set; } = string.Empty;  // "truco", "raise", "fold"
+}
+```
+
+### Game State DTOs
+
+#### GameStateDto
 ```csharp
 public class GameStateDto
 {
-    public List<PlayerDto> Players { get; set; } = new List<PlayerDto>();
-    public List<PlayedCardDto> PlayedCards { get; set; } = new List<PlayedCardDto>();
+    public List<PlayerDto> Players { get; set; } = new();
+    public List<PlayedCardDto> PlayedCards { get; set; } = new();
     public int Stakes { get; set; }
     public bool IsTrucoCalled { get; set; }
     public bool IsRaiseEnabled { get; set; }
     public int CurrentHand { get; set; }
-    public Dictionary<string, int> TeamScores { get; set; } = new Dictionary<string, int>();
+    public Dictionary<string, int> TeamScores { get; set; } = new();
     public string? TurnWinner { get; set; }
-    public List<ActionLogEntryDto> ActionLog { get; set; } = new List<ActionLogEntryDto>();
+    public List<ActionLogEntryDto> ActionLog { get; set; } = new();
 }
 ```
 
-### ActionLogEntryDto
+#### ActionLogEntryDto
 ```csharp
 public class ActionLogEntryDto
 {
     public string Type { get; set; } = string.Empty;
-    public string? PlayerId { get; set; }
+    public int? PlayerSeat { get; set; }
     public string? Card { get; set; }
     public string? Action { get; set; }
     public int? HandNumber { get; set; }
@@ -150,53 +222,137 @@ public class ActionLogEntryDto
 }
 ```
 
-### PlayCardRequest
-```csharp
-public class PlayCardRequest
+### DTO Usage Examples
+
+#### Start a new game
+```json
+POST /api/game/start
 {
-    public string PlayerId { get; set; } = string.Empty;
-    public int CardIndex { get; set; }
-    public bool IsFold { get; set; } = false;
+  "playerName": "John"
 }
 ```
 
-**PlayCardRequest Usage:**
-- **Normal Card Play**: `{ playerId: "player1", cardIndex: 0, isFold: false }`
-- **Fold Round**: `{ playerId: "player1", cardIndex: 0, isFold: true }` (cardIndex ignored)
-- When `IsFold: true`, the backend replaces the card with `{ Value: "FOLD", Suit: "NONE" }`
-- This allows the same endpoint to handle both regular plays and round folds
+#### Play a card
+```json
+POST /api/game/play-card
+{
+  "gameId": "abc123",
+  "playerSeat": 0,
+  "cardIndex": 0,
+  "isFold": false
+}
+```
+
+#### Fold current round
+```json
+POST /api/game/play-card
+{
+  "gameId": "abc123",
+  "playerSeat": 0,
+  "cardIndex": 0,
+  "isFold": true
+}
+```
+
+#### Call Truco
+```json
+POST /api/game/press-button
+{
+  "gameId": "abc123",
+  "playerSeat": 0,
+  "action": "truco"
+}
+```
+
+#### Fold entire hand
+```json
+POST /api/game/press-button
+{
+  "gameId": "abc123",
+  "playerSeat": 0,
+  "action": "fold"
+}
+```
 
 **All DTOs are serialized as JSON and use camelCase for property names when sent over the wire.**
 
 ## API Endpoints
 
-The backend exposes the following RESTful API endpoints:
+The backend exposes the following RESTful API endpoints using event-driven architecture:
+
+### Health Check
+- **`GET /api/game/health`** — Returns API health status and version information.
 
 ### Game Management
-- `POST /api/game` — Creates a new game and returns its ID.
-- `GET /api/game/{gameId}` — Returns the current `GameStateDto` for the specified game.
+- **`POST /api/game/start`** — Creates and starts a new game. Body: `{ "playerName": "string" }`
+- **`GET /api/game/{gameId}?playerSeat={seat}`** — Returns current game state with player-specific card visibility.
 
 ### Game Actions
-- `POST /api/game/{gameId}/play-card` — Plays a card or folds round. Body: `{ playerId, cardIndex, isFold }`.
-- `POST /api/game/{gameId}/truco` — Calls Truco/Raise (unified action). Body: `{ playerId }`.
-- `POST /api/game/{gameId}/fold` — Folds entire hand (all remaining rounds). Body: `{ playerId }`.
-- `POST /api/game/{gameId}/new-hand` — Starts a new hand.
+- **`POST /api/game/play-card`** — Plays a card or folds round. Body: `{ "gameId": "string", "playerSeat": 0, "cardIndex": 0, "isFold": false }`
+- **`POST /api/game/press-button`** — Unified endpoint for Truco/Raise/Fold actions. Body: `{ "gameId": "string", "playerSeat": 0, "action": "truco|raise|fold" }`
 
-#### Button Press Actions Explained
+### Endpoint Details
 
-##### Play Card / Fold Round
-- **Normal Play**: Send `{ playerId: "player1", cardIndex: 0, isFold: false }`
-- **Fold Round**: Send `{ playerId: "player1", cardIndex: 0, isFold: true }` (gives up current round only)
+#### Health Check
+```
+GET /api/game/health
+Response: { "status": "healthy", "timestamp": "2024-01-01T00:00:00Z", "service": "TrucoMineiro.API", "version": "1.0.0" }
+```
 
-##### Truco/Raise
-- **Single Button**: Frontend shows "Truco" or "Raise" based on current game state
-- **Backend Logic**: Determines if it's initial truco or raise based on current stakes
-- **Response Required**: Opposing team must accept, raise further, or fold entire hand
+#### Start Game
+```
+POST /api/game/start
+Body: { "playerName": "John" }
+Response: StartGameResponse with game state and player's cards
+```
 
-##### Fold Hand
-- **Purpose**: Give up all remaining cards (entire hand, not just current round)
-- **Effect**: Opponent wins immediately with current stakes
-- **Usage**: When player wants to concede the entire hand
+#### Get Game State
+```
+GET /api/game/{gameId}?playerSeat=0
+Response: GameStateDto with appropriate card visibility based on requesting player
+```
+
+#### Play Card / Fold Round
+```
+POST /api/game/play-card
+Body: 
+{
+  "gameId": "abc123",
+  "playerSeat": 0,
+  "cardIndex": 0,        // index of card to play (ignored if isFold=true)
+  "isFold": false        // true to fold current round
+}
+Response: PlayCardResponseDto with updated game state
+```
+
+#### Button Press Actions (Unified)
+```
+POST /api/game/press-button
+Body:
+{
+  "gameId": "abc123",
+  "playerSeat": 0,
+  "action": "truco"      // "truco", "raise", or "fold"
+}
+Response: GameStateDto with updated game state
+```
+
+### Action Types Explained
+
+#### Play Card / Fold Round
+- **Normal Play**: Send `{ "gameId": "abc123", "playerSeat": 0, "cardIndex": 0, "isFold": false }`
+- **Fold Round**: Send `{ "gameId": "abc123", "playerSeat": 0, "cardIndex": 0, "isFold": true }` (gives up current round only)
+
+#### Unified Button Press Actions
+- **Truco**: `{ "gameId": "abc123", "playerSeat": 0, "action": "truco" }` — Initial Truco call
+- **Raise**: `{ "gameId": "abc123", "playerSeat": 0, "action": "raise" }` — Counter-raise after opponent's Truco
+- **Fold**: `{ "gameId": "abc123", "playerSeat": 0, "action": "fold" }` — Fold entire hand (all remaining rounds)
+
+### Card Visibility Rules
+- **Human Player**: Always sees their own cards with full details
+- **AI Players**: Cards hidden (Value=null, Suit=null) unless DevMode is enabled
+- **DevMode**: When enabled, all cards are visible for debugging purposes
+- **Played Cards**: Always visible to all players once played
 
 ## Developer Instructions
 
