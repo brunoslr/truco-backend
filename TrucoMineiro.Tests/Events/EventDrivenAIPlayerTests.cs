@@ -94,7 +94,7 @@ namespace TrucoMineiro.Tests.Events
             Assert.Equal(1, cardPlayedEvent.Player.Seat); // AI player seat
             Assert.NotNull(cardPlayedEvent.Card);
         }        [Fact]
-        public async Task GameFlowEventHandler_Should_Handle_CardPlayedEvent()
+        public async Task RoundFlowEventHandler_Should_Handle_CardPlayedEvent()
         {
             // Arrange
             var services = new ServiceCollection();
@@ -115,12 +115,12 @@ namespace TrucoMineiro.Tests.Events
             var configuration = configurationBuilder.Build();
             services.AddSingleton<IConfiguration>(configuration);
             
-            services.AddScoped<GameFlowEventHandler>();
+            services.AddScoped<RoundFlowEventHandler>();
 
             var serviceProvider = services.BuildServiceProvider();
-            var handler = serviceProvider.GetRequiredService<GameFlowEventHandler>();
+            var handler = serviceProvider.GetRequiredService<RoundFlowEventHandler>();
             var gameRepo = (TestGameRepository)serviceProvider.GetRequiredService<IGameRepository>();
-            var eventPublisher = (TestEventPublisher)serviceProvider.GetRequiredService<IEventPublisher>();            // Create a test game
+            var eventPublisher = (TestEventPublisher)serviceProvider.GetRequiredService<IEventPublisher>();// Create a test game
             var gameId = Guid.NewGuid();
             var game = new GameState
             {

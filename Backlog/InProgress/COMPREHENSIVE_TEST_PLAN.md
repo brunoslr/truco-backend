@@ -197,7 +197,7 @@ GAME (Complete Match)
 12. **Required Events**
     - ✅ GameStartedEvent, PlayerTurnStartedEvent, CardPlayedEvent
     - ✅ RoundCompletedEvent, HandCompletedEvent, GameCompletedEvent
-    - ✅ TrucoRaiseEvent, FoldHandEvent, ActionLogEvent
+    - ✅ TrucoRaiseEvent, SurrenderHandEvent, ActionLogEvent
     - ✅ All events must carry proper Guid identifiers
     
     **❓ VALIDATION NEEDED:** Are these the complete set of required events?
