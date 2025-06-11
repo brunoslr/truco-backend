@@ -32,30 +32,31 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             _logger = logger;
             _configuration = configuration;
         }        
-        
-        /// <summary>
+          /// <summary>
         /// Handle AI player turn events
         /// </summary>
         public async Task HandleAsync(PlayerTurnStartedEvent gameEvent, CancellationToken cancellationToken = default)
-        {            try
+        {              try
             {
+                // Check if AI auto-play is enabled
+                var autoAiPlayEnabled = _configuration.GetValue<bool>("FeatureFlags:AutoAiPlay", true);                if (!autoAiPlayEnabled)
+                {
+                    return;
+                }
+                
                 var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
                 if (game == null)
                 {
                     _logger.LogWarning("Game {GameId} not found for AI turn", gameEvent.GameId);
                     return;
-                }
-
+                }                
                 var player = gameEvent.Player;
                 if (player == null || !player.IsAI)
                 {
                     // Not an AI player, ignore this event
-                    _logger.LogDebug("Player {PlayerName} at seat {PlayerSeat} in game {GameId} is not an AI player", 
-                        player?.Name, player?.Seat, gameEvent.GameId);
-                    return;                }
-
-                _logger.LogDebug("AI player {PlayerName} (seat {PlayerSeat}) thinking in game {GameId}", 
-                    player.Name, player.Seat, gameEvent.GameId);// Add thinking delay for realism
+                    return;                
+                }                
+                // Add thinking delay for realism
                 await Task.Delay(GetAIThinkingDelay(), cancellationToken);
 
                 // AI makes decision
@@ -89,15 +90,14 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                         gameEvent.Hand,
                         true, // isAIMove
                         game
-                    );                    await _eventPublisher.PublishAsync(cardPlayedEvent, cancellationToken);                    _logger.LogDebug("AI player {PlayerName} (seat {PlayerSeat}) played {Card} in game {GameId}", 
-                        player.Name, player.Seat, $"{card.Value} of {card.Suit}", gameEvent.GameId);
-                }
+                    );                    await _eventPublisher.PublishAsync(cardPlayedEvent, cancellationToken);
+                }                
                 else
                 {
                     _logger.LogWarning("AI player {PlayerName} (seat {PlayerSeat}) in game {GameId} could not select a valid card", 
                         player.Name, player.Seat, gameEvent.GameId);
                 }
-            }
+            }            
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing AI turn for player {PlayerName} (seat {PlayerSeat}) in game {GameId}", 

@@ -119,13 +119,7 @@ namespace TrucoMineiro.Tests.Integration
             var startGameContent = new StringContent(startGameJson, Encoding.UTF8, "application/json");            var startResponse = await client.PostAsync("/api/game/start", startGameContent);
             var startGameResponseJson = await startResponse.Content.ReadAsStringAsync();
             
-            // TODO: Remove debug logging after event-driven AI timing issues are resolved
-            Console.WriteLine($"Start game response: {startGameResponseJson}");
-            
             var gameState = JsonSerializer.Deserialize<StartGameResponse>(startGameResponseJson, _jsonOptions);            var gameId = gameState!.GameId;
-            
-            // TODO: Remove debug logging after event-driven AI timing issues are resolved
-            Console.WriteLine($"Parsed GameId: '{gameId}' (length: {gameId?.Length})");
             
             // Act - Human player makes a move
             var playCardRequest = new PlayCardRequestDto
@@ -137,17 +131,7 @@ namespace TrucoMineiro.Tests.Integration
             };
 
             var playCardJson = JsonSerializer.Serialize(playCardRequest, _jsonOptions);
-            var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");
-
-            var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
-            
-            // Debug: Check the response before asserting success
-            if (!playCardResponse.IsSuccessStatusCode)
-            {
-                var errorContent = await playCardResponse.Content.ReadAsStringAsync();
-                Console.WriteLine($"AIAutoPlay PlayCard failed with status: {playCardResponse.StatusCode}");
-                Console.WriteLine($"Error content: {errorContent}");
-            }
+            var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");            var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
             
             playCardResponse.EnsureSuccessStatusCode();
 
@@ -226,11 +210,7 @@ namespace TrucoMineiro.Tests.Integration
             var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");            
             var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
             playCardResponse.EnsureSuccessStatusCode();
-            
-            var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
-            
-            // Debug: Log the actual response to understand the issue
-            Console.WriteLine($"PlayCard Response JSON: {playCardResponseJson}");
+              var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
             
             var playCardResult = JsonSerializer.Deserialize<PlayCardResponseDto>(playCardResponseJson, _jsonOptions);
             

@@ -278,17 +278,18 @@ namespace TrucoMineiro.API.Domain.Models
         /// Initialize the game with players
         /// </summary>
         public void InitializeGame()
-        {
+        {            
             // Create players if they don't exist
             if (Players.Count < MaxPlayers)
             {                Players = new List<Player>
                 {
                     new Player("You", TrucoConstants.Teams.PlayerTeam, 0),
-                    new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1),
-                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),                    
-                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
+                    new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1) { IsAI = true },
+                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2) { IsAI = true },                    
+                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3) { IsAI = true }
                 };
-            }            // Set the dealer and first player
+            }
+            // Set the dealer and first player
             Players[DealerSeat].IsDealer = true;
             Players[FirstPlayerSeat].IsActive = true;
 
@@ -304,15 +305,15 @@ namespace TrucoMineiro.API.Domain.Models
         /// </summary>
         /// <param name="playerName">Custom name for the player at seat 0</param>
         public void InitializeGame(string playerName)
-        {
+        {            
             // Create players if they don't exist
             if (Players.Count < MaxPlayers)
             {                Players = new List<Player>
                 {
                     new Player(playerName, TrucoConstants.Teams.PlayerTeam, 0),
-                    new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1),
-                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),
-                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
+                    new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1) { IsAI = true },
+                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2) { IsAI = true },
+                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3) { IsAI = true }
                 };
             }
             else

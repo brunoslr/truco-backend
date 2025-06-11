@@ -86,7 +86,9 @@ namespace TrucoMineiro.Tests.TestUtilities
                 CardIndex = cardIndex,
                 IsFold = isFold
             };
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Finds the human player (seat 0) from a game response
         /// </summary>
         protected PlayerInfoDto GetHumanPlayer(StartGameResponse gameResponse)
@@ -100,34 +102,36 @@ namespace TrucoMineiro.Tests.TestUtilities
         protected PlayerInfoDto GetPlayerAtSeat(StartGameResponse gameResponse, int seat)
         {
             return gameResponse.Players.First(p => p.Seat == seat);
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Runs a test with specific configuration overrides
         /// Note: This method creates a temporary test instance - use constructor with configOverrides instead for better performance
         /// </summary>
         /// <param name="configOverrides">Configuration settings to override</param>
         /// <param name="testAction">Test action to execute with the configured test base</param>
         protected async Task TestWithConfigAsync(
-            Dictionary<string, string?> configOverrides, 
+            Dictionary<string, string?> configOverrides,
             Func<Task> testAction)
         {
             // Create temporary factory and client with the specified configuration
             using var factory = TestWebApplicationFactory.WithConfig(configOverrides);
             using var client = factory.CreateClient();
             var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            
+
             // Temporarily replace the current factory and client
             var originalFactory = _factory;
             var originalClient = _client;
-            
+
             // Use reflection to set the fields temporarily (this is a testing utility)
             var factoryField = typeof(EndpointTestBase).GetField("_factory", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             var clientField = typeof(EndpointTestBase).GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            
+
             try
             {
                 factoryField?.SetValue(this, factory);
                 clientField?.SetValue(this, client);
-                
+
                 await testAction();
             }
             finally
@@ -151,9 +155,7 @@ namespace TrucoMineiro.Tests.TestUtilities
                 {"FeatureFlags:AutoAiPlay", "true"},    // Enable AI auto-play
                 {"FeatureFlags:DevMode", "false"}       // Default to normal mode
             };
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Gets default fast test configuration with DevMode enabled
         /// Useful for tests that need to see all cards
         /// </summary>
@@ -162,6 +164,21 @@ namespace TrucoMineiro.Tests.TestUtilities
             var config = GetFastTestConfig();
             config["FeatureFlags:DevMode"] = "true";
             return config;
+        }
+
+        /// <summary>
+        /// Gets test configuration with AI auto-play disabled
+        /// Useful for tests that need to verify intermediate game states before AI takes over
+        /// </summary>
+        protected static Dictionary<string, string?> GetConfigWithoutAutoAiPlay()
+        {
+            return new Dictionary<string, string?>
+            {
+                {"GameSettings:AIPlayDelayMs", "0"},    // Immediate AI play when triggered
+                {"GameSettings:NewHandDelayMs", "0"},   // Immediate hand transitions for tests
+                {"FeatureFlags:AutoAiPlay", "false"},   // Disable AI auto-play
+                {"FeatureFlags:DevMode", "false"}       // Default to normal mode
+            };
         }
 
         public virtual void Dispose()

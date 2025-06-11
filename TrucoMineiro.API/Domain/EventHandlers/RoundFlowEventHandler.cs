@@ -29,8 +29,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             _gameStateManager = gameStateManager;
             _handResolutionService = handResolutionService;
             _logger = logger;
-        }
-
+        }        
         public async Task HandleAsync(CardPlayedEvent gameEvent, CancellationToken cancellationToken = default)
         {
             try
@@ -40,14 +39,10 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 {
                     _logger.LogWarning("Game {GameId} not found for round flow processing", gameEvent.GameId);
                     return;
-                }
-
-                _logger.LogDebug("Processing round flow for card played in game {GameId} by player {PlayerName} (seat {PlayerSeat})", 
-                    gameEvent.GameId, gameEvent.Player.Name, gameEvent.Player.Seat);
+                }               
 
                 // Advance to next player
                 _gameStateManager.AdvanceToNextPlayer(game);
-
                 // Check if round is complete
                 if (_gameStateManager.IsRoundComplete(game))
                 {
@@ -60,8 +55,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
 
                 // Save updated game state
                 await _gameRepository.SaveGameAsync(game);
-            }
-            catch (Exception ex)
+            }            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing round flow for card played event in game {GameId}", gameEvent.GameId);
             }
@@ -96,15 +90,13 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             {
                 await HandleNewRoundStart(game, gameId, winner, cancellationToken);
             }
-        }
-
-        private async Task HandleNextPlayerTurn(GameState game, Guid gameId, CancellationToken cancellationToken)
+        }        private async Task HandleNextPlayerTurn(GameState game, Guid gameId, CancellationToken cancellationToken)
         {
             var activePlayer = game.Players.FirstOrDefault(p => p.IsActive);
             if (activePlayer != null)
             {
-                _logger.LogDebug("Next player turn in game {GameId}: player {PlayerSeat}", 
-                    gameId, activePlayer.Seat);
+                _logger.LogInformation("🔄 RoundFlowEventHandler: Publishing PlayerTurnStartedEvent for {PlayerName} (seat {PlayerSeat}, IsAI: {IsAI})", 
+                    activePlayer.Name, activePlayer.Seat, activePlayer.IsAI);
 
                 var nextTurnEvent = new PlayerTurnStartedEvent(
                     gameId,
@@ -115,6 +107,12 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     new List<string> { "play-card" }
                 );
                 await _eventPublisher.PublishAsync(nextTurnEvent, cancellationToken);
+                
+                _logger.LogInformation("🔄 RoundFlowEventHandler: PlayerTurnStartedEvent published successfully");
+            }
+            else
+            {
+                _logger.LogWarning("🔄 RoundFlowEventHandler: No active player found for next turn in game {GameId}", gameId);
             }
         }
 

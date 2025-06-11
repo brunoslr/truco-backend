@@ -87,7 +87,9 @@ namespace TrucoMineiro.Tests.Integration
             // Verify the human player's card was played
             var humanPlayedCard = updatedGameState.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == 0);
             Assert.NotNull(humanPlayedCard);
-        }        [Fact]
+        }        
+        
+        [Fact]
         public async Task CompleteRound_ShouldHandleFullAIAutoPlayFlow_WhenEnabled()
         {
             // Arrange - Create factory with immediate AI delays for testing
@@ -125,31 +127,10 @@ namespace TrucoMineiro.Tests.Integration
             var gameStateResponse = await client.GetAsync($"/api/game/{gameState.GameId}");
             gameStateResponse.EnsureSuccessStatusCode();
             
-            var gameStateJson = await gameStateResponse.Content.ReadAsStringAsync();
-            var updatedGameState = JsonSerializer.Deserialize<GameStateDto>(gameStateJson, _jsonOptions);
+            var gameStateJson = await gameStateResponse.Content.ReadAsStringAsync();            var updatedGameState = JsonSerializer.Deserialize<GameStateDto>(gameStateJson, _jsonOptions);
             
             Assert.NotNull(updatedGameState);
             Assert.NotNull(updatedGameState.PlayedCards);            
-            // DEBUG: Log actual state for diagnosis
-            Console.WriteLine($"\n=== FINAL STATE ANALYSIS ===");
-            Console.WriteLine($"PlayedCards count: {updatedGameState.PlayedCards.Count}");
-            
-            for (int i = 0; i < updatedGameState.PlayedCards.Count; i++)
-            {
-                var pc = updatedGameState.PlayedCards[i];
-                var isFold = pc.Card?.Value == "FOLD" && pc.Card?.Suit == "FOLD";
-                Console.WriteLine($"Seat {pc.PlayerSeat}: {pc.Card?.Value} of {pc.Card?.Suit} (IsFold: {isFold})");
-            }
-            
-            Console.WriteLine($"\nPlayer states:");
-            for (int i = 0; i < updatedGameState.Players.Count; i++)
-            {
-                var player = updatedGameState.Players[i];
-                Console.WriteLine($"  Seat {player.Seat}: {player.Name} (IsActive: {player.IsActive}, Cards in hand: {player.Hand.Count})");
-            }
-            
-            Console.WriteLine($"Current Hand: {updatedGameState.CurrentHand}");
-            
             // Verify that all 4 players played their cards (1 human + 3 AI)
             // This validates the complete event-driven AI auto-play flow
             var playedCardsCount = updatedGameState.PlayedCards.Count;

@@ -51,15 +51,8 @@ namespace TrucoMineiro.API.Domain.Services
             if (!validationResult.IsValid)
             {
                 return CreateErrorResponse(validationResult.ErrorMessage);
-            }
-
+            }            
             var player = game.Players.First(p => p.Seat == request.PlayerSeat);
-
-            // Handle fold logic if requested
-            if (request.IsFold)
-            {
-                PlayFoldCard(player, request.CardIndex);
-            }
 
             // Execute card play (remove from hand and add to played cards)
             ExecuteCardPlay(game, player, request.CardIndex, request.IsFold);
@@ -98,24 +91,13 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return (true, string.Empty);
-        }
-
-        /// <summary>
-        /// Replaces the card at the specified position with a fold card
-        /// </summary>
-        private void PlayFoldCard(Player player, int cardIndex)
-        {
-            // Replace the card with a fold card
-            player.Hand[cardIndex] = Card.CreateFoldCard();
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Executes the card play by removing from hand and adding to played cards
         /// </summary>
         private void ExecuteCardPlay(GameState game, Player player, int cardIndex, bool isFold)
         {
-            // Get the card to play (either original card or fold card if fold was requested)
-            var cardToPlay = player.Hand[cardIndex];
+            // Determine the card to play: fold card if folding, otherwise the actual card from hand
+            var cardToPlay = isFold ? Card.CreateFoldCard() : player.Hand[cardIndex];
             
             // Remove from player's hand
             player.Hand.RemoveAt(cardIndex);
@@ -130,7 +112,8 @@ namespace TrucoMineiro.API.Domain.Services
             {
                 game.PlayedCards.Add(new PlayedCard(player.Seat, cardToPlay));
             }
-        }        /// <summary>
+        }
+        /// <summary>
         /// Publishes the card played event
         /// </summary>
         private async Task PublishCardPlayedEvent(GameState game, Player player, bool isFold)

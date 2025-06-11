@@ -34,22 +34,15 @@ namespace TrucoMineiro.API.Domain.Services
             {
                 _logger.LogWarning("Attempted to publish null event");
                 return;
-            }
-
+            }            
             try
             {
-                _logger.LogDebug("Publishing event {EventType} for game {GameId} (EventId: {EventId})", 
-                    gameEvent.EventType, gameEvent.GameId, gameEvent.EventId);
-
                 // Create a scope to resolve scoped services
                 using var scope = _serviceScopeFactory.CreateScope();
                 
                 // Get all handlers for this event type
-                var handlers = scope.ServiceProvider.GetServices<IEventHandler<T>>().ToList();
-
-                if (!handlers.Any())
+                var handlers = scope.ServiceProvider.GetServices<IEventHandler<T>>().ToList();                if (!handlers.Any())
                 {
-                    _logger.LogDebug("No handlers registered for event type {EventType}", gameEvent.EventType);
                     return;
                 }
 
