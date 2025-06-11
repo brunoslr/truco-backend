@@ -34,7 +34,6 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IAIPlayerService, 
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameStateManager, TrucoMineiro.API.Domain.Services.GameStateManager>();
 
 // Register application services
-builder.Services.AddScoped<TrucoMineiro.API.Services.GameManagementService>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IPlayCardService, TrucoMineiro.API.Domain.Services.PlayCardService>();
 builder.Services.AddSingleton<TrucoMineiro.API.Services.MappingService>();
 

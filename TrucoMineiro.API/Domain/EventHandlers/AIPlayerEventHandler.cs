@@ -37,13 +37,8 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         /// Handle AI player turn events
         /// </summary>
         public async Task HandleAsync(PlayerTurnStartedEvent gameEvent, CancellationToken cancellationToken = default)
-        {
-            try
+        {            try
             {
-                // TODO: REMOVE - Debug logging for event flow investigation
-                _logger.LogInformation("DEBUG: AIPlayerEventHandler received PlayerTurnStartedEvent for player {PlayerSeat} in game {GameId}", 
-                    gameEvent.Player?.Seat, gameEvent.GameId);
-
                 var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
                 if (game == null)
                 {
@@ -57,15 +52,10 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     // Not an AI player, ignore this event
                     _logger.LogDebug("Player {PlayerName} at seat {PlayerSeat} in game {GameId} is not an AI player", 
                         player?.Name, player?.Seat, gameEvent.GameId);
-                    return;
-                }
-
-                // TODO: REMOVE - Debug logging for event flow investigation
-                _logger.LogInformation("DEBUG: Processing AI player {PlayerName} (seat {PlayerSeat}) in game {GameId}", 
-                    player.Name, player.Seat, gameEvent.GameId);
+                    return;                }
 
                 _logger.LogDebug("AI player {PlayerName} (seat {PlayerSeat}) thinking in game {GameId}", 
-                    player.Name, player.Seat, gameEvent.GameId);                // Add thinking delay for realism
+                    player.Name, player.Seat, gameEvent.GameId);// Add thinking delay for realism
                 await Task.Delay(GetAIThinkingDelay(), cancellationToken);
 
                 // AI makes decision
@@ -99,14 +89,8 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                         gameEvent.Hand,
                         true, // isAIMove
                         game
-                    );                    await _eventPublisher.PublishAsync(cardPlayedEvent, cancellationToken);
-
-                    _logger.LogDebug("AI player {PlayerName} (seat {PlayerSeat}) played {Card} in game {GameId}", 
+                    );                    await _eventPublisher.PublishAsync(cardPlayedEvent, cancellationToken);                    _logger.LogDebug("AI player {PlayerName} (seat {PlayerSeat}) played {Card} in game {GameId}", 
                         player.Name, player.Seat, $"{card.Value} of {card.Suit}", gameEvent.GameId);
-
-                    // TODO: REMOVE - Debug logging for event flow investigation
-                    _logger.LogInformation("DEBUG: AI player {PlayerName} (seat {PlayerSeat}) successfully played card and published CardPlayedEvent", 
-                        player.Name, player.Seat);
                 }
                 else
                 {

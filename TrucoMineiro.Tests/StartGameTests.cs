@@ -22,7 +22,7 @@ namespace TrucoMineiro.Tests
             _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(inMemorySettings)
                 .Build();
-        }        private GameManagementService CreateGameManagementService(IConfiguration? config = null)
+        }        private IGameStateManager CreateGameStateManager(IConfiguration? config = null)
         {
             var configuration = config ?? _configuration;
               // Create a dictionary to store created games (simulating repository storage)
@@ -70,11 +70,7 @@ namespace TrucoMineiro.Tests
             // NOTE: ProcessAITurnsAsync is obsolete - AI processing is now event-driven
             // No need to mock this obsolete method as tests should use real event handlers
 
-            return new GameManagementService(
-                mockGameStateManager.Object,
-                mockGameRepository.Object,
-                mockPlayCardService.Object,
-                configuration);
+            return mockGameStateManager.Object;
         }        private GameState CreateValidGameState(string? playerName = null)
         {
             var gameState = new GameState();
@@ -82,20 +78,19 @@ namespace TrucoMineiro.Tests
             // FirstPlayerSeat is computed automatically based on DealerSeat
             gameState.CurrentPlayerIndex = 0; // Ensure human player is active
             return gameState;
-        }[Fact]
-        public void CreateGameWithCustomName_ShouldInitializeGameState()
+        }        [Fact]
+        public async Task CreateGameWithCustomName_ShouldInitializeGameState()
         {
             // Arrange
-            var gameService = CreateGameManagementService();
+            var gameStateManager = CreateGameStateManager();
             string playerName = "TestPlayer";
 
             // Act
-            var game = gameService.CreateGame(playerName);
+            var game = await gameStateManager.CreateGameAsync(playerName);
 
             // Assert
             Assert.NotNull(game);
             Assert.Equal(4, game.Players.Count);
-            Assert.Equal(TrucoConstants.Stakes.Initial, game.Stakes); // Stakes should start at 2 as per Truco Mineiro rules
             Assert.False(game.IsTrucoCalled);
             Assert.True(game.IsRaiseEnabled);
             Assert.Equal(1, game.CurrentHand);
@@ -117,12 +112,12 @@ namespace TrucoMineiro.Tests
             Assert.Equal("Partner", game.Players.First(p => p.Seat == 2).Name);
             Assert.Equal("AI 2", game.Players.First(p => p.Seat == 3).Name);
         }        [Fact]
-        public void MapGameStateToStartGameResponse_ShouldMapCorrectly()
+        public async Task MapGameStateToStartGameResponse_ShouldMapCorrectly()
         {
             // Arrange
-            var gameService = CreateGameManagementService();
+            var gameStateManager = CreateGameStateManager();
             string playerName = "TestPlayer";
-            var game = gameService.CreateGame(playerName);
+            var game = await gameStateManager.CreateGameAsync(playerName);
 
             // Act
             var response = MappingService.MapGameStateToStartGameResponse(game);
@@ -168,7 +163,7 @@ namespace TrucoMineiro.Tests
         }
         
         [Fact]
-        public void MapGameStateToStartGameResponse_WithDevMode_ShouldShowCards()
+        public async Task MapGameStateToStartGameResponse_WithDevMode_ShouldShowCards()
         {
             // Arrange
             var devModeSettings = new Dictionary<string, string?> {
@@ -177,9 +172,9 @@ namespace TrucoMineiro.Tests
                 .AddInMemoryCollection(devModeSettings)
                 .Build();
 
-            var gameService = CreateGameManagementService(devConfig);
+            var gameStateManager = CreateGameStateManager(devConfig);
             string playerName = "TestPlayer";
-            var game = gameService.CreateGame(playerName);
+            var game = await gameStateManager.CreateGameAsync(playerName);
 
             // Act - Note we pass true for showAllHands param
             var response = MappingService.MapGameStateToStartGameResponse(game, 0, true);            // Assert

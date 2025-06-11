@@ -15,15 +15,24 @@ namespace TrucoMineiro.API.Controllers
     [ApiController]
     [Produces("application/json")]    public class TrucoGameController : ControllerBase
     {
-        private readonly GameManagementService _gameManagementService;
+        private readonly IGameStateManager _gameStateManager;
+        private readonly IGameRepository _gameRepository;
         private readonly IPlayCardService _playCardService;
         private readonly IGameStateMachine _gameStateMachine;
+        private readonly IConfiguration _configuration;
 
-        public TrucoGameController(GameManagementService gameManagementService, IPlayCardService playCardService, IGameStateMachine gameStateMachine)
+        public TrucoGameController(
+            IGameStateManager gameStateManager,
+            IGameRepository gameRepository,
+            IPlayCardService playCardService, 
+            IGameStateMachine gameStateMachine,
+            IConfiguration configuration)
         {
-            _gameManagementService = gameManagementService;
+            _gameStateManager = gameStateManager;
+            _gameRepository = gameRepository;
             _playCardService = playCardService;
             _gameStateMachine = gameStateMachine;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -75,8 +84,8 @@ namespace TrucoMineiro.API.Controllers
         [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<GameStateDto> GetGameState(string gameId, [FromQuery] int? playerSeat = null)
-        {            var game = _gameManagementService.GetGame(gameId);
+        public async Task<ActionResult<GameStateDto>> GetGameState(string gameId, [FromQuery] int? playerSeat = null)        {
+            var game = await _gameRepository.GetGameAsync(gameId);
             if (game == null)
             {
                 return NotFound("Game not found");
@@ -94,10 +103,8 @@ namespace TrucoMineiro.API.Controllers
             if (!game.Players.Any(p => p.Seat == requestingPlayerSeat))
             {
                 return BadRequest($"Player at seat {requestingPlayerSeat} not found in game '{gameId}'");
-            }
-
-            // Check if DevMode is enabled to show all hands
-            bool showAllHands = _gameManagementService.IsDevMode();
+            }            // Check if DevMode is enabled to show all hands
+            bool showAllHands = _configuration.GetValue<bool>("FeatureFlags:DevMode", false);
 
             // Map the game state with player-specific visibility
             var gameStateDto = MappingService.MapGameStateToDto(game, requestingPlayerSeat, showAllHands);
@@ -176,9 +183,7 @@ namespace TrucoMineiro.API.Controllers
             if (!result.IsSuccess)
             {
                 return BadRequest(result.ErrorMessage);
-            }
-
-            var game = _gameManagementService.GetGame(request.GameId);
+            }            var game = await _gameRepository.GetGameAsync(request.GameId);
             if (game == null)
             {
                 return NotFound("Game not found");
@@ -209,8 +214,8 @@ namespace TrucoMineiro.API.Controllers
             if (string.IsNullOrWhiteSpace(request.PlayerName))
             {
                 return BadRequest("Player name is required");
-            }            // First create the game using GameManagementService
-            var game = _gameManagementService.CreateGame(request.PlayerName);
+            }            // Create the game using GameStateManager
+            var game = await _gameStateManager.CreateGameAsync(request.PlayerName);
             if (game == null)
             {
                 return BadRequest("Failed to create game");
@@ -221,13 +226,14 @@ namespace TrucoMineiro.API.Controllers
             {
                 return BadRequest(result.ErrorMessage);
             }            // Get the updated game state
-            var updatedGame = _gameManagementService.GetGame(game.GameId);
+            var updatedGame = await _gameRepository.GetGameAsync(game.GameId);
             if (updatedGame == null)
             {
                 return BadRequest("Failed to retrieve started game");
             }
 
-            var response = MappingService.MapGameStateToStartGameResponse(updatedGame, 0, _gameManagementService.IsDevMode());
+            bool showAllHands = _configuration.GetValue<bool>("FeatureFlags:DevMode", false);
+            var response = MappingService.MapGameStateToStartGameResponse(updatedGame, 0, showAllHands);
             return Ok(response);
         }        /// <summary>
         /// Play a card from a player's hand (new endpoint with enhanced features)

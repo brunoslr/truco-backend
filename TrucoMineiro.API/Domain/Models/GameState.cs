@@ -285,7 +285,8 @@ namespace TrucoMineiro.API.Domain.Models
                 {
                     new Player("You", TrucoConstants.Teams.PlayerTeam, 0),
                     new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1),
-                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
+                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2),                    
+                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3)
                 };
             }            // Set the dealer and first player
             Players[DealerSeat].IsDealer = true;

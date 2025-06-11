@@ -47,22 +47,8 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     _logger.LogWarning("Game {GameId} not found for game flow processing", gameEvent.GameId);
                     return;
                 }                _logger.LogDebug("Processing game flow for card played in game {GameId} by player {PlayerName} (seat {PlayerSeat})", 
-                    gameEvent.GameId, gameEvent.Player.Name, gameEvent.Player.Seat);
-
-                // TODO: REMOVE - Debug logging for event flow investigation
-                _logger.LogInformation("DEBUG: Before AdvanceToNextPlayer - Current player: {CurrentPlayerIndex}", game.CurrentPlayerIndex);
-                foreach (var p in game.Players)
-                {
-                    _logger.LogInformation("DEBUG: Player {Seat} ({Name}) - IsActive: {IsActive}", p.Seat, p.Name, p.IsActive);
-                }                // Advance to next player
+                    gameEvent.GameId, gameEvent.Player.Name, gameEvent.Player.Seat);                // Advance to next player
                 _gameStateManager.AdvanceToNextPlayer(game);
-
-                // TODO: REMOVE - Debug logging for event flow investigation
-                _logger.LogInformation("DEBUG: After AdvanceToNextPlayer - Current player: {CurrentPlayerIndex}", game.CurrentPlayerIndex);
-                foreach (var p in game.Players)
-                {
-                    _logger.LogInformation("DEBUG: Player {Seat} ({Name}) - IsActive: {IsActive}", p.Seat, p.Name, p.IsActive);
-                }
 
                 // Check if round is complete
                 if (_gameStateManager.IsRoundComplete(game))
@@ -124,13 +110,8 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 {                    // Continue with next player
                     var activePlayer = game.Players.FirstOrDefault(p => p.IsActive);
                     if (activePlayer != null)
-                    {
-                        _logger.LogDebug("Next player turn in game {GameId}: player {PlayerSeat}", 
+                    {                        _logger.LogDebug("Next player turn in game {GameId}: player {PlayerSeat}", 
                             gameEvent.GameId, activePlayer.Seat);
-
-                        // TODO: REMOVE - Debug logging for event flow investigation
-                        _logger.LogInformation("DEBUG: Publishing PlayerTurnStartedEvent for player {Seat} ({Name}) - IsAI: {IsAI}", 
-                            activePlayer.Seat, activePlayer.Name, activePlayer.IsAI);
 
                         var nextTurnEvent = new PlayerTurnStartedEvent(
                             gameEvent.GameId,
@@ -138,13 +119,8 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                             game.CurrentRound,
                             game.CurrentHand,
                             game,
-                            new List<string> { "play-card" }
-                        );
+                            new List<string> { "play-card" }                        );
                         await _eventPublisher.PublishAsync(nextTurnEvent, cancellationToken);
-
-                        // TODO: REMOVE - Debug logging for event flow investigation
-                        _logger.LogInformation("DEBUG: PlayerTurnStartedEvent published for player {Seat} ({Name})", 
-                            activePlayer.Seat, activePlayer.Name);
                     }
                 }
 
