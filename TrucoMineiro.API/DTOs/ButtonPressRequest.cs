@@ -20,15 +20,13 @@ namespace TrucoMineiro.API.DTOs
         /// </summary>
         /// <example>truco</example>
         public string Action { get; set; } = string.Empty;
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Enumeration of valid button press actions
     /// </summary>
     public static class ButtonPressActions
     {
         public const string Truco = "truco";
         public const string Raise = "raise";
-        public const string Fold = "fold";
+        public const string Surrender = "surrender";
     }
 }

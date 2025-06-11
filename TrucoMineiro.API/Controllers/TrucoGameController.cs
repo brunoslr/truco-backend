@@ -171,13 +171,11 @@ namespace TrucoMineiro.API.Controllers
                     // For "raise", we need to respond to an existing Truco with a counter-raise
                     var raiseCommand = new RespondToTrucoCommand(request.GameId, request.PlayerSeat, TrucoResponse.Raise);
                     result = await _gameStateMachine.ProcessCommandAsync(raiseCommand);
-                    break;
-                case ButtonPressActions.Fold:
-                    var foldCommand = new FoldCommand(request.GameId, request.PlayerSeat);
-                    result = await _gameStateMachine.ProcessCommandAsync(foldCommand);
-                    break;
-                default:
-                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.Truco}, {ButtonPressActions.Raise}, {ButtonPressActions.Fold}");
+                    break;                case ButtonPressActions.Surrender:
+                    var surrenderCommand = new SurrenderHandCommand(request.GameId, request.PlayerSeat);
+                    result = await _gameStateMachine.ProcessCommandAsync(surrenderCommand);
+                    break;                default:
+                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.Truco}, {ButtonPressActions.Raise}, {ButtonPressActions.Surrender}");
             }
 
             if (!result.IsSuccess)
@@ -219,7 +217,8 @@ namespace TrucoMineiro.API.Controllers
             if (game == null)
             {
                 return BadRequest("Failed to create game");
-            }            // Then activate it using the StartGameCommand through the state machine
+            }
+            // Then activate it using the StartGameCommand through the state machine
             var command = new StartGameCommand(game.GameId, request.PlayerName);
             var result = await _gameStateMachine.ProcessCommandAsync(command);
             if (!result.IsSuccess)
@@ -235,7 +234,8 @@ namespace TrucoMineiro.API.Controllers
             bool showAllHands = _configuration.GetValue<bool>("FeatureFlags:DevMode", false);
             var response = MappingService.MapGameStateToStartGameResponse(updatedGame, 0, showAllHands);
             return Ok(response);
-        }        /// <summary>
+        }
+        /// <summary>
         /// Play a card from a player's hand (new endpoint with enhanced features)
         /// </summary>
         /// <remarks>

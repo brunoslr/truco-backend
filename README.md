@@ -418,45 +418,46 @@ TrucoMineiro.API.Domain.Events/
     ├── PlayerTurnStartedEvent.cs  # Triggered when a player's turn begins
     ├── CardPlayedEvent.cs         # Triggered when a card is played
     ├── TrucoRaiseEvent.cs         # Triggered when Truco/Raise is called
-    ├── FoldEvent.cs               # Triggered when a player folds
+    ├── SurrenderHandEvent.cs      # Triggered when a player surrenders hand
     └── RoundCompletedEvent.cs     # Triggered when a round finishes
 ```
 
 ##### Event Handlers
 ```
 TrucoMineiro.API.Domain.EventHandlers/
-├── AIPlayerEventHandler.cs    # Handles AI decision making and actions
-├── GameFlowEventHandler.cs    # Manages game flow after events
-└── ActionLogEventHandler.cs   # Creates action log entries for frontend
+├── AIPlayerEventHandler.cs         # Handles AI decision making and actions
+├── GameFlowEventHandler.cs         # Manages card play and truco events
+├── HandCompletionEventHandler.cs   # Handles hand surrender and completion
+└── ActionLogEventHandler.cs        # Creates action log entries for frontend
 ```
 
 #### Event Flow Architecture
 
 ```mermaid
-graph TD
-    A[Frontend Button Press] --> B{Action Type}
+graph TD    A[Frontend Button Press] --> B{Action Type}
     B -->|Play Card| C[PlayCardRequest with IsFold flag]
     B -->|Truco/Raise| D[TrucoRaiseEvent]
-    B -->|Fold All| E[FoldEvent]
+    B -->|Surrender Hand| E[SurrenderHandEvent]
     
     C --> F[Card replaced with FOLD card if IsFold=true]
     F --> G[CardPlayedEvent Published]
     D --> H[TrucoRaiseEventHandler]
-    E --> I[FoldEventHandler]
+    E --> I[HandCompletionEventHandler]
     
     G --> J[Multiple Event Handlers]
     H --> J
     I --> J
-    
-    J --> K[ActionLogEventHandler - Creates UI entries]
-    J --> L[GameFlowEventHandler - Game logic]
+      J --> K[ActionLogEventHandler - Creates UI entries]
+    J --> L[GameFlowEventHandler - Card play logic]
     J --> M[AIPlayerEventHandler - AI responses]
     
-    L --> N{Game State Check}
-    N -->|Continue| O[Next PlayerTurnStartedEvent]
-    N -->|Round Complete| P[RoundCompletedEvent]
-    O --> Q[AI or Human Turn]
-    P --> R[Hand Complete Check]
+    I --> N[HandCompletionEventHandler - Hand termination]
+    
+    L --> O{Game State Check}
+    O -->|Continue| P[Next PlayerTurnStartedEvent]
+    O -->|Round Complete| Q[RoundCompletedEvent]
+    P --> R[AI or Human Turn]
+    Q --> S[Hand Complete Check]
 ```
 
 #### Key Features
@@ -485,8 +486,8 @@ graph TD
 
 ##### Fold All Cards
 - **Purpose**: Give up all remaining cards in the hand (not just current round)
-- **Frontend**: "Fold Hand" button (separate from round fold)
-- **Backend**: `FoldEvent` published, auto-plays FOLD for all remaining rounds
+- **Frontend**: "Surrender Hand" button (separate from round fold)
+- **Backend**: `SurrenderHandEvent` published, hand immediately terminated
 - **Result**: Opponent wins the hand immediately, gets points based on current stakes
 
 #### Service Architecture
@@ -501,7 +502,8 @@ graph TD
 
 ##### Event Handler Architecture
 - **`ActionLogEventHandler`**: Creates `ActionLogEntry` records for frontend display from all game events
-- **`GameFlowEventHandler`**: Manages game progression, round completion, and turn advancement
+- **`GameFlowEventHandler`**: Manages card play events and truco/raise responses
+- **`HandCompletionEventHandler`**: Handles hand surrender events, score updates, and game completion
 - **`AIPlayerEventHandler`**: Handles AI player decision making and automatic actions
 
 ##### Request/Response Flow Validation
@@ -534,13 +536,16 @@ public class TrucoRaiseEvent : GameEventBase
 }
 ```
 
-###### FoldEvent Structure  
+###### SurrenderHandEvent Structure  
 ```csharp
-public class FoldEvent : GameEventBase
+public class SurrenderHandEvent : GameEventBase
 {
-    public string PlayerId { get; set; }
+    public Player Player { get; set; }
     public int HandNumber { get; set; }
-    public int CurrentStakes { get; set; }
+    public int CurrentStake { get; set; }
+    public string WinningTeam { get; set; }
+    public GameState GameState { get; set; }
+}
 }
 ```
 
@@ -552,7 +557,7 @@ services.AddScoped<IEventHandler<PlayerTurnStartedEvent>, AIPlayerEventHandler>(
 services.AddScoped<IEventHandler<CardPlayedEvent>, GameFlowEventHandler>();
 services.AddScoped<IEventHandler<CardPlayedEvent>, ActionLogEventHandler>();
 services.AddScoped<IEventHandler<TrucoRaiseEvent>, GameFlowEventHandler>();
-services.AddScoped<IEventHandler<FoldEvent>, GameFlowEventHandler>();
+services.AddScoped<IEventHandler<SurrenderHandEvent>, HandCompletionEventHandler>();
 
 // Event Publishing
 services.AddScoped<IEventPublisher, InMemoryEventPublisher>();
@@ -577,9 +582,9 @@ The event-driven system includes comprehensive integration tests:
 
 ##### Phase 2: Structured Event Definitions (Current)
 1. **Remove IsFold property from CardPlayedEvent** - determine fold by card inspection
-2. **Create TrucoRaiseEvent and FoldEvent classes** with proper structure
+2. **Create TrucoRaiseEvent and SurrenderHandEvent classes** with proper structure
 3. **Update PlayCardRequest handling** to replace card with FOLD card when IsFold=true
-4. **Implement event handlers** for TrucoRaiseEvent and FoldEvent
+4. **Implement event handlers** for TrucoRaiseEvent and SurrenderHandEvent
 5. **Add comprehensive tests** for all button press scenarios
 
 ##### Phase 3: Event-Driven AI Integration (Next)

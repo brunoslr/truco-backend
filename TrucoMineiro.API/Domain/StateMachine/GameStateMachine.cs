@@ -58,10 +58,10 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 var result = command switch
                 {
                     StartGameCommand startCmd => await ProcessStartGameCommand(startCmd, game),
-                    // REMOVED: PlayCardCommand - moved to PlayCardService for consolidation
+                    PlayCardCommand playCmd => await ProcessPlayCardCommand(playCmd, game),
                     CallTrucoCommand trucoCmd => await ProcessCallTrucoCommand(trucoCmd, game),
                     RespondToTrucoCommand respondCmd => await ProcessRespondToTrucoCommand(respondCmd, game),
-                    FoldCommand foldCmd => await ProcessFoldCommand(foldCmd, game),
+                    SurrenderHandCommand surrenderCmd => await ProcessSurrenderHandCommand(surrenderCmd, game),
                     _ => CommandResult.Failure($"Unknown command type: {command.CommandType}")
                 };
 
@@ -104,7 +104,7 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 PlayCardCommand playCmd => ValidatePlayCardCommand(playCmd, game),
                 CallTrucoCommand trucoCmd => ValidateCallTrucoCommand(trucoCmd, game),
                 RespondToTrucoCommand respondCmd => ValidateRespondToTrucoCommand(respondCmd, game),
-                FoldCommand foldCmd => ValidateFoldCommand(foldCmd, game),
+                SurrenderHandCommand surrenderCmd => ValidateSurrenderHandCommand(surrenderCmd, game),
                 _ => CommandResult.Failure($"Unknown command type: {command.CommandType}")
             };
         }
@@ -153,9 +153,89 @@ namespace TrucoMineiro.API.Domain.StateMachine
             catch (Exception ex)
             {
                 return CommandResult.Failure($"Failed to start game: {ex.Message}");
+            }        }
+
+        private async Task<CommandResult> ProcessPlayCardCommand(PlayCardCommand command, GameState game)
+        {
+            try
+            {
+                var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);
+                if (player == null)
+                {
+                    return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
+                }
+
+                // Validate player can play
+                if (!player.IsActive)
+                {
+                    return CommandResult.Failure("It's not this player's turn");
+                }
+
+                // Find card in player's hand
+                Card cardToPlay;
+                int cardIndex;
+                
+                if (command.Card != null)
+                {
+                    // Find the card in the player's hand
+                    cardIndex = player.Hand.FindIndex(c => c.Value == command.Card.Value && c.Suit == command.Card.Suit);
+                    if (cardIndex == -1)
+                    {
+                        return CommandResult.Failure("Card not found in player's hand");
+                    }
+                    cardToPlay = command.Card;
+                }
+                else
+                {
+                    // Use CardIndex
+                    if (command.CardIndex < 0 || command.CardIndex >= player.Hand.Count)
+                    {
+                        return CommandResult.Failure("Invalid card index");
+                    }
+                    cardIndex = command.CardIndex;
+                    cardToPlay = player.Hand[cardIndex];
+                }
+
+                // Remove card from player's hand
+                player.Hand.RemoveAt(cardIndex);
+
+                // Add to played cards
+                var existingPlayedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == player.Seat);
+                if (existingPlayedCard != null)
+                {
+                    existingPlayedCard.Card = cardToPlay;
+                }
+                else
+                {
+                    game.PlayedCards.Add(new PlayedCard(player.Seat, cardToPlay));
+                }
+
+                // Publish card played event
+                if (Guid.TryParse(command.GameId, out var gameGuid))
+                {
+                    await _eventPublisher.PublishAsync(new CardPlayedEvent(
+                        gameGuid,
+                        player.Id,
+                        cardToPlay,
+                        player,
+                        game.CurrentRound,
+                        game.CurrentHand,
+                        player.IsAI,
+                        game
+                    ));
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for CardPlayedEvent", command.GameId);
+                }
+
+                return CommandResult.Success("Card played successfully");
             }
-        }        // REMOVED: ProcessPlayCardCommand - PlayCard logic moved to PlayCardService
-        // This reduces complexity and consolidates card play logic in a single location
+            catch (Exception ex)
+            {
+                return CommandResult.Failure($"Failed to play card: {ex.Message}");
+            }
+        }
 
         private async Task<CommandResult> ProcessCallTrucoCommand(CallTrucoCommand command, GameState game)
         {
@@ -248,7 +328,7 @@ namespace TrucoMineiro.API.Domain.StateMachine
             }
         }
 
-        private async Task<CommandResult> ProcessFoldCommand(FoldCommand command, GameState game)
+        private async Task<CommandResult> ProcessSurrenderHandCommand(SurrenderHandCommand command, GameState game)
         {
             try
             {
@@ -262,19 +342,20 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 player.HasFolded = true;
                 game.GameStatus = "completed";                // Determine winning team (opponent team wins)
                 var winningTeam = player.Team == "team1" ? "team2" : "team1";
-                
-                if (Guid.TryParse(command.GameId, out var gameGuid))
-                {
-                    await _eventPublisher.PublishAsync(new PlayerFoldedEvent(
+                  if (Guid.TryParse(command.GameId, out var gameGuid))
+                {                    await _eventPublisher.PublishAsync(new SurrenderHandEvent(
                         gameGuid,
+                        player.Id,
                         player,
+                        game.CurrentHand,
+                        game.CurrentStake,
                         winningTeam,
                         game
                     ));
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to parse GameId '{GameId}' for PlayerFoldedEvent", command.GameId);
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for SurrenderHandEvent", command.GameId);
                 }
 
                 return CommandResult.Success("Player folded successfully");
@@ -389,7 +470,7 @@ namespace TrucoMineiro.API.Domain.StateMachine
             return CommandResult.Success();
         }
 
-        private CommandResult ValidateFoldCommand(FoldCommand command, GameState game)
+        private CommandResult ValidateSurrenderHandCommand(SurrenderHandCommand command, GameState game)
         {
             if (game.GameStatus != "active")
             {

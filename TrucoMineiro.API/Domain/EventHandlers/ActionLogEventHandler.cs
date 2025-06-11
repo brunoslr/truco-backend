@@ -5,7 +5,8 @@ using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.EventHandlers
-{    /// <summary>
+{
+    /// <summary>
     /// Event handler for creating ActionLogEntry records from game events for frontend display
     /// </summary>
     public class ActionLogEventHandler : 
@@ -13,7 +14,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         IEventHandler<PlayerTurnStartedEvent>,
         IEventHandler<RoundCompletedEvent>,
         IEventHandler<TrucoRaiseEvent>,
-        IEventHandler<FoldHandEvent>
+        IEventHandler<SurrenderHandEvent>
     {
         private readonly IGameRepository _gameRepository;
         private readonly ILogger<ActionLogEventHandler> _logger;
@@ -150,7 +151,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             {
                 _logger.LogError(ex, "Error creating action log entry for truco/raise event in game {GameId}", gameEvent.GameId);
             }
-        }        public async Task HandleAsync(FoldHandEvent gameEvent, CancellationToken cancellationToken = default)
+        }        public async Task HandleAsync(SurrenderHandEvent gameEvent, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -159,13 +160,11 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 {
                     _logger.LogWarning("Game {GameId} not found for action log creation", gameEvent.GameId);
                     return;
-                }
-
-                // Create action log entry for hand fold
+                }                // Create action log entry for hand surrender
                 var actionLogEntry = new ActionLogEntry("button-pressed")
                 {
                     PlayerSeat = gameEvent.Player.Seat,
-                    Action = $"folded hand, {gameEvent.WinningTeam} gains {gameEvent.CurrentStakes} points"
+                    Action = $"surrendered hand, {gameEvent.WinningTeam} gains {gameEvent.CurrentStake} points"
                 };
 
                 game.ActionLog.Add(actionLogEntry);

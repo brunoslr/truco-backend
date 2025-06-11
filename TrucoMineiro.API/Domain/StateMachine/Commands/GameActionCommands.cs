@@ -1,24 +1,23 @@
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.StateMachine.Commands
-{
-    /// <summary>
-    /// Command to fold/give up the current hand
+{    /// <summary>
+    /// Command to surrender/give up the current hand
     /// </summary>
-    public class FoldCommand : GameCommandBase
+    public class SurrenderHandCommand : GameCommandBase
     {
-        public override string CommandType => "Fold";
+        public override string CommandType => "SurrenderHand";
         
         /// <summary>
-        /// Optional reason for folding
+        /// Optional reason for surrendering
         /// </summary>
         public string? Reason { get; set; }
 
-        public FoldCommand() : base()
+        public SurrenderHandCommand() : base()
         {
         }
 
-        public FoldCommand(string gameId, int playerSeat, string? reason = null) 
+        public SurrenderHandCommand(string gameId, int playerSeat, string? reason = null) 
             : base(gameId, playerSeat)
         {
             Reason = reason;

@@ -297,12 +297,12 @@ public class GameStateMachineTests
         
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoRejectedEvent>()), Times.Once);
     }    [Fact]
-    public async Task ProcessCommandAsync_FoldCommand_ShouldMarkPlayerAsFoldedAndPublishEvent()
+    public async Task ProcessCommandAsync_SurrenderHandCommand_ShouldMarkPlayerAsFoldedAndPublishEvent()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
         var playerId = Guid.NewGuid();
-          var command = new FoldCommand
+          var command = new SurrenderHandCommand
         {
             GameId = gameId,
             PlayerSeat = 1
@@ -330,7 +330,7 @@ public class GameStateMachineTests
         Assert.True(result.IsSuccess);
         Assert.True(player.HasFolded);
         
-        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<PlayerFoldedEvent>()), Times.Once);
+        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<SurrenderHandEvent>()), Times.Once);
     }    [Fact]
     public async Task ProcessCommandAsync_WrongPlayerTurn_ShouldReturnFailure()
     {
