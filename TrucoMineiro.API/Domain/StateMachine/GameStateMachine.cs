@@ -13,7 +13,6 @@ namespace TrucoMineiro.API.Domain.StateMachine
     public class GameStateMachine : IGameStateMachine
     {
         private readonly IGameRepository _gameRepository;
-        private readonly IGameFlowService _gameFlowService;
         private readonly IEventPublisher _eventPublisher;
         private readonly IAIPlayerService _aiPlayerService;
         private readonly IHandResolutionService _handResolutionService;
@@ -21,14 +20,12 @@ namespace TrucoMineiro.API.Domain.StateMachine
 
         public GameStateMachine(
             IGameRepository gameRepository,
-            IGameFlowService gameFlowService,
             IEventPublisher eventPublisher,
             IAIPlayerService aiPlayerService,
             IHandResolutionService handResolutionService,
             ILogger<GameStateMachine> logger)
         {
             _gameRepository = gameRepository;
-            _gameFlowService = gameFlowService;
             _eventPublisher = eventPublisher;
             _aiPlayerService = aiPlayerService;
             _handResolutionService = handResolutionService;
@@ -57,13 +54,11 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 if (game == null)
                 {
                     return CommandResult.Failure($"Game {command.GameId} not found");
-                }
-
-                // Process command based on type
+                }                // Process command based on type
                 var result = command switch
                 {
                     StartGameCommand startCmd => await ProcessStartGameCommand(startCmd, game),
-                    PlayCardCommand playCmd => await ProcessPlayCardCommand(playCmd, game),
+                    // REMOVED: PlayCardCommand - moved to PlayCardService for consolidation
                     CallTrucoCommand trucoCmd => await ProcessCallTrucoCommand(trucoCmd, game),
                     RespondToTrucoCommand respondCmd => await ProcessRespondToTrucoCommand(respondCmd, game),
                     FoldCommand foldCmd => await ProcessFoldCommand(foldCmd, game),
@@ -159,68 +154,8 @@ namespace TrucoMineiro.API.Domain.StateMachine
             {
                 return CommandResult.Failure($"Failed to start game: {ex.Message}");
             }
-        }
-
-        private async Task<CommandResult> ProcessPlayCardCommand(PlayCardCommand command, GameState game)
-        {
-            try
-            {                var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);
-                if (player == null)
-                {
-                    return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
-                }
-
-                if (command.Card == null)
-                {
-                    return CommandResult.Failure("Card is required for play card command");
-                }
-
-                var card = player.Hand?.FirstOrDefault(c => c.Suit == command.Card.Suit && c.Value == command.Card.Value);
-                if (card == null)
-                {
-                    return CommandResult.Failure("Card not found in player's hand");
-                }
-
-                // Find the card index
-                var cardIndex = player.Hand!.FindIndex(c => c.Suit == command.Card.Suit && c.Value == command.Card.Value);
-                if (cardIndex == -1)
-                {
-                    return CommandResult.Failure("Card not found in player's hand");
-                }
-
-                // Play the card using game flow service
-                var playSuccess = _gameFlowService.PlayCard(game, command.PlayerSeat, cardIndex);
-                if (!playSuccess)
-                {
-                    return CommandResult.Failure("Failed to play card");
-                }                // Publish card played event
-                if (Guid.TryParse(command.GameId, out var gameGuid))
-                {
-                    await _eventPublisher.PublishAsync(new CardPlayedEvent(
-                        gameGuid,
-                        player.Id,  // Already a Guid
-                        card,
-                        player,
-                        game.CurrentRound,
-                        game.CurrentHand,
-                        player.IsAI,
-                        game
-                    ));
-                }
-                else
-                {
-                    // Log the issue but don't fail the card play
-                    _logger.LogWarning("Failed to parse GameId '{GameId}' for event publishing", 
-                        command.GameId);
-                }
-
-                return CommandResult.Success("Card played successfully");
-            }
-            catch (Exception ex)
-            {
-                return CommandResult.Failure($"Failed to play card: {ex.Message}");
-            }
-        }
+        }        // REMOVED: ProcessPlayCardCommand - PlayCard logic moved to PlayCardService
+        // This reduces complexity and consolidates card play logic in a single location
 
         private async Task<CommandResult> ProcessCallTrucoCommand(CallTrucoCommand command, GameState game)
         {

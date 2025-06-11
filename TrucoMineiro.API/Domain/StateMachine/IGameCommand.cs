@@ -1,5 +1,3 @@
-using System;
-
 namespace TrucoMineiro.API.Domain.StateMachine
 {
     /// <summary>

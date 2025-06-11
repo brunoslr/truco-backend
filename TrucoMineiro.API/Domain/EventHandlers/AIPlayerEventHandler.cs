@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Events;
@@ -16,24 +17,33 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         private readonly IGameRepository _gameRepository;
         private readonly IEventPublisher _eventPublisher;
         private readonly ILogger<AIPlayerEventHandler> _logger;
+        private readonly IConfiguration _configuration;
 
         public AIPlayerEventHandler(
             IAIPlayerService aiPlayerService,
             IGameRepository gameRepository,
             IEventPublisher eventPublisher,
-            ILogger<AIPlayerEventHandler> logger)
+            ILogger<AIPlayerEventHandler> logger,
+            IConfiguration configuration)
         {
             _aiPlayerService = aiPlayerService;
             _gameRepository = gameRepository;
             _eventPublisher = eventPublisher;
             _logger = logger;
-        }        /// <summary>
+            _configuration = configuration;
+        }        
+        
+        /// <summary>
         /// Handle AI player turn events
         /// </summary>
         public async Task HandleAsync(PlayerTurnStartedEvent gameEvent, CancellationToken cancellationToken = default)
         {
             try
             {
+                // TODO: REMOVE - Debug logging for event flow investigation
+                _logger.LogInformation("DEBUG: AIPlayerEventHandler received PlayerTurnStartedEvent for player {PlayerSeat} in game {GameId}", 
+                    gameEvent.Player?.Seat, gameEvent.GameId);
+
                 var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
                 if (game == null)
                 {
@@ -49,6 +59,10 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                         player?.Name, player?.Seat, gameEvent.GameId);
                     return;
                 }
+
+                // TODO: REMOVE - Debug logging for event flow investigation
+                _logger.LogInformation("DEBUG: Processing AI player {PlayerName} (seat {PlayerSeat}) in game {GameId}", 
+                    player.Name, player.Seat, gameEvent.GameId);
 
                 _logger.LogDebug("AI player {PlayerName} (seat {PlayerSeat}) thinking in game {GameId}", 
                     player.Name, player.Seat, gameEvent.GameId);                // Add thinking delay for realism
@@ -85,12 +99,14 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                         gameEvent.Hand,
                         true, // isAIMove
                         game
-                    );
-
-                    await _eventPublisher.PublishAsync(cardPlayedEvent, cancellationToken);
+                    );                    await _eventPublisher.PublishAsync(cardPlayedEvent, cancellationToken);
 
                     _logger.LogDebug("AI player {PlayerName} (seat {PlayerSeat}) played {Card} in game {GameId}", 
                         player.Name, player.Seat, $"{card.Value} of {card.Suit}", gameEvent.GameId);
+
+                    // TODO: REMOVE - Debug logging for event flow investigation
+                    _logger.LogInformation("DEBUG: AI player {PlayerName} (seat {PlayerSeat}) successfully played card and published CardPlayedEvent", 
+                        player.Name, player.Seat);
                 }
                 else
                 {
@@ -104,13 +120,25 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     gameEvent.Player?.Name, gameEvent.Player?.Seat, gameEvent.GameId);
             }
         }        /// <summary>
-        /// Generate realistic AI thinking delay
+        /// Generate realistic AI thinking delay using configuration values
         /// </summary>
         private TimeSpan GetAIThinkingDelay()
         {
-            // Random delay between min and max AI play delay for realism
+            // Get the configured AI play delay (can be 0 for immediate play in tests)
+            var aiPlayDelayMs = _configuration.GetValue<int>("GameSettings:AIPlayDelayMs", GameConfiguration.DefaultMaxAIPlayDelayMs);
+            
+            // If delay is 0 or very small, return immediately (for tests)
+            if (aiPlayDelayMs <= 0)
+            {
+                return TimeSpan.Zero;
+            }
+            
+            // For realistic gameplay, add some randomness (50% to 100% of configured delay)
             var random = new Random();
-            return TimeSpan.FromMilliseconds(random.Next(GameConfiguration.DefaultMinAIPlayDelayMs, GameConfiguration.DefaultMaxAIPlayDelayMs));
+            var minDelayMs = Math.Max(0, aiPlayDelayMs / 2);
+            var maxDelayMs = aiPlayDelayMs;
+            
+            return TimeSpan.FromMilliseconds(random.Next(minDelayMs, maxDelayMs));
         }
     }
 }

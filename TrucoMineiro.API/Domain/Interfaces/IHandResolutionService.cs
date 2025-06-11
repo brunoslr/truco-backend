@@ -43,13 +43,19 @@ namespace TrucoMineiro.API.Domain.Interfaces
         /// </summary>
         /// <param name="game">The current game state</param>
         /// <returns>True if hand is complete, false otherwise</returns>
-        bool IsHandComplete(GameState game);
-
-        /// <summary>
+        bool IsHandComplete(GameState game);        /// <summary>
         /// Gets the winning team of the current hand
         /// </summary>
         /// <param name="game">The current game state</param>
         /// <returns>The winning team name, or null if hand is not complete</returns>
         string? GetHandWinner(GameState game);
+
+        /// <summary>
+        /// Checks if a hand is complete and processes end-of-hand logic
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        /// <param name="newHandDelayMs">Delay before starting new hand in milliseconds</param>
+        /// <returns>Task representing the async operation</returns>
+        Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs);
     }
 }

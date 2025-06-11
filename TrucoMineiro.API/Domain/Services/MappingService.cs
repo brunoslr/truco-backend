@@ -59,7 +59,7 @@ namespace TrucoMineiro.API.Services
         {            return new PlayedCardDto
             {
                 PlayerSeat = playedCard.PlayerSeat,
-                Card = playedCard.Card.IsFold ? null : MapCardToDto(playedCard.Card)
+                Card = MapCardToDto(playedCard.Card)
             };
         }
 

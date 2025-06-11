@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TrucoMineiro.API.Domain.Events;
@@ -17,20 +18,32 @@ namespace TrucoMineiro.Tests.Events
     {
         [Fact]
         public async Task AIPlayerEventHandler_Should_Handle_PlayerTurnStartedEvent()
-        {
-            // Arrange
+        {            // Arrange
             var services = new ServiceCollection();
             services.AddLogging(builder => builder.AddConsole());
             services.AddScoped<IGameRepository, TestGameRepository>();
             services.AddScoped<IEventPublisher, TestEventPublisher>();
             services.AddScoped<IAIPlayerService, TestAIPlayerService>();
             services.AddScoped<IGameStateManager, TestGameStateManager>();
+            
+            // Add configuration for AIPlayerEventHandler
+            var configurationBuilder = new ConfigurationBuilder();
+            configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                {"GameSettings:AIPlayDelayMs", "0"}, // Immediate for tests
+                {"GameSettings:NewHandDelayMs", "0"}, // Immediate for tests
+                {"GameSettings:InitialDealerSeat", "3"}
+            });
+            var configuration = configurationBuilder.Build();
+            services.AddSingleton<IConfiguration>(configuration);
+            
             services.AddScoped<AIPlayerEventHandler>();
 
             var serviceProvider = services.BuildServiceProvider();
             var handler = serviceProvider.GetRequiredService<AIPlayerEventHandler>();
             var gameRepo = (TestGameRepository)serviceProvider.GetRequiredService<IGameRepository>();
-            var eventPublisher = (TestEventPublisher)serviceProvider.GetRequiredService<IEventPublisher>();            // Create a test game with AI player
+            var eventPublisher = (TestEventPublisher)serviceProvider.GetRequiredService<IEventPublisher>();            
+            // Create a test game with AI player
             var gameId = Guid.NewGuid();
             var game = new GameState
             {
@@ -80,9 +93,7 @@ namespace TrucoMineiro.Tests.Events
             Assert.Equal(gameId, cardPlayedEvent.GameId);
             Assert.Equal(1, cardPlayedEvent.Player.Seat); // AI player seat
             Assert.NotNull(cardPlayedEvent.Card);
-        }
-
-        [Fact]
+        }        [Fact]
         public async Task GameFlowEventHandler_Should_Handle_CardPlayedEvent()
         {
             // Arrange
@@ -90,8 +101,20 @@ namespace TrucoMineiro.Tests.Events
             services.AddLogging(builder => builder.AddConsole());
             services.AddScoped<IGameRepository, TestGameRepository>();
             services.AddScoped<IEventPublisher, TestEventPublisher>();
-            services.AddScoped<IGameFlowService, TestGameFlowService>();
             services.AddScoped<IHandResolutionService, TestHandResolutionService>();
+            services.AddScoped<IGameStateManager, TestGameStateManager>();
+            
+            // Add configuration for any handlers that might need it
+            var configurationBuilder = new ConfigurationBuilder();
+            configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                {"GameSettings:AIPlayDelayMs", "0"}, // Immediate for tests
+                {"GameSettings:NewHandDelayMs", "0"}, // Immediate for tests
+                {"GameSettings:InitialDealerSeat", "3"}
+            });
+            var configuration = configurationBuilder.Build();
+            services.AddSingleton<IConfiguration>(configuration);
+            
             services.AddScoped<GameFlowEventHandler>();
 
             var serviceProvider = services.BuildServiceProvider();
@@ -270,35 +293,28 @@ namespace TrucoMineiro.Tests.Events
         public bool IsGameCompleted(GameState game)
         {
             return game.IsCompleted;
-        }
-
-        public Task<List<string>> GetExpiredGameIdsAsync()
+        }        public Task<List<string>> GetExpiredGameIdsAsync()
         {
             return Task.FromResult(new List<string>());
         }
-    }    public class TestGameFlowService : IGameFlowService
-    {
-        public bool PlayCard(GameState game, int playerSeat, int cardIndex)
+
+        public bool IsRoundComplete(GameState game)
         {
-            return true;
+            return game.PlayedCards.Count == 4 && game.PlayedCards.All(pc => !pc.Card.IsEmpty);
+        }        public void StartNewHand(GameState game)
+        {
+            game.PlayedCards.Clear();
+            game.CurrentRound = 1;
+            game.CurrentHand++;
         }
 
-        public Task ProcessAITurnsAsync(GameState game, int aiPlayDelayMs)
+        public bool IsDevMode()
         {
-            return Task.CompletedTask;
+            return false; // Default to false for tests
         }
+    }
 
-        public Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void AdvanceToNextPlayer(GameState game) { }
-        
-        public bool IsRoundComplete(GameState game) => false;
-        
-        public void StartNewHand(GameState game) { }
-    }    public class TestHandResolutionService : IHandResolutionService
+    public class TestHandResolutionService : IHandResolutionService
     {
         public int GetCardStrength(Card card) => 5;
         
@@ -310,11 +326,15 @@ namespace TrucoMineiro.Tests.Events
         public string? HandleDrawResolution(GameState game, int roundNumber) => null;
         
         public bool IsHandComplete(GameState game) => false;
-        
-        public string? GetHandWinner(GameState game) => null;
+          public string? GetHandWinner(GameState game) => null;
         
         public Player? DetermineHandWinner(GameState game) => null;
         
         public void UpdateGameScores(GameState game, Player handWinner, int points) { }
+
+        public Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

@@ -119,6 +119,22 @@ namespace TrucoMineiro.API.Constants
             /// Card strength value for a fold (guaranteed lowest)
             /// </summary>
             public const int FoldStrength = -1;
+
+
+            /// <summary>
+            /// Special card value used to represent a fold (lowest possible value)
+            /// </summary>
+            public const string EmptyValue = "EMPTY";
+
+            /// <summary>
+            /// Special suit used to represent a fold
+            /// </summary>
+            public const string EmptySuit = "EMPTY";
+
+            /// <summary>
+            /// Card strength value for a fold (guaranteed lowest)
+            /// </summary>
+            public const int EmptyStrength = 0;
         }
     }
 }

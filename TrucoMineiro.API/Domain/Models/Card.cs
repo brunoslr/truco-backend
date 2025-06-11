@@ -34,13 +34,24 @@ namespace TrucoMineiro.API.Domain.Models
         }
 
         /// <summary>
+        /// Creates a Empty card (card placeholder before it is chosen)
+        /// </summary>
+        public static Card CreateEmptyCard()
+        {
+            return new Card(TrucoConstants.Cards.EmptyValue, TrucoConstants.Cards.EmptySuit);
+        }        /// <summary>
         /// Checks if this card represents a fold
         /// </summary>
         public bool IsFold => Value == TrucoConstants.Cards.FoldValue && Suit == TrucoConstants.Cards.FoldSuit;
 
         /// <summary>
+        /// Checks if this card represents an empty slot
+        /// </summary>
+        public bool IsEmpty => Value == TrucoConstants.Cards.EmptyValue && Suit == TrucoConstants.Cards.EmptySuit;
+
+        /// <summary>
         /// Returns a string representation of the card
         /// </summary>
-        public override string ToString() => IsFold ? "FOLD" : $"{Value} of {Suit}";
+        public override string ToString() => IsFold ? "FOLD" : IsEmpty ? "EMPTY" : $"{Value} of {Suit}";
     }
 }

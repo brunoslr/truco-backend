@@ -10,7 +10,7 @@ namespace TrucoMineiro.API.DTOs
         public int PlayerSeat { get; set; }
 
         /// <summary>
-        /// The card that was played, or null if not played yet
+        /// The card that was played, or empty if not played yet
         /// </summary>
         public CardDto? Card { get; set; }
     }

@@ -32,10 +32,10 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.ITrucoRulesEngine,
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IScoreCalculationService, TrucoMineiro.API.Domain.Services.ScoreCalculationService>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IAIPlayerService, TrucoMineiro.API.Domain.Services.AIPlayerService>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameStateManager, TrucoMineiro.API.Domain.Services.GameStateManager>();
-builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameFlowService, TrucoMineiro.API.Domain.Services.GameFlowService>();
 
 // Register application services
-builder.Services.AddScoped<TrucoMineiro.API.Services.GameService>();
+builder.Services.AddScoped<TrucoMineiro.API.Services.GameManagementService>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IPlayCardService, TrucoMineiro.API.Domain.Services.PlayCardService>();
 builder.Services.AddSingleton<TrucoMineiro.API.Services.MappingService>();
 
 // Register event system
@@ -60,9 +60,6 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMin
 
 // Register state machine
 builder.Services.AddScoped<TrucoMineiro.API.Domain.StateMachine.IGameStateMachine, TrucoMineiro.API.Domain.StateMachine.GameStateMachine>();
-
-// Register background services
-builder.Services.AddHostedService<TrucoMineiro.API.Services.GameCleanupService>();
 
 // Add CORS for the React frontend
 builder.Services.AddCors(options =>

@@ -1,54 +1,36 @@
+using TrucoMineiro.API.Domain.Events.GameEvents;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Interfaces
 {
     /// <summary>
-    /// Service responsible for managing the game flow and turn sequence
+    /// Service responsible for game flow orchestration and event generation
     /// </summary>
     public interface IGameFlowService
-    {
+    {        /// <summary>
+        /// Processes game flow after a card is played and returns events to publish
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        /// <returns>List of events to publish</returns>
+        List<object> ProcessCardPlayedFlow(GameState game);
+
         /// <summary>
-        /// Executes a player's card play and manages the subsequent game flow
+        /// Processes game flow after a truco/raise is called and returns events to publish
         /// </summary>
         /// <param name="game">The current game state</param>
-        /// <param name="playerSeat">The seat of the player playing the card</param>
-        /// <param name="cardIndex">The index of the card in the player's hand</param>
-        /// <returns>True if the card was played successfully</returns>
-        bool PlayCard(GameState game, int playerSeat, int cardIndex);
-          /// <summary>
-        /// Executes AI player turns in sequence with appropriate delays
-        /// </summary>
-        /// <param name="game">The current game state</param>
-        /// <param name="aiPlayDelayMs">Delay between AI plays in milliseconds</param>
-        /// <returns>Task representing the async operation</returns>
-        [Obsolete("This method is deprecated. AI turns are now handled by event-driven architecture via CardPlayedEvent -> PlayerTurnStartedEvent -> AIPlayerEventHandler. This will be removed in a future version.")]
-        Task ProcessAITurnsAsync(GameState game, int aiPlayDelayMs);
-        
+        /// <param name="callingPlayer">The player who called truco/raise</param>
+        /// <param name="newStakes">The new stakes value</param>
+        /// <returns>List of events to publish</returns>
+        List<object> ProcessTrucoRaiseFlow(GameState game, Player callingPlayer, int newStakes);
+
         /// <summary>
-        /// Checks if a hand is complete and processes end-of-hand logic
+        /// Processes game flow after a fold occurs and returns events to publish
         /// </summary>
         /// <param name="game">The current game state</param>
-        /// <param name="newHandDelayMs">Delay before starting new hand in milliseconds</param>
-        /// <returns>Task representing the async operation</returns>
-        Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs);
-        
-        /// <summary>
-        /// Advances the turn to the next player
-        /// </summary>
-        /// <param name="game">The current game state</param>
-        void AdvanceToNextPlayer(GameState game);
-        
-        /// <summary>
-        /// Checks if all players have played their cards for the current round
-        /// </summary>
-        /// <param name="game">The current game state</param>
-        /// <returns>True if all players have played</returns>
-        bool IsRoundComplete(GameState game);
-        
-        /// <summary>
-        /// Starts a new hand by resetting the game state
-        /// </summary>
-        /// <param name="game">The current game state</param>
-        void StartNewHand(GameState game);
+        /// <param name="foldingPlayer">The player who folded</param>
+        /// <param name="winningTeam">The team that wins due to fold</param>
+        /// <param name="currentStakes">The current stakes value</param>
+        /// <returns>List of events to publish</returns>
+        List<object> ProcessFoldFlow(GameState game, Player foldingPlayer, string winningTeam, int currentStakes);
     }
 }

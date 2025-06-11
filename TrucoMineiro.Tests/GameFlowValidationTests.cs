@@ -30,18 +30,72 @@ namespace TrucoMineiro.Tests
                 .Build();
         }
 
-        private GameService CreateGameService()
+        private GameManagementService CreateGameService()
         {
             // Create a dictionary to store created games (simulating repository storage)
             var gameStorage = new Dictionary<string, GameState>();
               // Create mock services
             var mockGameStateManager = new Mock<IGameStateManager>();
             var mockGameRepository = new Mock<IGameRepository>();
-            var mockGameFlowService = new Mock<IGameFlowService>();
             var mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
             var mockAIPlayerService = new Mock<IAIPlayerService>();
             var mockScoreCalculationService = new Mock<IScoreCalculationService>();
             var mockEventPublisher = new Mock<IEventPublisher>();
+            var mockPlayCardService = new Mock<IPlayCardService>();
+            
+            // Setup IPlayCardService.ProcessPlayCardRequestAsync to return successful responses
+            mockPlayCardService.Setup(x => x.ProcessPlayCardRequestAsync(It.IsAny<PlayCardRequestDto>()))
+                .ReturnsAsync((PlayCardRequestDto request) => {
+                    var game = gameStorage.ContainsKey(request.GameId) ? gameStorage[request.GameId] : null;
+                    if (game == null)
+                    {
+                        return new PlayCardResponseDto
+                        {
+                            Success = false,
+                            Message = "Game not found",
+                            GameState = new GameStateDto(),
+                            Hand = new List<CardDto>(),
+                            PlayerHands = new List<PlayerHandDto>()
+                        };
+                    }
+                    
+                    var player = game.Players.FirstOrDefault(p => p.Seat == request.PlayerSeat);
+                    if (player == null || request.CardIndex < 0 || request.CardIndex >= player.Hand.Count)
+                    {
+                        return new PlayCardResponseDto
+                        {
+                            Success = false,
+                            Message = "Invalid move",
+                            GameState = new GameStateDto(),
+                            Hand = new List<CardDto>(),
+                            PlayerHands = new List<PlayerHandDto>()
+                        };
+                    }
+                    
+                    // Simulate card play
+                    var cardToPlay = player.Hand[request.CardIndex];
+                    player.Hand.RemoveAt(request.CardIndex);
+                    
+                    // Add to played cards
+                    var existingPlayedCard = game.PlayedCards.FirstOrDefault(pc => pc.PlayerSeat == request.PlayerSeat);
+                    if (existingPlayedCard != null)
+                    {
+                        existingPlayedCard.Card = cardToPlay;
+                    }
+                    else
+                    {
+                        game.PlayedCards.Add(new PlayedCard(request.PlayerSeat, cardToPlay));
+                    }
+                    
+                    return new PlayCardResponseDto
+                    {
+                        Success = true,
+                        Message = "Card played successfully",
+                        GameState = new GameStateDto(),
+                        Hand = player.Hand.Select(card => new CardDto { Value = card.Value, Suit = card.Suit }).ToList(),
+                        PlayerHands = new List<PlayerHandDto>()
+                    };
+                });
 
             // Configure mock GameStateManager to return a valid GameState and store it
             mockGameStateManager.Setup(x => x.CreateGameAsync(It.IsAny<string>()))
@@ -67,57 +121,26 @@ namespace TrucoMineiro.Tests
 
             // Configure mock TrucoRulesEngine
             mockTrucoRulesEngine.Setup(x => x.CalculateHandPoints(It.IsAny<GameState>()))
-                .Returns(1);            // Configure mock GameFlowService to simulate real card playing
-            mockGameFlowService.Setup(x => x.PlayCard(It.IsAny<GameState>(), It.IsAny<int>(), It.IsAny<int>()))
-                .Returns((GameState gameState, int playerSeat, int cardIndex) => {
-                    var player = gameState.Players[playerSeat];
-                    if (cardIndex < 0 || cardIndex >= player.Hand.Count)
-                        return false;
-                    
-                    // Store the card before removing it
-                    var cardToPlay = player.Hand[cardIndex];
-                    
-                    // Remove card from player's hand
-                    player.Hand.RemoveAt(cardIndex);
-                    
-                    // Add to played cards
-                    gameState.PlayedCards.Add(new PlayedCard(playerSeat, cardToPlay));
-                    
-                    // Move to next player
-                    gameState.CurrentPlayerIndex = (playerSeat + 1) % 4;
-                    
-                    // Update player activity flags
-                    foreach (var p in gameState.Players)
-                    {
-                        p.IsActive = (p.Seat == gameState.CurrentPlayerIndex);
-                    }
-                    
-                    return true;
-                });            // Configure ProcessHandCompletionAsync to do nothing (no hand completion logic needed for this test)
-            mockGameFlowService.Setup(x => x.ProcessHandCompletionAsync(It.IsAny<GameState>(), It.IsAny<int>()))
-                .Returns(Task.CompletedTask);
+                .Returns(1);            
             
             // NOTE: ProcessAITurnsAsync is obsolete - AI processing is now event-driven
             // No need to mock this obsolete method as tests should use real event handlers
-                  return new GameService(
+                  return new GameManagementService(
                 mockGameStateManager.Object,
                 mockGameRepository.Object,
-                mockGameFlowService.Object,
-                mockTrucoRulesEngine.Object,
-                mockAIPlayerService.Object,
-                mockScoreCalculationService.Object,
-                mockEventPublisher.Object,
+                mockPlayCardService.Object,
                 _configuration);
         }
 
         private GameState CreateValidGameState(string? playerName = null)
-        {
-            var gameState = new GameState();
+        {            var gameState = new GameState();
             gameState.InitializeGame(playerName ?? "TestPlayer");
-            gameState.FirstPlayerSeat = 0; // Ensure human player starts
+            // FirstPlayerSeat is computed automatically based on DealerSeat
             gameState.CurrentPlayerIndex = 0; // Ensure human player is active
             return gameState;
-        }        [Fact]
+        }        
+        
+        [Fact]
         public void GameFlow_ShouldReflectPlayedCardsInGameState()
         {
             // Step 1: Create a new game

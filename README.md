@@ -36,7 +36,7 @@ The objective is to win rounds (hands) and accumulate points. The first team to 
 
 #### Dealing Cards
 - At the beginning of each hand, the dealer shuffles the deck and deals three cards to each player.
-- The dealer rotates clockwise after each hand.
+- The dealer rotates clockwise (to the left) after each hand.
 
 #### Playing Cards
 - Players take turns playing one card each, starting with the player to the left of the dealer.
@@ -586,7 +586,6 @@ The event-driven system includes comprehensive integration tests:
 1. **Expand AI decision making** to handle Truco/Raise/Fold responses via events
 2. **Add AI strategy patterns** for different game situations
 3. **Implement AI response delays** for realistic gameplay experience
-4. **Add AI personality traits** for varied playing styles
 
 ### Domain Models
 

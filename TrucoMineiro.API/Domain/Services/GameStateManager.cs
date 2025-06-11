@@ -1,68 +1,62 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using TrucoMineiro.API.Domain.Interfaces;
-using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Services
 {
     /// <summary>
-    /// Manages game lifecycle, timeouts, and state transitions
+    /// Service responsible for managing game state lifecycle and timeouts
+    /// Handles creation, persistence, cleanup, and basic game state operations
     /// </summary>
     public class GameStateManager : IGameStateManager
     {
         private readonly IGameRepository _gameRepository;
-        private readonly IScoreCalculationService _scoreCalculationService;
-        private readonly ITrucoRulesEngine _trucoRulesEngine;
-        private static readonly TimeSpan GameTimeout = TimeSpan.FromMinutes(30);
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<GameStateManager> _logger;
 
         public GameStateManager(
             IGameRepository gameRepository,
-            IScoreCalculationService scoreCalculationService,
-            ITrucoRulesEngine trucoRulesEngine)
+            IConfiguration configuration,
+            ILogger<GameStateManager> logger)
         {
             _gameRepository = gameRepository;
-            _scoreCalculationService = scoreCalculationService;
-            _trucoRulesEngine = trucoRulesEngine;
-        }        public async Task<GameState> CreateGameAsync(string? playerName = null)
-        {            var game = new GameState
-            {
-                Id = Guid.NewGuid().ToString(),
-                CreatedAt = DateTime.UtcNow,
-                LastActivity = DateTime.UtcNow,
-                CurrentRound = 1,
-                RoundWinners = new List<int>(),
-                IsCompleted = false,                WinningTeam = null,
-                Players = CreatePlayers(playerName),
-                Deck = new Deck(),
-                PlayedCards = new List<PlayedCard>(),
-                CurrentPlayerIndex = 0,
-                Team1Score = 0,
-                Team2Score = 0,
-                ActionLog = new List<ActionLogEntry>(),
-                CurrentStake = 1,
-                PendingTrucoCall = false,
-                TrucoCallerSeat = null,
-                LastTrucoResponse = null,
-                // Set initial dealer according to configuration
-                // In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese)
-                DealerSeat = GameConfiguration.InitialDealerSeat,
-                FirstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(GameConfiguration.InitialDealerSeat)
-            };
-
-            // Initialize dealer and active player properly
-            SetupInitialPlayers(game);
-
-            // Deal initial cards
-            DealCards(game);
-
-            await _gameRepository.SaveGameAsync(game);
-            return game;
+            _configuration = configuration;
+            _logger = logger;
         }
 
+        /// <summary>
+        /// Creates a new game
+        /// </summary>
+        public async Task<GameState> CreateGameAsync(string? playerName = null)
+        {
+            _logger.LogInformation("Creating new game for player: {PlayerName}", playerName ?? "Anonymous");
+            
+            var gameState = new GameState();
+            gameState.InitializeGame(playerName ?? "Anonymous");
+            
+            await _gameRepository.SaveGameAsync(gameState);
+            
+            _logger.LogInformation("Game created with ID: {GameId}", gameState.GameId);
+            return gameState;
+        }
+
+        /// <summary>
+        /// Retrieves a game by ID and updates its last activity
+        /// </summary>
         public async Task<GameState?> GetActiveGameAsync(string gameId)
         {
             var game = await _gameRepository.GetGameAsync(gameId);
-            if (game == null || IsGameExpired(game) || IsGameCompleted(game))
+            
+            if (game == null)
             {
+                _logger.LogWarning("Game {GameId} not found", gameId);
+                return null;
+            }
+
+            if (IsGameExpired(game))
+            {
+                _logger.LogInformation("Game {GameId} has expired", gameId);
                 return null;
             }
 
@@ -73,244 +67,175 @@ namespace TrucoMineiro.API.Domain.Services
             return game;
         }
 
+        /// <summary>
+        /// Saves game state changes
+        /// </summary>
         public async Task<bool> SaveGameAsync(GameState game)
         {
-            game.LastActivity = DateTime.UtcNow;
-            return await _gameRepository.SaveGameAsync(game);
+            try
+            {
+                game.LastActivity = DateTime.UtcNow;
+                return await _gameRepository.SaveGameAsync(game);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save game {GameId}", game.GameId);
+                return false;
+            }
         }
 
+        /// <summary>
+        /// Removes a completed or expired game
+        /// </summary>
         public async Task<bool> RemoveGameAsync(string gameId)
         {
-            return await _gameRepository.DeleteGameAsync(gameId);
+            try
+            {
+                return await _gameRepository.DeleteGameAsync(gameId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to remove game {GameId}", gameId);
+                return false;
+            }
         }
 
+        /// <summary>
+        /// Cleanup expired games based on timeout
+        /// </summary>
         public async Task<int> CleanupExpiredGamesAsync()
         {
-            var expiredIds = await GetExpiredGameIdsAsync();
-            int cleanedCount = 0;
-            
-            foreach (var gameId in expiredIds)
+            var expiredGameIds = await GetExpiredGameIdsAsync();
+            int cleanedUp = 0;
+
+            foreach (var gameId in expiredGameIds)
             {
-                if (await _gameRepository.DeleteGameAsync(gameId))
+                if (await RemoveGameAsync(gameId))
                 {
-                    cleanedCount++;
+                    cleanedUp++;
                 }
             }
-            
-            return cleanedCount;
+
+            if (cleanedUp > 0)
+            {
+                _logger.LogInformation("Cleaned up {Count} expired games", cleanedUp);
+            }
+
+            return cleanedUp;
         }
 
+        /// <summary>
+        /// Cleanup completed games
+        /// </summary>
         public async Task<int> CleanupCompletedGamesAsync()
         {
             var allGames = await _gameRepository.GetAllGamesAsync();
-            int cleanedCount = 0;
+            var completedGames = allGames.Where(g => IsGameCompleted(g)).ToList();
+            int cleanedUp = 0;
 
-            foreach (var game in allGames)
+            foreach (var game in completedGames)
             {
-                if (IsGameCompleted(game))
+                if (await RemoveGameAsync(game.GameId))
                 {
-                    if (await _gameRepository.DeleteGameAsync(game.Id))
-                    {
-                        cleanedCount++;
-                    }
+                    cleanedUp++;
                 }
             }
 
-            return cleanedCount;
+            if (cleanedUp > 0)
+            {
+                _logger.LogInformation("Cleaned up {Count} completed games", cleanedUp);
+            }
+
+            return cleanedUp;
         }
 
+        /// <summary>
+        /// Checks if a game is expired based on last activity
+        /// </summary>
         public bool IsGameExpired(GameState game)
         {
-            return DateTime.UtcNow - game.LastActivity > GameTimeout;
-        }        public bool IsGameCompleted(GameState game)
-        {
-            return game.IsCompleted || _scoreCalculationService.IsGameComplete(game);
+            var timeoutMinutes = _configuration.GetValue<int>("GameSettings:InactivityTimeoutMinutes", 30);
+            var timeoutThreshold = DateTime.UtcNow.AddMinutes(-timeoutMinutes);
+            return game.LastActivity < timeoutThreshold;
         }
 
-        public async Task<bool> UpdateLastActivityAsync(string gameId)
+        /// <summary>
+        /// Checks if a game is completed (winner reached 12 points)
+        /// </summary>
+        public bool IsGameCompleted(GameState game)
         {
-            var game = await _gameRepository.GetGameAsync(gameId);
-            if (game == null) return false;
+            return game.Status == GameStatus.Completed || 
+                   game.Team1Score >= 12 || 
+                   game.Team2Score >= 12;
+        }
 
-            game.LastActivity = DateTime.UtcNow;
-            await _gameRepository.SaveGameAsync(game);
-            return true;
-        }        public async Task<bool> IsGameExpiredAsync(string gameId)
-        {
-            var game = await _gameRepository.GetGameAsync(gameId);
-            if (game == null) return true;
-
-            return IsGameExpired(game);
-        }public async Task<List<string>> GetExpiredGameIdsAsync()
+        /// <summary>
+        /// Gets the IDs of expired games
+        /// </summary>
+        public async Task<List<string>> GetExpiredGameIdsAsync()
         {
             var allGames = await _gameRepository.GetAllGamesAsync();
-            var expiredIds = new List<string>();
-
-            foreach (var game in allGames)
-            {
-                if (IsGameExpired(game))
-                {
-                    expiredIds.Add(game.Id);
-                }
-            }
-
-            return expiredIds;
+            return allGames.Where(g => IsGameExpired(g)).Select(g => g.GameId).ToList();
         }
 
-        public async Task<bool> CompleteGameAsync(string gameId, int winningTeam)
-        {
-            var game = await _gameRepository.GetGameAsync(gameId);
-            if (game == null) return false;
-
-            game.IsCompleted = true;
-            game.WinningTeam = winningTeam;
-            game.LastActivity = DateTime.UtcNow;
-
-            await _gameRepository.SaveGameAsync(game);
-            return true;
-        }        public async Task<bool> StartNewHandAsync(string gameId)
-        {
-            var game = await _gameRepository.GetGameAsync(gameId);
-            if (game == null || game.IsCompleted) return false;
-
-            // Reset hand state
-            game.CurrentRound = 1;
-            game.RoundWinners.Clear();
-            game.PlayedCards.Clear();
-            game.CurrentStake = 1;
-            game.PendingTrucoCall = false;
-            game.TrucoCallerSeat = null;
-            game.LastTrucoResponse = null;
-            game.LastActivity = DateTime.UtcNow;            
-            
-            // Rotate dealer to next seat (clockwise) - the dealer moves to the left at the end of each hand
-            // In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese)
-            game.DealerSeat = GameConfiguration.GetNextDealerSeat(game.DealerSeat);
-            game.FirstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(game.DealerSeat);
-
-            // Clear player hands and deal new cards
-            foreach (var player in game.Players)
-            {
-                player.Hand.Clear();
-                player.IsActive = false;
-                player.IsDealer = false;
-            }
-
-            // Set new dealer and active player
-            SetupInitialPlayers(game);
-            DealCards(game);
-
-            await _gameRepository.SaveGameAsync(game);
-            return true;
-        }
-
-        public async Task<bool> RecordRoundWinnerAsync(string gameId, int winningTeam)
-        {
-            var game = await _gameRepository.GetGameAsync(gameId);
-            if (game == null || game.IsCompleted) return false;
-
-            game.RoundWinners.Add(winningTeam);
-            game.LastActivity = DateTime.UtcNow;
-
-            // Check if hand is complete (2 out of 3 rounds won)
-            var team1Wins = game.RoundWinners.Count(w => w == 1);
-            var team2Wins = game.RoundWinners.Count(w => w == 2);
-
-            if (team1Wins >= 2 || team2Wins >= 2)
-            {
-                // Hand is complete, award points
-                var handWinner = team1Wins >= 2 ? 1 : 2;
-                await AwardHandPointsAsync(game, handWinner);                // Check if game is complete
-                if (_scoreCalculationService.IsGameComplete(game))
-                {
-                    var gameWinner = game.Team1Score >= 12 ? 1 : 2;
-                    await CompleteGameAsync(gameId, gameWinner);
-                }
-            }
-
-            await _gameRepository.SaveGameAsync(game);
-            return true;
-        }        private Task AwardHandPointsAsync(GameState game, int winningTeam)
-        {
-            var points = _trucoRulesEngine.CalculateHandPoints(game);
-            
-            if (winningTeam == 1)
-            {
-                game.Team1Score += points;
-            }
-            else
-            {
-                game.Team2Score += points;
-            }
-
-            game.ActionLog.Add(new ActionLogEntry("hand-result")
-            {
-                Action = $"Team {winningTeam} wins the hand and scores {points} point(s)!"
-            });
-
-            return Task.CompletedTask;
-        }        private List<Player> CreatePlayers(string? playerName = null)
-        {
-            return new List<Player>
-            {
-                new Player { Id = Guid.NewGuid(), Name = playerName ?? "Human", Seat = 0, IsAI = false, Hand = new List<Card>() },
-                new Player { Id = Guid.NewGuid(), Name = "AI 1", Seat = 1, IsAI = true, Hand = new List<Card>() },
-                new Player { Id = Guid.NewGuid(), Name = "AI 2", Seat = 2, IsAI = true, Hand = new List<Card>() },
-                new Player { Id = Guid.NewGuid(), Name = "AI 3", Seat = 3, IsAI = true, Hand = new List<Card>() }
-            };
-        }
-
-        private void DealCards(GameState game)
-        {
-            game.Deck.Shuffle();
-            
-            // Deal 3 cards to each player
-            for (int cardIndex = 0; cardIndex < 3; cardIndex++)
-            {
-                for (int playerIndex = 0; playerIndex < 4; playerIndex++)
-                {
-                    var card = game.Deck.DealCard();
-                    if (card != null)
-                    {
-                        game.Players[playerIndex].Hand.Add(card);
-                    }
-                }
-            }
-        }        /// <summary>
-        /// Sets up initial dealer and active player according to Truco rules.
-        /// In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese).
-        /// The first player is always the one sitting to the left of the dealer.
+        /// <summary>
+        /// Advances the turn to the next player
         /// </summary>
-        /// <param name="game">The game state to initialize</param>
-        private void SetupInitialPlayers(GameState game)
+        public void AdvanceToNextPlayer(GameState game)
         {
-            var dealerSeat = game.DealerSeat;
-            
-            // Ensure all players start as inactive
-            foreach (var player in game.Players)
+            var currentPlayer = game.Players.FirstOrDefault(p => p.IsActive);
+            if (currentPlayer != null)
             {
-                player.IsActive = false;
-                player.IsDealer = false;
+                currentPlayer.IsActive = false;
+                var nextPlayerIndex = (currentPlayer.Seat + 1) % game.Players.Count;
+                game.Players[nextPlayerIndex].IsActive = true;
+                game.CurrentPlayerIndex = nextPlayerIndex;
             }
-            
-            // Set the dealer (Pé)
-            var dealer = game.Players.FirstOrDefault(p => p.Seat == dealerSeat);
-            if (dealer != null)
+        }
+
+        /// <summary>
+        /// Checks if all players have played their cards for the current round
+        /// </summary>
+        public bool IsRoundComplete(GameState game)
+        {
+            return game.PlayedCards.Count == 4 && 
+                   game.PlayedCards.All(pc => pc.Card != null && !pc.Card.IsEmpty);
+        }
+
+        /// <summary>
+        /// Starts a new hand by resetting the game state
+        /// </summary>
+        public void StartNewHand(GameState game)
+        {
+            _logger.LogInformation("Starting new hand for game {GameId} - Hand {HandNumber}", 
+                game.GameId, game.CurrentHand + 1);
+
+            // Clear played cards
+            foreach (var pc in game.PlayedCards)
             {
-                dealer.IsDealer = true;
+                pc.Card = Card.CreateEmptyCard();
             }
-            
-            // Set the first active player (left of the dealer)
-            var firstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(dealerSeat);
-            var firstPlayer = game.Players.FirstOrDefault(p => p.Seat == firstPlayerSeat);
-            if (firstPlayer != null)
-            {
-                firstPlayer.IsActive = true;
-                game.CurrentPlayerIndex = firstPlayerSeat;
-            }
-            
-            // Update game state
-            game.FirstPlayerSeat = firstPlayerSeat;
+
+            // Reset round
+            game.CurrentRound = 1;
+            game.CurrentHand++;
+
+            // Deal new cards to all players
+            game.DealCards();
+
+            // Reset stakes
+            game.Stakes = 1;
+
+            _logger.LogInformation("New hand started for game {GameId} - Hand {HandNumber}", 
+                game.GameId, game.CurrentHand);
+        }
+
+        /// <summary>
+        /// Checks if the development mode is enabled
+        /// </summary>
+        public bool IsDevMode()
+        {
+            return _configuration.GetValue<bool>("FeatureFlags:DevMode", false);
         }
     }
 }

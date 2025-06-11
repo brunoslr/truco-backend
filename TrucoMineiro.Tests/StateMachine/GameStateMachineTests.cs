@@ -13,7 +13,6 @@ namespace TrucoMineiro.Tests.StateMachine;
 public class GameStateMachineTests
 {
     private readonly Mock<IGameRepository> _mockGameRepository;
-    private readonly Mock<IGameFlowService> _mockGameFlowService;
     private readonly Mock<IEventPublisher> _mockEventPublisher;
     private readonly Mock<IAIPlayerService> _mockAIPlayerService;
     private readonly Mock<IHandResolutionService> _mockHandResolutionService;
@@ -23,7 +22,6 @@ public class GameStateMachineTests
     public GameStateMachineTests()
     {
         _mockGameRepository = new Mock<IGameRepository>();
-        _mockGameFlowService = new Mock<IGameFlowService>();
         _mockEventPublisher = new Mock<IEventPublisher>();
         _mockAIPlayerService = new Mock<IAIPlayerService>();
         _mockHandResolutionService = new Mock<IHandResolutionService>();
@@ -31,7 +29,6 @@ public class GameStateMachineTests
         
         _gameStateMachine = new GameStateMachine(
             _mockGameRepository.Object,
-            _mockGameFlowService.Object,
             _mockEventPublisher.Object,
             _mockAIPlayerService.Object,
             _mockHandResolutionService.Object,
@@ -127,12 +124,8 @@ public class GameStateMachineTests
             GameStatus = "active",
             Players = new List<Player> { player }
         };
-          
-        _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
+            _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
             .ReturnsAsync(gameState);
-        
-        _mockGameFlowService.Setup(x => x.PlayCard(gameState, 1, 0))
-            .Returns(true);
         
         // Act
         var result = await _gameStateMachine.ProcessCommandAsync(command);
@@ -140,7 +133,6 @@ public class GameStateMachineTests
         // Assert
         Assert.True(result.IsSuccess);
         
-        _mockGameFlowService.Verify(x => x.PlayCard(gameState, 1, 0), Times.Once);
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<CardPlayedEvent>()), Times.Once);
     }[Fact]
     public async Task ProcessCommandAsync_PlayCardCommand_WithInvalidCard_ShouldReturnFailure()

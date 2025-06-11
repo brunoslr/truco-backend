@@ -56,12 +56,10 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// The seat number of the player who played this card (0-3)
         /// </summary>
-        public int PlayerSeat { get; set; }
-
-        /// <summary>
-        /// The card that was played (never null - use Card.CreateFoldCard() for empty slots)
+        public int PlayerSeat { get; set; }        /// <summary>
+        /// The card that was played (never null - use Card.CreateEmptyCard() for empty slots)
         /// </summary>
-        public Card Card { get; set; } = Card.CreateFoldCard();        public PlayedCard(int playerSeat, Card card)
+        public Card Card { get; set; } = Card.CreateEmptyCard();        public PlayedCard(int playerSeat, Card card)
         {
             PlayerSeat = playerSeat;
             Card = card;
@@ -70,7 +68,7 @@ namespace TrucoMineiro.API.Domain.Models
         public PlayedCard(int playerSeat)
         {
             PlayerSeat = playerSeat;
-            Card = Card.CreateFoldCard();
+            Card = Card.CreateEmptyCard();
         }
 
         public PlayedCard() { }
@@ -187,12 +185,12 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// The current dealer's seat
         /// </summary>
-        public int DealerSeat { get; set; } = 0;
-
+        public int DealerSeat { get; set; } = GameConfiguration.InitialDealerSeat;        
         /// <summary>
-        /// Seat number of the first player for the current hand
+        /// Seat number of the first player for the current hand (computed based on dealer seat)
+        /// The first player is always the one to the left of the dealer (next seat clockwise)
         /// </summary>
-        public int FirstPlayerSeat { get; set; } = 1;
+        public int FirstPlayerSeat => GameConfiguration.GetFirstPlayerSeat(DealerSeat);
 
         /// <summary>
         /// The deck of cards for the game
@@ -207,7 +205,8 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// Timestamp of the last activity in the game
         /// </summary>
-        public DateTime LastActivity { get; set; } = DateTime.UtcNow;        /// <summary>
+        public DateTime LastActivity { get; set; } = DateTime.UtcNow;
+        /// <summary>
         /// Current round number within the hand (1, 2, or 3)
         /// </summary>
         public int CurrentRound { get; set; } = 1;
@@ -221,7 +220,8 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// Winners of each round in the current hand (by team number)
         /// </summary>
-        public List<int> RoundWinners { get; set; } = new List<int>();        /// <summary>
+        public List<int> RoundWinners { get; set; } = new List<int>();        
+        /// <summary>
         /// Whether the game is completed (someone reached 12 points)
         /// </summary>
         public bool IsCompleted { get; set; } = false;
@@ -232,7 +232,7 @@ namespace TrucoMineiro.API.Domain.Models
         public int? WinningTeam { get; set; }        /// <summary>
         /// Current game status using proper enum
         /// </summary>
-        public TrucoMineiro.API.Domain.Models.GameStatus Status { get; set; } = TrucoMineiro.API.Domain.Models.GameStatus.Waiting;
+        public GameStatus Status { get; set; } = Models.GameStatus.Waiting;
 
         /// <summary>
         /// Current game status as string (for backward compatibility)
@@ -241,7 +241,7 @@ namespace TrucoMineiro.API.Domain.Models
         { 
             get => Status.ToString().ToLower();            set 
             { 
-                if (Enum.TryParse<TrucoMineiro.API.Domain.Models.GameStatus>(value, true, out var status))
+                if (Enum.TryParse<GameStatus>(value, true, out var status))
                     Status = status;
             }
         }
@@ -344,7 +344,7 @@ namespace TrucoMineiro.API.Domain.Models
             }            // Reset the played cards
             foreach (var playedCard in PlayedCards)
             {
-                playedCard.Card = Card.CreateFoldCard();
+                playedCard.Card = Card.CreateEmptyCard();
             }
 
             // Reset the deck and shuffle
@@ -378,12 +378,11 @@ namespace TrucoMineiro.API.Domain.Models
         public void NextHand()
         {
             CurrentHand++;
-            
-            // Update the dealer and first player for the next hand
+              // Update the dealer and first player for the next hand
             // In Truco Mineiro, the dealer is known as the "Pé" (foot in Portuguese)
             // The dealer moves to the left at the end of each hand
             DealerSeat = GameConfiguration.GetNextDealerSeat(DealerSeat);
-            FirstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(DealerSeat);
+            // FirstPlayerSeat is now computed automatically based on DealerSeat
             
             // Reset player states
             foreach (var player in Players)

@@ -5,7 +5,8 @@ using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.EventHandlers
-{    /// <summary>
+{
+    /// <summary>
     /// Event handler for managing game flow after game events
     /// </summary>
     public class GameFlowEventHandler : 
@@ -15,20 +16,20 @@ namespace TrucoMineiro.API.Domain.EventHandlers
     {
         private readonly IGameRepository _gameRepository;
         private readonly IEventPublisher _eventPublisher;
-        private readonly IGameFlowService _gameFlowService;
+        private readonly IGameStateManager _gameStateManager;
         private readonly IHandResolutionService _handResolutionService;
         private readonly ILogger<GameFlowEventHandler> _logger;
 
         public GameFlowEventHandler(
             IGameRepository gameRepository,
             IEventPublisher eventPublisher,
-            IGameFlowService gameFlowService,
+            IGameStateManager gameStateManager,
             IHandResolutionService handResolutionService,
             ILogger<GameFlowEventHandler> logger)
         {
             _gameRepository = gameRepository;
             _eventPublisher = eventPublisher;
-            _gameFlowService = gameFlowService;
+            _gameStateManager = gameStateManager;
             _handResolutionService = handResolutionService;
             _logger = logger;
         }
@@ -45,16 +46,26 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 {
                     _logger.LogWarning("Game {GameId} not found for game flow processing", gameEvent.GameId);
                     return;
-                }
-
-                _logger.LogDebug("Processing game flow for card played in game {GameId} by player {PlayerName} (seat {PlayerSeat})", 
+                }                _logger.LogDebug("Processing game flow for card played in game {GameId} by player {PlayerName} (seat {PlayerSeat})", 
                     gameEvent.GameId, gameEvent.Player.Name, gameEvent.Player.Seat);
 
-                // Advance to next player
-                _gameFlowService.AdvanceToNextPlayer(game);
+                // TODO: REMOVE - Debug logging for event flow investigation
+                _logger.LogInformation("DEBUG: Before AdvanceToNextPlayer - Current player: {CurrentPlayerIndex}", game.CurrentPlayerIndex);
+                foreach (var p in game.Players)
+                {
+                    _logger.LogInformation("DEBUG: Player {Seat} ({Name}) - IsActive: {IsActive}", p.Seat, p.Name, p.IsActive);
+                }                // Advance to next player
+                _gameStateManager.AdvanceToNextPlayer(game);
+
+                // TODO: REMOVE - Debug logging for event flow investigation
+                _logger.LogInformation("DEBUG: After AdvanceToNextPlayer - Current player: {CurrentPlayerIndex}", game.CurrentPlayerIndex);
+                foreach (var p in game.Players)
+                {
+                    _logger.LogInformation("DEBUG: Player {Seat} ({Name}) - IsActive: {IsActive}", p.Seat, p.Name, p.IsActive);
+                }
 
                 // Check if round is complete
-                if (_gameFlowService.IsRoundComplete(game))
+                if (_gameStateManager.IsRoundComplete(game))
                 {
                     _logger.LogDebug("Round complete in game {GameId}, determining winner", gameEvent.GameId);                    // Determine round winner using proper service
                     var playedCards = game.PlayedCards.Where(pc => pc.Card != null).ToList();
@@ -88,7 +99,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                             gameEvent.GameId, winner?.Name ?? "Draw");                        // Clear played cards for next round
                         foreach (var pc in game.PlayedCards)
                         {
-                            pc.Card = Card.CreateFoldCard();
+                            pc.Card = Card.CreateEmptyCard();
                         }
 
                         // Winner of round plays first in next round (or first player if draw)
@@ -110,13 +121,16 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     }
                 }
                 else
-                {
-                    // Continue with next player
+                {                    // Continue with next player
                     var activePlayer = game.Players.FirstOrDefault(p => p.IsActive);
                     if (activePlayer != null)
                     {
                         _logger.LogDebug("Next player turn in game {GameId}: player {PlayerSeat}", 
                             gameEvent.GameId, activePlayer.Seat);
+
+                        // TODO: REMOVE - Debug logging for event flow investigation
+                        _logger.LogInformation("DEBUG: Publishing PlayerTurnStartedEvent for player {Seat} ({Name}) - IsAI: {IsAI}", 
+                            activePlayer.Seat, activePlayer.Name, activePlayer.IsAI);
 
                         var nextTurnEvent = new PlayerTurnStartedEvent(
                             gameEvent.GameId,
@@ -127,6 +141,10 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                             new List<string> { "play-card" }
                         );
                         await _eventPublisher.PublishAsync(nextTurnEvent, cancellationToken);
+
+                        // TODO: REMOVE - Debug logging for event flow investigation
+                        _logger.LogInformation("DEBUG: PlayerTurnStartedEvent published for player {Seat} ({Name})", 
+                            activePlayer.Seat, activePlayer.Name);
                     }
                 }
 
@@ -189,7 +207,9 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             {
                 _logger.LogError(ex, "Error processing game flow for truco/raise event in game {GameId}", gameEvent.GameId);
             }
-        }        /// <summary>
+        }        
+        
+        /// <summary>
         /// Handle fold events and manage game completion
         /// </summary>
         public async Task HandleAsync(FoldHandEvent gameEvent, CancellationToken cancellationToken = default)
@@ -224,14 +244,12 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                         gameEvent.GameId, game.Team1Score, game.Team2Score);
                 }
                 else
-                {
-                    // Start new hand
-                    _gameFlowService.StartNewHand(game);
-                    
-                    // Clear played cards
+                {                    // Start new hand
+                    _gameStateManager.StartNewHand(game);
+                      // Clear played cards
                     foreach (var pc in game.PlayedCards)
                     {
-                        pc.Card = Card.CreateFoldCard();
+                        pc.Card = Card.CreateEmptyCard();
                     }
 
                     // Set first player active for new hand

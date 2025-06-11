@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 using TrucoMineiro.API.Domain.Services;
+using TrucoMineiro.API.Domain.Events;
 using Xunit;
 
 namespace TrucoMineiro.Tests.Integration
@@ -13,12 +14,13 @@ namespace TrucoMineiro.Tests.Integration
     public class AIIntegrationTests
     {
         private readonly IAIPlayerService _aiPlayerService;
-        private readonly IHandResolutionService _handResolutionService;
-
-        public AIIntegrationTests()
+        private readonly IHandResolutionService _handResolutionService;        public AIIntegrationTests()
         {
             var services = new ServiceCollection();
             services.AddLogging(builder => builder.AddConsole());
+            
+            // Add required dependencies for HandResolutionService
+            services.AddSingleton<IEventPublisher, InMemoryEventPublisher>();
             services.AddScoped<IHandResolutionService, HandResolutionService>();
             services.AddScoped<IAIPlayerService, AIPlayerService>();
 

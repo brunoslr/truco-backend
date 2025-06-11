@@ -12,13 +12,13 @@ namespace TrucoMineiro.API.Domain.EventHandlers
     public class RoundCleanupEventHandler : IEventHandler<RoundCompletedEvent>
     {
         private readonly IGameRepository _gameRepository;
-        private readonly IEventPublisher _eventPublisher;
 
-        public RoundCleanupEventHandler(IGameRepository gameRepository, IEventPublisher eventPublisher)
+        public RoundCleanupEventHandler(IGameRepository gameRepository)
         {
             _gameRepository = gameRepository;
-            _eventPublisher = eventPublisher;
-        }        /// <summary>
+        }        
+        
+        /// <summary>
         /// Handle round completed events and perform round cleanup
         /// </summary>
         public async Task HandleAsync(RoundCompletedEvent gameEvent, CancellationToken cancellationToken = default)
@@ -53,9 +53,11 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             var currentRoundCards = game.PlayedCards.Where(pc => pc.Card != null).ToList();
             if (currentRoundCards.Any())
             {
-                game.RoundHistory[game.CurrentRound] = new List<PlayedCard>(currentRoundCards);
+                game.RoundHistory[game.CurrentRound] = currentRoundCards;
             }
-        }        /// <summary>
+        }        
+        
+        /// <summary>
         /// Clear the cards that were played in the completed round
         /// </summary>
         private static void ClearRoundPlayedCards(GameState game)
@@ -63,7 +65,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             // Reset each played card slot
             foreach (var playedCard in game.PlayedCards)
             {
-                playedCard.Card = Card.CreateFoldCard();
+                playedCard.Card = Card.CreateEmptyCard();
             }
         }
 

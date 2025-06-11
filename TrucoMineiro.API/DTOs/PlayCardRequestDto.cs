@@ -23,7 +23,7 @@ namespace TrucoMineiro.API.DTOs
         public int CardIndex { get; set; }
 
         /// <summary>
-        /// Whether this is a fold action instead of playing a card
+        /// When IsFold is true, the player CardIndex is removed from hand and a FOLD card is added to the PlayedCards.
         /// </summary>
         /// <example>false</example>
         public bool IsFold { get; set; } = false;

@@ -17,7 +17,9 @@ namespace TrucoMineiro.API.Constants
         /// - Seat 2: AI 2
         /// - Seat 3: AI 3 (Initial dealer/Pé)
         /// </summary>
-        public const int InitialDealerSeat = 3;        /// <summary>
+        public const int InitialDealerSeat = 3;        
+        
+        /// <summary>
         /// Number of players in the game
         /// </summary>
         public const int MaxPlayers = 4;

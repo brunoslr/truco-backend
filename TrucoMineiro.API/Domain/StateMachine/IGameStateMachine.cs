@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.StateMachine

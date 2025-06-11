@@ -59,12 +59,33 @@ namespace TrucoMineiro.API.Domain.Interfaces
         /// </summary>
         /// <param name="game">The game to check</param>
         /// <returns>True if completed, false otherwise</returns>
-        bool IsGameCompleted(GameState game);
-
-        /// <summary>
+        bool IsGameCompleted(GameState game);        /// <summary>
         /// Gets the IDs of expired games
         /// </summary>
         /// <returns>List of expired game IDs</returns>
         Task<List<string>> GetExpiredGameIdsAsync();
+
+        /// <summary>
+        /// Advances the turn to the next player
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        void AdvanceToNextPlayer(GameState game);
+
+        /// <summary>
+        /// Checks if all players have played their cards for the current round
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        /// <returns>True if all players have played</returns>
+        bool IsRoundComplete(GameState game);
+
+        /// <summary>
+        /// Starts a new hand by resetting the game state
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        void StartNewHand(GameState game);        /// <summary>
+        /// Checks if the development mode is enabled
+        /// </summary>
+        /// <returns>True if DevMode is enabled, false otherwise</returns>
+        bool IsDevMode();
     }
 }

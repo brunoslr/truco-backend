@@ -142,11 +142,9 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         /// <summary>
         /// Rotate the dealer to the next player for the new hand
         /// </summary>
-        private static void RotateDealer(GameState game)
-        {
-            // Update dealer and first player
+        private static void RotateDealer(GameState game)        {
+            // Update dealer - FirstPlayerSeat will be computed automatically
             game.DealerSeat = GameConfiguration.GetNextDealerSeat(game.DealerSeat);
-            game.FirstPlayerSeat = GameConfiguration.GetFirstPlayerSeat(game.DealerSeat);
             
             // Update player states
             foreach (var player in game.Players)

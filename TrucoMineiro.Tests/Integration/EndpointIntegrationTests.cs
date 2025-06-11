@@ -122,8 +122,7 @@ namespace TrucoMineiro.Tests.Integration
             // TODO: Remove debug logging after event-driven AI timing issues are resolved
             Console.WriteLine($"Start game response: {startGameResponseJson}");
             
-            var gameState = JsonSerializer.Deserialize<StartGameResponse>(startGameResponseJson, _jsonOptions);
-            var gameId = gameState!.GameId;
+            var gameState = JsonSerializer.Deserialize<StartGameResponse>(startGameResponseJson, _jsonOptions);            var gameId = gameState!.GameId;
             
             // TODO: Remove debug logging after event-driven AI timing issues are resolved
             Console.WriteLine($"Parsed GameId: '{gameId}' (length: {gameId?.Length})");
@@ -131,7 +130,7 @@ namespace TrucoMineiro.Tests.Integration
             // Act - Human player makes a move
             var playCardRequest = new PlayCardRequestDto
             {
-                GameId = gameId,
+                GameId = gameId ?? throw new InvalidOperationException("GameId cannot be null"),
                 PlayerSeat = 0,
                 CardIndex = 0,
                 IsFold = false
@@ -199,7 +198,8 @@ namespace TrucoMineiro.Tests.Integration
             var startResponse = await client.PostAsync("/api/game/start", startGameContent);
             var startGameResponseJson = await startResponse.Content.ReadAsStringAsync();
             var gameState = JsonSerializer.Deserialize<StartGameResponse>(startGameResponseJson, _jsonOptions);
-            var gameId = gameState!.GameId;            // Act & Assert - Verify all cards use Unicode suit symbols
+            var gameId = gameState!.GameId;            
+            // Act & Assert - Verify all cards use Unicode suit symbols
             var gameStateResponse = await client.GetAsync($"/api/game/{gameId}");
             var gameStateJson = await gameStateResponse.Content.ReadAsStringAsync();
             var currentGameState = JsonSerializer.Deserialize<GameStateDto>(gameStateJson, _jsonOptions);
@@ -236,11 +236,15 @@ namespace TrucoMineiro.Tests.Integration
             
             Assert.NotNull(playCardResult);
             Assert.True(playCardResult.Success);
-            
-            // Verify played cards use proper suit symbols
+              // Verify played cards use proper suit symbols (skip empty placeholder cards)
             foreach (var playedCard in playCardResult.GameState.PlayedCards)
             {
                 Assert.NotNull(playedCard.Card);
+                
+                // Skip empty placeholder cards - they have "EMPTY" suit and value which is valid
+                if (playedCard.Card.Suit == "EMPTY" && playedCard.Card.Value == "EMPTY")
+                    continue;
+                
                 Assert.Contains(playedCard.Card.Suit, validSuits);
                 Assert.False(string.IsNullOrEmpty(playedCard.Card.Value));
             }

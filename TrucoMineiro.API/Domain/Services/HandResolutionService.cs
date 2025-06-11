@@ -1,14 +1,23 @@
 using TrucoMineiro.API.Constants;
+using TrucoMineiro.API.Domain.Events;
+using TrucoMineiro.API.Domain.Events.GameEvents;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Services
-{
-    /// <summary>
+{    /// <summary>
     /// Implementation of hand resolution logic for Truco Mineiro
     /// </summary>
     public class HandResolutionService : IHandResolutionService
-    {        // Truco Mineiro card hierarchy (higher values = stronger cards)
+    {
+        private readonly IEventPublisher _eventPublisher;
+
+        public HandResolutionService(IEventPublisher eventPublisher)
+        {
+            _eventPublisher = eventPublisher;
+        }
+        
+        // Truco Mineiro card hierarchy (higher values = stronger cards)
         private readonly Dictionary<string, Dictionary<string, int>> _cardStrengths = new()
         {
             // Special cards (manilhas)
@@ -50,18 +59,20 @@ namespace TrucoMineiro.API.Domain.Services
             
             // Default strength for cards not in hierarchy (shouldn't happen with proper deck)
             return 0;
-        }        public Player? DetermineRoundWinner(List<PlayedCard> playedCards, List<Player> players)
+        }        
+        
+        public Player? DetermineRoundWinner(List<PlayedCard> playedCards, List<Player> players)
         {
-            if (!playedCards.Any(pc => !pc.Card.IsFold))
+            if (!playedCards.Any(pc => !pc.Card.IsEmpty))
                 return null;
 
             Player? winner = null;
             int highestStrength = -1;
             bool hasDraw = false;
-            foreach (var playedCard in playedCards.Where(pc => !pc.Card.IsFold))
+            foreach (var playedCard in playedCards.Where(pc => !pc.Card.IsEmpty))
             {
                 var player = players.FirstOrDefault(p => p.Seat == playedCard.PlayerSeat);
-                if (player != null && !playedCard.Card.IsFold)
+                if (player != null && !playedCard.Card.IsEmpty)
                 {
                     var strength = GetCardStrength(playedCard.Card);
 
@@ -79,10 +90,12 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return hasDraw ? null : winner;
-        }        public bool IsRoundDraw(List<PlayedCard> playedCards, List<Player> players)
+        }        
+        
+        public bool IsRoundDraw(List<PlayedCard> playedCards, List<Player> players)
         {
             return DetermineRoundWinner(playedCards, players) == null && 
-                   playedCards.Any(pc => !pc.Card.IsFold);
+                   playedCards.Any(pc => !pc.Card.IsEmpty);
         }
 
         public string? HandleDrawResolution(GameState game, int roundNumber)
@@ -123,6 +136,7 @@ namespace TrucoMineiro.API.Domain.Services
 
             return false;
         }
+
         public string? GetHandWinner(GameState game)
         {
             if (!IsHandComplete(game))
@@ -133,16 +147,45 @@ namespace TrucoMineiro.API.Domain.Services
             foreach (var winningTeam in game.RoundWinners)
             {
                 teamWins[winningTeam] = teamWins.GetValueOrDefault(winningTeam, 0) + 1;
-            }
-
-            var winningTeamNumber = teamWins.FirstOrDefault(kvp => kvp.Value >= 2).Key;
+            }            var winningTeamNumber = teamWins.FirstOrDefault(kvp => kvp.Value >= 2).Key;
             return winningTeamNumber == 0 ? null : $"Team{winningTeamNumber}";
         }
 
-        private string? GetPlayerTeam(GameState game, string playerName)
+        public async Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs)
         {
-            var player = game.Players.FirstOrDefault(p => p.Name == playerName);
-            return player?.Team;
+            // Use the proper hand resolution service to check completion
+            if (IsHandComplete(game))
+            {
+                // Determine the winning team and round information
+                var winningTeam = game.TurnWinner ?? TrucoConstants.Teams.PlayerTeam;
+                var roundWinners = new List<int>(); // This would need to be tracked throughout the hand
+                var pointsAwarded = game.Stakes;
+
+                // Publish hand completed event which will trigger cleanup
+                await _eventPublisher.PublishAsync(new HandCompletedEvent(
+                    Guid.Parse(game.Id), 
+                    game.CurrentHand, 
+                    winningTeam,
+                    roundWinners,
+                    pointsAwarded,
+                    game));
+
+                // Add delay before starting a new hand
+                await Task.Delay(newHandDelayMs);
+
+                // Determine new dealer and first player for next hand
+                var currentDealerSeat = game.Players.FindIndex(p => p.IsDealer);
+                var newDealerSeat = (currentDealerSeat + 1) % TrucoConstants.Game.MaxPlayers;
+                var newFirstPlayerSeat = (newDealerSeat + 1) % TrucoConstants.Game.MaxPlayers;
+
+                // Publish hand started event for the new hand
+                await _eventPublisher.PublishAsync(new HandStartedEvent(
+                    Guid.Parse(game.Id), 
+                    game.CurrentHand + 1,
+                    newDealerSeat,
+                    newFirstPlayerSeat,
+                    game));
+            }
         }
     }
 }

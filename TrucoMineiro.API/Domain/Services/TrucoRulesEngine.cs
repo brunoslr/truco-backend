@@ -58,7 +58,9 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return false;
-        }        public bool ProcessFold(GameState game, int playerSeat)
+        }       
+        
+        public bool ProcessFold(GameState game, int playerSeat)
         {
             var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (player == null)
@@ -87,7 +89,9 @@ namespace TrucoMineiro.API.Domain.Services
             });
 
             return true;
-        }        public bool CanCallTruco(GameState game, int playerSeat)
+        }        
+        
+        public bool CanCallTruco(GameState game, int playerSeat)
         {
             // Can only call Truco if:
             // 1. Truco hasn't been called yet, OR
@@ -109,7 +113,8 @@ namespace TrucoMineiro.API.Domain.Services
         }
 
         public void ApplyMaoDe10Rule(GameState game)
-        {            if (IsMaoDe10Active(game))
+        {           
+            if (IsMaoDe10Active(game))
             {
                 // In "Mão de 10", the hand is automatically worth 4 points
                 game.Stakes = TrucoConstants.Stakes.TrucoCall;
