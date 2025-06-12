@@ -341,7 +341,7 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 // Mark player as folded
                 player.HasFolded = true;
                 game.GameStatus = "completed";                // Determine winning team (opponent team wins)
-                var winningTeam = player.Team == "team1" ? "team2" : "team1";
+                var winningTeam = player.Team == Team.PlayerTeam ? Team.OpponentTeam : Team.PlayerTeam;
                   if (Guid.TryParse(command.GameId, out var gameGuid))
                 {                    await _eventPublisher.PublishAsync(new SurrenderHandEvent(
                         gameGuid,

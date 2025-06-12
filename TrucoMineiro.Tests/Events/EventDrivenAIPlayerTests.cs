@@ -50,13 +50,12 @@ namespace TrucoMineiro.Tests.Events
                 Id = gameId.ToString(), // Use Id property instead of GameId
                 CurrentHand = 1,
                 CurrentRound = 1,
-                CurrentPlayerIndex = 1,
-                Players = new List<Player>
+                CurrentPlayerIndex = 1,                Players = new List<Player>
                 {
-                    new Player("Human", "team1", 0) { IsAI = false },
-                    new Player("AI Player", "team2", 1) { IsAI = true, IsActive = true },
-                    new Player("Partner", "team1", 2) { IsAI = false },
-                    new Player("AI Partner", "team2", 3) { IsAI = true }
+                    new Player("Human", TrucoMineiro.API.Domain.Models.Team.PlayerTeam, 0) { IsAI = false },
+                    new Player("AI Player", TrucoMineiro.API.Domain.Models.Team.OpponentTeam, 1) { IsAI = true, IsActive = true },
+                    new Player("Partner", TrucoMineiro.API.Domain.Models.Team.PlayerTeam, 2) { IsAI = false },
+                    new Player("AI Partner", TrucoMineiro.API.Domain.Models.Team.OpponentTeam, 3) { IsAI = true }
                 }
             };
 
@@ -127,13 +126,12 @@ namespace TrucoMineiro.Tests.Events
                 Id = gameId.ToString(), // Use Id property instead of GameId
                 CurrentHand = 1,
                 CurrentRound = 1,
-                CurrentPlayerIndex = 1,
-                Players = new List<Player>
+                CurrentPlayerIndex = 1,                Players = new List<Player>
                 {
-                    new Player("Human", "team1", 0) { IsAI = false },
-                    new Player("AI Player", "team2", 1) { IsAI = true },
-                    new Player("Partner", "team1", 2) { IsAI = false, IsActive = true },
-                    new Player("AI Partner", "team2", 3) { IsAI = true }
+                    new Player("Human", Team.PlayerTeam, 0) { IsAI = false },
+                    new Player("AI Player", Team.OpponentTeam, 1) { IsAI = true },
+                    new Player("Partner", Team.PlayerTeam, 2) { IsAI = false, IsActive = true },
+                    new Player("AI Partner", Team.OpponentTeam, 3) { IsAI = true }
                 }
             };
 
@@ -324,9 +322,8 @@ namespace TrucoMineiro.Tests.Events
         public bool IsRoundDraw(List<PlayedCard> playedCards, List<Player> players) => false;
         
         public string? HandleDrawResolution(GameState game, int roundNumber) => null;
-        
-        public bool IsHandComplete(GameState game) => false;
-          public string? GetHandWinner(GameState game) => null;
+          public bool IsHandComplete(GameState game) => false;
+          public TrucoMineiro.API.Domain.Models.Team? GetHandWinner(GameState game) => null;
         
         public Player? DetermineHandWinner(GameState game) => null;
         

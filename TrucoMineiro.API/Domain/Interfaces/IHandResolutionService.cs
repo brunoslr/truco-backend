@@ -48,7 +48,7 @@ namespace TrucoMineiro.API.Domain.Interfaces
         /// </summary>
         /// <param name="game">The current game state</param>
         /// <returns>The winning team name, or null if hand is not complete</returns>
-        string? GetHandWinner(GameState game);
+        Team? GetHandWinner(GameState game);
 
         /// <summary>
         /// Checks if a hand is complete and processes end-of-hand logic

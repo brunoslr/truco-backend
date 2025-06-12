@@ -17,7 +17,7 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// Player's team (e.g., "Player's Team", "Opponent Team")
         /// </summary>
-        public string Team { get; set; } = string.Empty;
+        public Team Team { get; set; }
 
         /// <summary>
         /// Player's current hand of cards
@@ -49,7 +49,7 @@ namespace TrucoMineiro.API.Domain.Models
         /// </summary>
         public bool HasFolded { get; set; } = false;
 
-        public Player(string name, string team, int seat)
+        public Player(string name, Team team, int seat)
         {
             Name = name;
             Team = team;

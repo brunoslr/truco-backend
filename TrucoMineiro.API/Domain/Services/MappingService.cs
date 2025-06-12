@@ -1,6 +1,5 @@
-using TrucoMineiro.API.DTOs;
-using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Models;
+using TrucoMineiro.API.DTOs;
 
 namespace TrucoMineiro.API.Services
 {
@@ -8,7 +7,8 @@ namespace TrucoMineiro.API.Services
     /// Service for mapping between models and DTOs
     /// </summary>
     public class MappingService
-    {        /// <summary>
+    {
+        /// <summary>
         /// Map a Card model to a CardDto with optional card hiding
         /// </summary>
         public static CardDto MapCardToDto(Card card, bool hideCard = false)
@@ -27,7 +27,9 @@ namespace TrucoMineiro.API.Services
                 Value = card.Value,
                 Suit = card.Suit
             };
-        }/// <summary>
+        }
+
+        /// <summary>
         /// Map a CardDto to a Card model
         /// </summary>
         public static Card MapDtoToCard(CardDto dto)
@@ -43,30 +45,37 @@ namespace TrucoMineiro.API.Services
         /// Map a Player model to a PlayerDto
         /// </summary>
         public static PlayerDto MapPlayerToDto(Player player, int firstPlayerSeat)
-        {            return new PlayerDto
+        {
+            return new PlayerDto
             {
                 Name = player.Name,
-                Team = player.Team,
+                Team = player.Team.ToString(),
                 Hand = player.Hand.Select(card => MapCardToDto(card, false)).ToList(),
                 IsDealer = player.IsDealer,
                 IsActive = player.IsActive,
                 Seat = player.Seat
             };
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Map a PlayedCard model to a PlayedCardDto
         /// </summary>
         public static PlayedCardDto MapPlayedCardToDto(PlayedCard playedCard)
-        {            return new PlayedCardDto
+        {
+            return new PlayedCardDto
             {
                 PlayerSeat = playedCard.PlayerSeat,
                 Card = MapCardToDto(playedCard.Card)
             };
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Map an ActionLogEntry model to an ActionLogEntryDto
         /// Optimized to only include relevant fields based on action type
         /// </summary>
         public static ActionLogEntryDto MapActionLogEntryToDto(ActionLogEntry entry)
-        {            var dto = new ActionLogEntryDto
+        {
+            var dto = new ActionLogEntryDto
             {
                 Type = entry.Type,
                 Timestamp = entry.Timestamp,
@@ -84,16 +93,15 @@ namespace TrucoMineiro.API.Services
                 case "button-pressed":
                     dto.Action = entry.Action;
                     break;
-                    
-                case "hand-result":
+                      case "hand-result":
                     dto.HandNumber = entry.HandNumber;
-                    dto.Winner = entry.Winner;
-                    dto.WinnerTeam = entry.WinnerTeam;
+                    dto.Winner = entry.Winner?.ToString();
+                    dto.WinnerTeam = entry.WinnerTeam?.ToString();
                     break;
                     
                 case "turn-result":
-                    dto.Winner = entry.Winner;
-                    dto.WinnerTeam = entry.WinnerTeam;
+                    dto.Winner = entry.Winner?.ToString();
+                    dto.WinnerTeam = entry.WinnerTeam?.ToString();
                     break;
                     
                 case "turn-start":
@@ -104,9 +112,7 @@ namespace TrucoMineiro.API.Services
             }
 
             return dto;
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Map a GameState model to a GameStateDto
         /// </summary>
         public static GameStateDto MapGameStateToDto(GameState gameState)
@@ -119,13 +125,13 @@ namespace TrucoMineiro.API.Services
                 IsTrucoCalled = gameState.IsTrucoCalled,
                 IsRaiseEnabled = gameState.IsRaiseEnabled,
                 CurrentHand = gameState.CurrentHand,
+                RoundWinners = gameState.RoundWinners.ToList(),
                 TeamScores = gameState.TeamScores,
-                TurnWinner = gameState.TurnWinner,
+                IsGameComplete = gameState.IsCompleted,
+                WinningTeam = gameState.IsCompleted ? gameState.WinningTeam : null,
                 ActionLog = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList()
             };
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Map a GameState model to a GameStateDto with player-specific card visibility
         /// </summary>
         /// <param name="gameState">The game state to map</param>
@@ -141,8 +147,10 @@ namespace TrucoMineiro.API.Services
                 IsTrucoCalled = gameState.IsTrucoCalled,
                 IsRaiseEnabled = gameState.IsRaiseEnabled,
                 CurrentHand = gameState.CurrentHand,
+                RoundWinners = gameState.RoundWinners.ToList(),
                 TeamScores = gameState.TeamScores,
-                TurnWinner = gameState.TurnWinner,
+                IsGameComplete = gameState.IsCompleted,
+                WinningTeam = gameState.IsCompleted ? gameState.WinningTeam : null,
                 ActionLog = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList()
             };
         }
@@ -157,10 +165,11 @@ namespace TrucoMineiro.API.Services
         public static PlayerDto MapPlayerToDto(Player player, int firstPlayerSeat, int requestingPlayerSeat, bool showAllHands = false)
         {
             bool shouldHideCards = !showAllHands && player.Seat != requestingPlayerSeat;
-              return new PlayerDto
+            
+            return new PlayerDto
             {
                 Name = player.Name,
-                Team = player.Team,
+                Team = player.Team.ToString(),
                 Hand = player.Hand.Select(card => MapCardToDto(card, shouldHideCards)).ToList(),
                 IsDealer = player.IsDealer,
                 IsActive = player.IsActive,
@@ -180,37 +189,38 @@ namespace TrucoMineiro.API.Services
             {
                 GameId = gameState.GameId,
                 PlayerSeat = playerSeat,
-                DealerSeat = gameState.DealerSeat,
-                Stakes = gameState.Stakes,
+                DealerSeat = gameState.DealerSeat,                Stakes = gameState.Stakes,
                 CurrentHand = gameState.CurrentHand,
-                TeamScores = gameState.TeamScores,
+                TeamScores = gameState.TeamScores.ToDictionary(kvp => kvp.Key.ToString(), kvp => kvp.Value),
                 Actions = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList()
-            };            // Create teams
+            };            
+            
+            // Create teams
             response.Teams = new List<TeamDto>
             {
                 new TeamDto 
                 { 
-                    Name = TrucoConstants.Teams.PlayerTeam, 
-                    Seats = gameState.Players.Where(p => p.Team == TrucoConstants.Teams.PlayerTeam)
+                    Name = Team.PlayerTeam.ToString(), 
+                    Seats = gameState.Players.Where(p => p.Team == Team.PlayerTeam)
                                            .Select(p => p.Seat)
                                            .ToList() 
                 },
                 new TeamDto 
                 { 
-                    Name = TrucoConstants.Teams.OpponentTeam, 
-                    Seats = gameState.Players.Where(p => p.Team == TrucoConstants.Teams.OpponentTeam)
+                    Name = Team.OpponentTeam.ToString(), 
+                    Seats = gameState.Players.Where(p => p.Team == Team.OpponentTeam)
                                            .Select(p => p.Seat)
                                            .ToList() 
                 }
-            };
-
-            // Add players
+            };            // Add players
             response.Players = gameState.Players.Select(p => new PlayerInfoDto
             {
                 Name = p.Name,
                 Seat = p.Seat,
-                Team = p.Team
-            }).ToList();            // Add the player's hand and all player hands
+                Team = p.Team.ToString()
+            }).ToList();
+
+            // Add the player's hand and all player hands
             var requestingPlayer = gameState.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (requestingPlayer != null)
             {
@@ -234,7 +244,8 @@ namespace TrucoMineiro.API.Services
                     playerHandDto.Cards = player.Hand.Select(card => MapCardToDto(card, false)).ToList();
                 }
                 else
-                {                    // For AI or other players, only show empty card objects
+                {
+                    // For AI or other players, only show empty card objects
                     // This follows the requirement to just show the number of cards but not their values/suits
                     for (int i = 0; i < player.Hand.Count; i++)
                     {
@@ -243,7 +254,9 @@ namespace TrucoMineiro.API.Services
                 }
                 
                 response.PlayerHands.Add(playerHandDto);
-            }            return response;
+            }
+
+            return response;
         }
     }
 }

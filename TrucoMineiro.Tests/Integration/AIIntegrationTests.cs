@@ -34,7 +34,7 @@ namespace TrucoMineiro.Tests.Integration
     ///    - Tests edge cases and boundary conditions
     /// 
     /// 4. TEST DATA MANAGEMENT:
-    ///    - CreateTestGame() provides consistent baseline state
+    ///    - TestGameFactory.CreateTestGame() provides consistent baseline state
     ///    - Each test manipulates specific game conditions
     ///    - Hand compositions designed to trigger specific AI strategies
     ///    - Clear separation between setup, action, and assertion phases
@@ -91,13 +91,11 @@ namespace TrucoMineiro.Tests.Integration
             _serviceProvider = services.BuildServiceProvider();
             _aiPlayerService = _serviceProvider.GetRequiredService<IAIPlayerService>();
             _handResolutionService = _serviceProvider.GetRequiredService<IHandResolutionService>();
-        }
-
-        [Fact]
+        }        [Fact]
         public void AI_Should_PlayWeakest_WhenCannotWin()
         {
             // Arrange - Create scenario where AI cannot win
-            var game = CreateTestGame();
+            var game = TestGameFactory.CreateTestGame();
             var aiPlayer = game.Players[1]; // AI player at seat 1            // Give AI weak cards
             aiPlayer.Hand = new List<Card>
             {
@@ -112,13 +110,11 @@ namespace TrucoMineiro.Tests.Integration
             Assert.Equal(0, selectedIndex);
             Assert.Equal("4", aiPlayer.Hand[selectedIndex].Value);
             Assert.Equal("♥", aiPlayer.Hand[selectedIndex].Suit);
-        }
-
-        [Fact]
+        }        [Fact]
         public void AI_Should_PlayMinimal_WhenPartnerHasStrongest()
         {
             // Arrange - Create scenario where partner has strongest card
-            var game = CreateTestGame();
+            var game = TestGameFactory.CreateTestGame();
             var aiPlayer = game.Players[1]; // AI player at seat 1
             aiPlayer.Hand = new List<Card>
             {
@@ -135,14 +131,12 @@ namespace TrucoMineiro.Tests.Integration
             // Assert - Should play weakest card to save stronger ones
             Assert.Equal(0, selectedIndex);
             Assert.Equal("7", aiPlayer.Hand[selectedIndex].Value);
-        }
-
-        [Fact]
+        }        [Fact]
         public void AI_Should_PlaySmallestWinning_WhenCanWin()
         {
             // Arrange - Create scenario where AI can win with multiple cards
-            var game = CreateTestGame();
-            var aiPlayer = game.Players[1]; // AI player at seat 1            
+            var game = TestGameFactory.CreateTestGame();
+            var aiPlayer = game.Players[1]; // AI player at seat 1
             // Give AI cards that can beat current played cards
             aiPlayer.Hand = new List<Card>
             {
@@ -159,13 +153,11 @@ namespace TrucoMineiro.Tests.Integration
             // Assert - Should select smallest winning card (King at index 1)
             Assert.Equal(1, selectedIndex);
             Assert.Equal("K", aiPlayer.Hand[selectedIndex].Value);
-        }
-
-        [Fact]
+        }        [Fact]
         public void AI_Should_ResponsToTrucoCall_Appropriately()
         {
             // Arrange
-            var game = CreateTestGame();
+            var game = TestGameFactory.CreateTestGame();
             var aiPlayer = game.Players[1];
             game.PendingTrucoCall = true;
             game.TrucoCallerSeat = 0; // Human called Truco            
@@ -184,14 +176,12 @@ namespace TrucoMineiro.Tests.Integration
 
             Assert.False(shouldFold); // Should not fold with strong hand
             // Other tests can vary due to randomness, but fold should be false
-        }
-
-        [Fact]
+        }        [Fact]
         public void AI_Should_MakeConsistentDecisions_InMultipleRounds()
         {
             // Arrange
-            var game = CreateTestGame();
-            var aiPlayer = game.Players[1];            // Give AI the same hand multiple times
+            var game = TestGameFactory.CreateTestGame();
+            var aiPlayer = game.Players[1];// Give AI the same hand multiple times
             var testHand = new List<Card>
             {
                 new Card("K", "♥"),
@@ -215,19 +205,9 @@ namespace TrucoMineiro.Tests.Integration
 
             // Assert - Should be consistent (same decision each time)
             Assert.True(decisions.All(d => d == decisions[0]), 
-                "AI should make consistent decisions in identical scenarios");
-        }        private GameState CreateTestGame()
-        {
-            var game = new GameState();
-            game.InitializeGame("TestPlayer");
-            
-            // Ensure AI players are properly marked
-            game.Players[1].IsAI = true;
-            game.Players[2].IsAI = false; // Partner
-            game.Players[3].IsAI = true;
+                "AI should make consistent decisions in identical scenarios");        }
 
-            return game;
-        }        public void Dispose()
+        public void Dispose()
         {
             _serviceProvider?.Dispose();
         }

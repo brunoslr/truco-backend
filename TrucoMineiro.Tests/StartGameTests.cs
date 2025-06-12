@@ -1,13 +1,10 @@
 using Microsoft.Extensions.Configuration;
-using System.Collections.Generic;
+using Moq;
 using TrucoMineiro.API.Constants;
-using TrucoMineiro.API.Services;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
-using TrucoMineiro.API.Domain.Services;
-using Moq;
-using Xunit;
 using TrucoMineiro.API.Domain.Models;
+using TrucoMineiro.API.Services;
 
 namespace TrucoMineiro.Tests
 {    public class StartGameTests
@@ -95,8 +92,8 @@ namespace TrucoMineiro.Tests
             Assert.True(game.IsRaiseEnabled);
             Assert.Equal(1, game.CurrentHand);
             Assert.Equal(2, game.TeamScores.Count);
-            Assert.Equal(0, game.TeamScores["Player's Team"]);
-            Assert.Equal(0, game.TeamScores["Opponent Team"]);
+            Assert.Equal(0, game.TeamScores[Team.PlayerTeam]);
+            Assert.Equal(0, game.TeamScores[Team.OpponentTeam]);
             
             // Each player should have 3 cards
             foreach (var player in game.Players)
@@ -130,14 +127,14 @@ namespace TrucoMineiro.Tests
             Assert.Equal(TrucoConstants.Stakes.Initial, response.Stakes); // Stakes should start at 2
             Assert.Equal(1, response.CurrentHand);
             Assert.Equal(2, response.TeamScores.Count);
-            Assert.Equal(0, response.TeamScores["Player's Team"]);
-            Assert.Equal(0, response.TeamScores["Opponent Team"]);
+            Assert.Equal(0, response.TeamScores[Team.PlayerTeam.ToString()]);
+            Assert.Equal(0, response.TeamScores[Team.OpponentTeam.ToString()]);
             Assert.Empty(response.Actions);
             
             // Teams should be mapped correctly
             Assert.Equal(2, response.Teams.Count);
-            var playerTeam = response.Teams.First(t => t.Name == "Player's Team");
-            var opponentTeam = response.Teams.First(t => t.Name == "Opponent Team");
+            var playerTeam = response.Teams.First(t => t.Name == Team.PlayerTeam.ToString());
+            var opponentTeam = response.Teams.First(t => t.Name == Team.OpponentTeam.ToString());
             Assert.Equal(2, playerTeam.Seats.Count);
             Assert.Equal(2, opponentTeam.Seats.Count);
             Assert.Contains(0, playerTeam.Seats);
@@ -148,7 +145,7 @@ namespace TrucoMineiro.Tests
             // Players should be mapped correctly
             Assert.Equal(4, response.Players.Count);
             Assert.Equal(playerName, response.Players.First(p => p.Seat == 0).Name);
-            Assert.Equal("Player's Team", response.Players.First(p => p.Seat == 0).Team);
+            Assert.Equal("PlayerTeam", response.Players.First(p => p.Seat == 0).Team);
               // Hand should have 3 cards for player at seat 0
             Assert.Equal(3, response.Hand.Count);
             
@@ -177,7 +174,8 @@ namespace TrucoMineiro.Tests
             var game = await gameStateManager.CreateGameAsync(playerName);
 
             // Act - Note we pass true for showAllHands param
-            var response = MappingService.MapGameStateToStartGameResponse(game, 0, true);            // Assert
+            var response = MappingService.MapGameStateToStartGameResponse(game, 0, true);            
+            // Assert
             Assert.NotNull(response);
             Assert.Equal(3, response.Hand.Count); // Player's cards should be visible
             

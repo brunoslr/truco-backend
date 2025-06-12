@@ -8,7 +8,7 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
     public class HandCompletedEvent : GameEventBase
     {
         public int Hand { get; set; }
-        public string WinningTeam { get; set; } = string.Empty;
+        public Team WinningTeam { get; set; }
         public List<int> RoundWinners { get; set; } = new();
         public int PointsAwarded { get; set; }
         public GameState GameState { get; set; } = null!;
@@ -16,7 +16,7 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
         public HandCompletedEvent(
             Guid gameId, 
             int hand, 
-            string winningTeam,
+            Team winningTeam,
             List<int> roundWinners,
             int pointsAwarded,
             GameState gameState) 

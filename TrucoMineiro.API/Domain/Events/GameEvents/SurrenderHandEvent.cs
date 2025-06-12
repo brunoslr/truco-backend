@@ -7,18 +7,20 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
     /// This is different from folding a single round via PlayCardRequest.IsFold.
     /// </summary>
     public class SurrenderHandEvent : GameEventBase
-    {        public Player Player { get; set; } = null!;
+    {       
+         public Player Player { get; set; } = null!;
         public int HandNumber { get; set; }
         public int CurrentStake { get; set; }
-        public string WinningTeam { get; set; } = string.Empty;
-        public GameState GameState { get; set; } = null!;        public SurrenderHandEvent(
-            Guid gameId, 
-            Guid playerId, 
+        public Team WinningTeam { get; set; }
+        public GameState GameState { get; set; } = null!;
+        public SurrenderHandEvent(
+            Guid gameId,
+            Guid playerId,
             Player player,
             int handNumber,
             int currentStake,
-            string winningTeam,
-            GameState gameState) 
+            Team winningTeam,
+            GameState gameState)
             : base(gameId, playerId)
         {
             Player = player;

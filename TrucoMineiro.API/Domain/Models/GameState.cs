@@ -37,17 +37,15 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// The hand number (optional, for "hand-result" type)
         /// </summary>
-        public int? HandNumber { get; set; }
-
-        /// <summary>
+        public int? HandNumber { get; set; }        /// <summary>
         /// The winner (optional, for "hand-result" or "turn-result" type)
         /// </summary>
-        public string? Winner { get; set; }
+        public Team? Winner { get; set; }
 
         /// <summary>
         /// The winning team (optional, for "turn-result" type)
         /// </summary>
-        public string? WinnerTeam { get; set; }
+        public Team? WinnerTeam { get; set; }
 
         public ActionLogEntry(string type)
         {
@@ -99,9 +97,7 @@ namespace TrucoMineiro.API.Domain.Models
         { 
             get => GameId; 
             set => GameId = value; 
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Current player index for turn tracking
         /// </summary>
         public int CurrentPlayerIndex { get; set; } = 0;        /// <summary>
@@ -109,8 +105,8 @@ namespace TrucoMineiro.API.Domain.Models
         /// </summary>
         public int Team1Score 
         { 
-            get => TeamScores.ContainsKey(TrucoConstants.Teams.PlayerTeam) ? TeamScores[TrucoConstants.Teams.PlayerTeam] : 0;
-            set => TeamScores[TrucoConstants.Teams.PlayerTeam] = value;
+            get => TeamScores.ContainsKey(Team.PlayerTeam) ? TeamScores[Team.PlayerTeam] : 0;
+            set => TeamScores[Team.PlayerTeam] = value;
         }
 
         /// <summary>
@@ -118,8 +114,8 @@ namespace TrucoMineiro.API.Domain.Models
         /// </summary>
         public int Team2Score 
         { 
-            get => TeamScores.ContainsKey(TrucoConstants.Teams.OpponentTeam) ? TeamScores[TrucoConstants.Teams.OpponentTeam] : 0;
-            set => TeamScores[TrucoConstants.Teams.OpponentTeam] = value;
+            get => TeamScores.ContainsKey(Team.OpponentTeam) ? TeamScores[Team.OpponentTeam] : 0;
+            set => TeamScores[Team.OpponentTeam] = value;
         }
 
         /// <summary>
@@ -174,17 +170,15 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// The current hand number in the match
         /// </summary>
-        public int CurrentHand { get; set; } = 1;
-
-        /// <summary>
+        public int CurrentHand { get; set; } = 1;        /// <summary>
         /// The scores for each team
         /// </summary>
-        public Dictionary<string, int> TeamScores { get; set; } = new Dictionary<string, int>();
+        public Dictionary<Team, int> TeamScores { get; set; } = new Dictionary<Team, int>();
 
         /// <summary>
         /// The team that won the current turn, or null if undecided
         /// </summary>
-        public string? TurnWinner { get; set; }
+        public Team? TurnWinner { get; set; }
 
         /// <summary>
         /// Log of actions that have occurred in the game
@@ -279,8 +273,8 @@ namespace TrucoMineiro.API.Domain.Models
         public const int WinningScore = TrucoConstants.Game.WinningScore;        public GameState()
         {
             // Initialize team scores
-            TeamScores[TrucoConstants.Teams.PlayerTeam] = 0;
-            TeamScores[TrucoConstants.Teams.OpponentTeam] = 0;
+            TeamScores[Team.PlayerTeam] = 0;
+            TeamScores[Team.OpponentTeam] = 0;
         }
 
         /// <summary>
@@ -292,10 +286,10 @@ namespace TrucoMineiro.API.Domain.Models
             if (Players.Count < MaxPlayers)
             {                Players = new List<Player>
                 {
-                    new Player("You", TrucoConstants.Teams.PlayerTeam, 0),
-                    new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1) { IsAI = true },
-                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2) { IsAI = true },                    
-                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3) { IsAI = true }
+                    new Player("You", Team.PlayerTeam, 0),
+                    new Player("AI 1", Team.OpponentTeam, 1) { IsAI = true },
+                    new Player("Partner", Team.PlayerTeam, 2) { IsAI = true },                    
+                    new Player("AI 2", Team.OpponentTeam, 3) { IsAI = true }
                 };
             }
             // Set the dealer and first player
@@ -319,10 +313,10 @@ namespace TrucoMineiro.API.Domain.Models
             if (Players.Count < MaxPlayers)
             {                Players = new List<Player>
                 {
-                    new Player(playerName, TrucoConstants.Teams.PlayerTeam, 0),
-                    new Player("AI 1", TrucoConstants.Teams.OpponentTeam, 1) { IsAI = true },
-                    new Player("Partner", TrucoConstants.Teams.PlayerTeam, 2) { IsAI = true },
-                    new Player("AI 2", TrucoConstants.Teams.OpponentTeam, 3) { IsAI = true }
+                    new Player(playerName, Team.PlayerTeam, 0),
+                    new Player("AI 1", Team.OpponentTeam, 1) { IsAI = true },
+                    new Player("Partner", Team.PlayerTeam, 2) { IsAI = true },
+                    new Player("AI 2", Team.OpponentTeam, 3) { IsAI = true }
                 };
             }
             else
@@ -409,19 +403,16 @@ namespace TrucoMineiro.API.Domain.Models
             
             // Log the start of a new hand
             ActionLog.Add(new ActionLogEntry("hand-start") { HandNumber = CurrentHand });
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Add points to a team's score
         /// </summary>
-        public void AddScore(string team, int points)
+        public void AddScore(Team team, int points)
         {
             if (TeamScores.ContainsKey(team))
             {
                 TeamScores[team] += points;
                 
-                // Check for game winner
-                if (TeamScores[team] >= WinningScore)
+                // Check for game winner                if (TeamScores[team] >= WinningScore)
                 {
                     ActionLog.Add(new ActionLogEntry("game-result") { WinnerTeam = team });
                 }

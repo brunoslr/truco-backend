@@ -1,3 +1,4 @@
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Events.GameEvents;
 using TrucoMineiro.API.Domain.Interfaces;
@@ -6,122 +7,293 @@ using TrucoMineiro.API.Domain.Models;
 namespace TrucoMineiro.API.Domain.EventHandlers
 {
     /// <summary>
-    /// Handles hand completion events, including hand surrender scenarios.
-    /// Responsible for awarding stakes, checking game completion, and starting new hands.
+    /// Unified event handler for all types of hand completion scenarios.
+    /// Handles both regular hand completion (2 of 3 rounds won) and surrender scenarios.
+    /// Single responsibility: Process hand completion, award points, and manage game progression.
     /// </summary>
-    public class HandCompletionEventHandler : IEventHandler<SurrenderHandEvent>
+    public class HandCompletionEventHandler : 
+        IEventHandler<HandCompletedEvent>, 
+        IEventHandler<SurrenderHandEvent>
     {
         private readonly IGameRepository _gameRepository;
         private readonly IEventPublisher _eventPublisher;
-        private readonly IGameStateManager _gameStateManager;
+        private readonly IConfiguration _configuration;
         private readonly ILogger<HandCompletionEventHandler> _logger;
 
         public HandCompletionEventHandler(
             IGameRepository gameRepository,
             IEventPublisher eventPublisher,
             IGameStateManager gameStateManager,
+            IConfiguration configuration,
             ILogger<HandCompletionEventHandler> logger)
         {
             _gameRepository = gameRepository;
             _eventPublisher = eventPublisher;
-            _gameStateManager = gameStateManager;
+            _configuration = configuration;
             _logger = logger;
         }
 
+        /// <summary>
+        /// Handle regular hand completion (2 of 3 rounds won)
+        /// </summary>
+        public async Task HandleAsync(HandCompletedEvent gameEvent, CancellationToken cancellationToken = default)
+        {
+            var game = gameEvent.GameState;
+            
+            _logger.LogDebug("Processing regular hand completion in game {GameId}, winning team: {WinningTeam}", 
+                gameEvent.GameId, gameEvent.WinningTeam);
+
+            // Award points to winning team
+            AwardPointsToTeam(game, gameEvent.WinningTeam, gameEvent.PointsAwarded);
+            
+            // Process hand completion
+            await ProcessHandCompletion(game, gameEvent.GameId, cancellationToken);
+        }
+
+        /// <summary>
+        /// Handle surrender scenarios
+        /// </summary>
         public async Task HandleAsync(SurrenderHandEvent gameEvent, CancellationToken cancellationToken = default)
         {
-            try
+            var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
+            if (game == null)
             {
-                var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
-                if (game == null)
-                {
-                    _logger.LogWarning("Game {GameId} not found for hand surrender processing", gameEvent.GameId);
-                    return;
-                }
-
-                _logger.LogDebug("Processing hand surrender in game {GameId} by player {PlayerName} (seat {PlayerSeat})", 
-                    gameEvent.GameId, gameEvent.Player.Name, gameEvent.Player.Seat);
-
-                // Award stakes to the winning team
-                await AwardStakesToWinningTeam(game, gameEvent);
-
-                // Check if game is complete or continue with new hand
-                if (IsGameComplete(game))
-                {
-                    await CompleteGame(game, gameEvent);
-                }
-                else
-                {
-                    await StartNewHand(game, gameEvent, cancellationToken);
-                }
-
-                // Save updated game state
-                await _gameRepository.SaveGameAsync(game);
+                _logger.LogWarning("Game {GameId} not found for hand surrender processing", gameEvent.GameId);
+                return;
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing hand surrender event in game {GameId}", gameEvent.GameId);
-            }
+
+            _logger.LogDebug("Processing hand surrender in game {GameId} by player {PlayerName}, winning team: {WinningTeam}", 
+                gameEvent.GameId, gameEvent.Player.Name, gameEvent.WinningTeam);
+
+            // Award points to winning team
+            AwardPointsToTeam(game, gameEvent.WinningTeam, gameEvent.CurrentStake);
+            
+            // Process hand completion
+            await ProcessHandCompletion(game, gameEvent.GameId, cancellationToken);
         }
 
-        private async Task AwardStakesToWinningTeam(GameState game, SurrenderHandEvent gameEvent)
+        /// <summary>
+        /// Core hand completion processing logic shared by both scenarios
+        /// </summary>
+        private async Task ProcessHandCompletion(GameState game, Guid gameId, CancellationToken cancellationToken)
         {
-            var winningTeam = gameEvent.WinningTeam;
-            if (winningTeam == "Team 1")
+            // Check if game is complete
+            if (IsGameComplete(game))
             {
-                game.Team1Score += gameEvent.CurrentStake;
-                _logger.LogDebug("Team 1 awarded {Stakes} points in game {GameId}", gameEvent.CurrentStake, gameEvent.GameId);
+                await CompleteGame(game, gameId, cancellationToken);
             }
-            else if (winningTeam == "Team 2")
+            else
             {
-                game.Team2Score += gameEvent.CurrentStake;
-                _logger.LogDebug("Team 2 awarded {Stakes} points in game {GameId}", gameEvent.CurrentStake, gameEvent.GameId);
+                await PrepareNextHand(game, gameId, cancellationToken);
             }
-        }
 
-        private bool IsGameComplete(GameState game)
+            // Save updated game state
+            await _gameRepository.SaveGameAsync(game);
+        }        
+        
+        /// <summary>
+        /// Award points to the specified team
+        /// </summary>
+        private void AwardPointsToTeam(GameState game, Team winningTeam, int points)
         {
-            return game.Team1Score >= 12 || game.Team2Score >= 12;
+            if ((int)winningTeam == 1)
+            {
+                game.Team1Score += points;
+                game.TeamScores[Team.PlayerTeam] = game.Team1Score;
+                _logger.LogDebug("Team 1 awarded {Points} points", points);
+            }
+            else if ((int)winningTeam == 2)
+            {
+                game.Team2Score += points;
+                game.TeamScores[Team.OpponentTeam] = game.Team2Score;
+                _logger.LogDebug("Team 2 awarded {Points} points", points);
+            }
+            else
+            {
+                _logger.LogWarning("Unknown team identifier '{WinningTeam}' - could not award {Points} points", winningTeam, points);
+            }
+        }      
+
+        /// <summary>
+        /// Check if the game is complete (one team reached winning score)
+        /// </summary>
+        private static bool IsGameComplete(GameState game)
+        {
+            return game.Team1Score >= TrucoConstants.Game.WinningScore || 
+                   game.Team2Score >= TrucoConstants.Game.WinningScore;
         }
 
-        private async Task CompleteGame(GameState game, SurrenderHandEvent gameEvent)
+        /// <summary>
+        /// Complete the game and publish game completion event
+        /// </summary>
+        private async Task CompleteGame(GameState game, Guid gameId, CancellationToken cancellationToken)
         {
             game.GameStatus = "completed";
             
-            _logger.LogInformation("Game {GameId} completed. Final scores - Team 1: {Team1Score}, Team 2: {Team2Score}", 
-                gameEvent.GameId, game.Team1Score, game.Team2Score);
-        }
-
-        private async Task StartNewHand(GameState game, SurrenderHandEvent gameEvent, CancellationToken cancellationToken)
-        {
-            // Start new hand
-            _gameStateManager.StartNewHand(game);
+            // Calculate game duration
+            var gameDuration = DateTime.UtcNow - game.CreatedAt;
             
-            // Clear played cards
-            foreach (var pc in game.PlayedCards)
+            // Get winning team
+            var winningTeam = GetWinningTeam(game);
+            
+            // Convert team scores to player scores dictionary
+            var finalScores = new Dictionary<Guid, int>();
+            foreach (var player in game.Players)
             {
-                pc.Card = Card.CreateEmptyCard();
+                var teamScore = game.TeamScores.ContainsKey(player.Team) ? game.TeamScores[player.Team] : 0;
+                finalScores[player.Id] = teamScore;
             }
-
-            // Set first player active for new hand
-            game.Players.ForEach(p => p.IsActive = false);
-            var firstPlayer = game.Players.First();
-            firstPlayer.IsActive = true;
-            game.CurrentPlayerIndex = firstPlayer.Seat;
-
-            // Publish new hand start event
-            var nextTurnEvent = new PlayerTurnStartedEvent(
-                gameEvent.GameId,
-                firstPlayer,
-                1, // New hand starts at round 1
-                game.CurrentHand,
+            
+            // Publish game completed event
+            var gameCompletedEvent = new GameCompletedEvent(
+                gameId,
+                winningTeam,
+                finalScores,
                 game,
-                new List<string> { "play-card", "truco" }
+                gameDuration
             );
-            await _eventPublisher.PublishAsync(nextTurnEvent, cancellationToken);
-
-            _logger.LogDebug("Started new hand {HandNumber} in game {GameId}, first player: {PlayerName} (seat {PlayerSeat})", 
-                game.CurrentHand, gameEvent.GameId, firstPlayer.Name, firstPlayer.Seat);
+            await _eventPublisher.PublishAsync(gameCompletedEvent, cancellationToken);
+            
+            _logger.LogInformation("Game {GameId} completed. Final scores - Team 1: {Team1Score}, Team 2: {Team2Score}", 
+                gameId, game.Team1Score, game.Team2Score);
         }
+
+        /// <summary>
+        /// Prepare for the next hand
+        /// </summary>
+        private async Task PrepareNextHand(GameState game, Guid gameId, CancellationToken cancellationToken)
+        {
+            // Clear all hand-related state
+            ClearHandState(game);
+            
+            // Move to next hand
+            game.CurrentHand++;
+            
+            // Add hand resolution delay before starting next hand
+            var handResolutionDelay = GetHandResolutionDelay();
+            if (handResolutionDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(handResolutionDelay, cancellationToken);
+            }
+            
+            // Rotate dealer and set first player
+            RotateDealer(game);
+            
+            // Deal new cards
+            DealNewCards(game);
+            
+            // Initialize played cards slots for new hand
+            InitializePlayedCardsSlots(game);
+            
+            // Publish hand started event
+            var handStartedEvent = new HandStartedEvent(
+                gameId,
+                game.CurrentHand,
+                game.DealerSeat,
+                game.FirstPlayerSeat,
+                game
+            );
+            await _eventPublisher.PublishAsync(handStartedEvent, cancellationToken);
+            
+            _logger.LogDebug("Started new hand {HandNumber} in game {GameId}", game.CurrentHand, gameId);
+        }
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Clear all state related to the completed hand
+        /// </summary>
+        private static void ClearHandState(GameState game)
+        {
+            // Clear all played cards completely
+            game.PlayedCards.Clear();
+            
+            // Clear round winners
+            game.RoundWinners.Clear();
+            
+            // Reset round counter
+            game.CurrentRound = TrucoConstants.Game.FirstRound;
+            
+            // Reset stakes and truco state
+            game.Stakes = TrucoConstants.Stakes.Initial;
+            game.IsTrucoCalled = false;
+            game.IsRaiseEnabled = true;
+            
+            // Clear all player hands
+            foreach (var player in game.Players)
+            {
+                player.Hand.Clear();
+                player.IsActive = false;
+            }
+        }
+
+        /// <summary>
+        /// Get the winning team
+        /// </summary>
+        private static Team? GetWinningTeam(GameState game)
+        {
+            return game.TeamScores.FirstOrDefault(kvp => kvp.Value >= TrucoConstants.Game.WinningScore).Key;
+        }
+
+        /// <summary>
+        /// Rotate the dealer to the next player for the new hand
+        /// </summary>
+        private static void RotateDealer(GameState game)
+        {
+            // Update dealer - FirstPlayerSeat will be computed automatically
+            game.DealerSeat = GameConfiguration.GetNextDealerSeat(game.DealerSeat);
+            
+            // Update player states
+            foreach (var player in game.Players)
+            {
+                player.IsDealer = player.Seat == game.DealerSeat;
+                player.IsActive = player.Seat == game.FirstPlayerSeat;
+            }
+            
+            // Update current player index
+            game.CurrentPlayerIndex = game.FirstPlayerSeat;
+        }
+
+        /// <summary>
+        /// Deal new cards to all players
+        /// </summary>
+        private static void DealNewCards(GameState game)
+        {
+            // Create new shuffled deck
+            game.Deck = new Deck();
+            game.Deck.Shuffle();
+            
+            // Deal cards to all players
+            game.DealCards();
+        }
+
+        /// <summary>
+        /// Initialize played cards slots for the new hand
+        /// </summary>
+        private static void InitializePlayedCardsSlots(GameState game)
+        {
+            game.PlayedCards.Clear();
+            for (int seat = 0; seat < TrucoConstants.Game.MaxPlayers; seat++)
+            {
+                game.PlayedCards.Add(new PlayedCard(seat));
+            }
+        }
+
+        /// <summary>
+        /// Get hand resolution delay using configuration values with fallback to defaults
+        /// </summary>
+        private TimeSpan GetHandResolutionDelay()
+        {
+            var delayMs = _configuration.GetValue<int>("GameSettings:HandResolutionDelayMs", GameConfiguration.DefaultHandResolutionDelayMs);
+            
+            if (delayMs <= 0)
+            {
+                return TimeSpan.Zero;
+            }
+            
+            return TimeSpan.FromMilliseconds(delayMs);
+        }
+
+        #endregion
     }
 }

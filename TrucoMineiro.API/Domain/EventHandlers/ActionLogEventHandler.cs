@@ -99,18 +99,17 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     _logger.LogWarning("Game {GameId} not found for action log creation", gameEvent.GameId);
                     return;
                 }                // Create action log entry for round result
-                var winner = gameEvent.RoundWinner?.Name ?? "Draw";                var actionLogEntry = new ActionLogEntry("turn-result")
+                var actionLogEntry = new ActionLogEntry("turn-result")
                 {
-                    Winner = winner,
-                    WinnerTeam = gameEvent.RoundWinner != null ? (gameEvent.RoundWinner.Seat % 2 == 0 ? "Team 1" : "Team 2") : null,
+                    Winner = gameEvent.RoundWinner?.Team,                    
                     RoundNumber = gameEvent.Round // Use round number from event
                 };
 
                 game.ActionLog.Add(actionLogEntry);
                 await _gameRepository.SaveGameAsync(game);
 
-                _logger.LogDebug("Added action log entry for round completed: Winner {Winner} in game {GameId}", 
-                    winner, gameEvent.GameId);
+                _logger.LogDebug("Added action log entry for round completed: Winner {Winner} in game {GameId}",
+                    gameEvent.RoundWinner.ToString(), gameEvent.GameId);
             }
             catch (Exception ex)
             {
@@ -170,8 +169,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 var handResultEntry = new ActionLogEntry("hand-result")
                 {
                     HandNumber = gameEvent.HandNumber,
-                    Winner = gameEvent.WinningTeam,
-                    WinnerTeam = gameEvent.WinningTeam
+                    Winner = gameEvent.WinningTeam
                 };
 
                 game.ActionLog.Add(handResultEntry);

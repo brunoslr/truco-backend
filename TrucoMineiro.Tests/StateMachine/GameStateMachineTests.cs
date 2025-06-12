@@ -111,7 +111,7 @@ public class GameStateMachineTests
             Card = card
         };
         
-        var player = new Player("Test Player", "team1", 1)
+        var player = new Player("Test Player", Team.PlayerTeam, 1)
         {
             Id = playerId,
             Hand = new List<Card> { card },
@@ -150,7 +150,7 @@ public class GameStateMachineTests
             Card = invalidCard
         };
         
-        var player = new Player("Test Player", "team1", 1)
+        var player = new Player("Test Player", Team.PlayerTeam, 1)
         {
             Id = playerId,
             Hand = new List<Card> { card }, // Player doesn't have the invalid card
@@ -185,7 +185,7 @@ public class GameStateMachineTests
             PlayerSeat = 1
         };
         
-        var player = new Player("Test Player", "team1", 1)
+        var player = new Player("Test Player", Team.PlayerTeam, 1)
         {
             Id = playerId
         };
@@ -224,7 +224,7 @@ public class GameStateMachineTests
             Accept = true
         };
         
-        var player = new Player("Test Player", "team2", 2)
+        var player = new Player("Test Player", Team.OpponentTeam, 2)
         {
             Id = playerId
         };
@@ -264,12 +264,12 @@ public class GameStateMachineTests
             Accept = false
         };
         
-        var respondingPlayer = new Player("Test Player", "team2", 2)
+        var respondingPlayer = new Player("Test Player", Team.OpponentTeam, 2)
         {
             Id = playerId
         };
         
-        var callingPlayer = new Player("Calling Player", "team1", 1)
+        var callingPlayer = new Player("Calling Player", Team.PlayerTeam, 1)
         {
             Id = trucoCallerId
         };
@@ -308,7 +308,7 @@ public class GameStateMachineTests
             PlayerSeat = 1
         };
         
-        var player = new Player("Test Player", "team1", 1)
+        var player = new Player("Test Player", Team.PlayerTeam, 1)
         {
             Id = playerId
         };
@@ -345,7 +345,7 @@ public class GameStateMachineTests
             Card = card
         };
         
-        var player = new Player("Test Player", "team2", 2)
+        var player = new Player("Test Player", Team.OpponentTeam, 2)
         {
             Id = playerId,
             Hand = new List<Card> { card }

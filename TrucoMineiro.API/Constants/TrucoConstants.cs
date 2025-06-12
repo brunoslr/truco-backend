@@ -66,40 +66,8 @@ namespace TrucoMineiro.API.Constants
             /// Human player seat number
             /// </summary>
             public const int HumanPlayerSeat = 0;
-        }
-
-        /// <summary>
-        /// AI and automation constants
-        /// </summary>
-        public static class AI
-        {
-            /// <summary>
-            /// Maximum iterations to prevent infinite loops in AI processing
-            /// </summary>
-            public const int MaxIterations = 10;
-
-            /// <summary>
-            /// Default delay in milliseconds before starting a new hand
-            /// </summary>
-            public const int NewHandDelayMs = 1000;
-        }
-
-        /// <summary>
-        /// Team configuration constants
-        /// </summary>
-        public static class Teams
-        {
-            /// <summary>
-            /// Name for the player's team (seats 0 and 2)
-            /// </summary>
-            public const string PlayerTeam = "Player's Team";
-
-            /// <summary>
-            /// Name for the opponent team (seats 1 and 3)
-            /// </summary>
-            public const string OpponentTeam = "Opponent Team";
-        }
-
+        }     
+        
         /// <summary>
         /// Card and fold constants
         /// </summary>

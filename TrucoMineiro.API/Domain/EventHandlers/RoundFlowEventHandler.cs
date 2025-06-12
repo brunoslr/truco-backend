@@ -33,8 +33,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             _handResolutionService = handResolutionService;
             _configuration = configuration;
             _logger = logger;
-        }        
-        public async Task HandleAsync(CardPlayedEvent gameEvent, CancellationToken cancellationToken = default)
+        }        public async Task HandleAsync(CardPlayedEvent gameEvent, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -84,11 +83,12 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 new Dictionary<Guid, int>(), // Score changes - can be calculated if needed
                 game,
                 winner == null // isDraw when no winner
-            );
-            await _eventPublisher.PublishAsync(roundCompletedEvent, cancellationToken);            // Determine if hand is complete or new round should start
+            );            await _eventPublisher.PublishAsync(roundCompletedEvent, cancellationToken);
+
+            // Determine if hand is complete or new round should start
             if (AreAllCardsPlayed(game))
             {
-                HandleHandCompletion(game, gameId);
+                await HandleHandCompletion(game, gameId, cancellationToken);
             }
             else
             {
@@ -115,13 +115,13 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             }
         }        private async Task HandleNewRoundStart(GameState game, Guid gameId, Player? winner, CancellationToken cancellationToken)
         {
-            _logger.LogDebug("Starting new round in game {GameId}, winner {WinnerName} plays first", 
+            _logger.LogDebug("Starting new round in game {GameId}, winner {WinnerName} plays first",
                 gameId, winner?.Name ?? "Draw");            // Add round resolution delay before starting next round
             var roundResolutionDelay = GetRoundResolutionDelay();
-            
-            _logger.LogDebug("Adding round resolution delay of {DelayMs}ms before starting next round in game {GameId}", 
+
+            _logger.LogDebug("Adding round resolution delay of {DelayMs}ms before starting next round in game {GameId}",
                 roundResolutionDelay.TotalMilliseconds, gameId);
-            
+
             if (roundResolutionDelay > TimeSpan.Zero)
             {
                 await Task.Delay(roundResolutionDelay, cancellationToken);
@@ -149,17 +149,43 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 game.CurrentRound,
                 game.CurrentHand,
                 game,
-                new List<string> { "play-card" }
-            );
+                new List<string> { "play-card" });
             await _eventPublisher.PublishAsync(nextTurnEvent, cancellationToken);
-        }        private void HandleHandCompletion(GameState game, Guid gameId)
+        }
+
+        private async Task HandleHandCompletion(GameState game, Guid gameId, CancellationToken cancellationToken)
         {
             _logger.LogDebug("Hand complete in game {GameId}", gameId);
-            
-            // Hand completion will be handled by HandCompletionEventHandler
-            // For now, just log it
-            _logger.LogInformation("Hand completed in game {GameId} - Hand completion logic to be handled by specialized handler", gameId);
-        }        private static bool AreAllCardsPlayed(GameState game)
+
+            // Determine the winning team using hand resolution service
+            var winningTeam = _handResolutionService.GetHandWinner(game);
+
+            if (winningTeam.HasValue) // Ensure winningTeam is not null
+            {
+                // Publish hand completed event to trigger cleanup and new hand start
+                var handCompletedEvent = new HandCompletedEvent(
+                    gameId,
+                    game.CurrentHand,
+                    winningTeam.Value, 
+                    game.RoundWinners.ToList(), // Copy the round winners list
+                    game.Stakes, // Points to be awarded
+                    game
+                );
+
+                await _eventPublisher.PublishAsync(handCompletedEvent, cancellationToken);
+
+                _logger.LogInformation("Hand {HandNumber} completed in game {GameId}, winning team: {WinningTeam}",
+                    game.CurrentHand, gameId, winningTeam.Value);
+            }
+            else
+            {
+                _logger.LogError("Hand {HandNumber} completed in game {GameId} but no winning team could be determined",
+                    game.CurrentHand, gameId);
+                throw new InvalidOperationException($"Unable to complete hand {game.CurrentHand} - winning team could not be determined");
+            }
+        }
+
+        private static bool AreAllCardsPlayed(GameState game)
         {
             return game.Players.All(p => p.Hand.Count == 0);
         }

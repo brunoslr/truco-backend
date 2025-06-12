@@ -17,8 +17,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         {
             _gameRepository = gameRepository;
         }        
-        
-        /// <summary>
+          /// <summary>
         /// Handle round completed events and perform round cleanup
         /// </summary>
         public async Task HandleAsync(RoundCompletedEvent gameEvent, CancellationToken cancellationToken = default)
@@ -27,6 +26,9 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             
             // Save the completed round to history before clearing
             SaveRoundToHistory(game);
+            
+            // Update RoundWinners list with the winning team number
+            UpdateRoundWinners(game, gameEvent.RoundWinner);
             
             // Clear played cards for the completed round
             ClearRoundPlayedCards(game);
@@ -42,9 +44,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             
             // Save the updated game state
             await _gameRepository.SaveGameAsync(game);
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Save the current round's played cards to the round history
         /// </summary>
         private static void SaveRoundToHistory(GameState game)
@@ -55,7 +55,26 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             {
                 game.RoundHistory[game.CurrentRound] = currentRoundCards;
             }
-        }        
+        }
+
+        /// <summary>
+        /// Update the RoundWinners list with the winning team number
+        /// </summary>
+        private static void UpdateRoundWinners(GameState game, Player? roundWinner)
+        {
+            if (roundWinner != null)
+            {
+                // Determine team number from player seat
+                // Team 1: seats 0, 2; Team 2: seats 1, 3
+                var teamNumber = (roundWinner.Seat % 2 == 0) ? 1 : 2;
+                game.RoundWinners.Add(teamNumber);
+            }
+            else
+            {
+                // In case of a draw, we could add 0 or just skip
+                // For now, let's not add anything for draws
+            }
+        }
         
         /// <summary>
         /// Clear the cards that were played in the completed round

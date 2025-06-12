@@ -141,7 +141,7 @@ namespace TrucoMineiro.API.Domain.Services
             return false;
         }
 
-        public string? GetHandWinner(GameState game)
+        public Team? GetHandWinner(GameState game)
         {
             if (!IsHandComplete(game))
                 return null;
@@ -151,15 +151,19 @@ namespace TrucoMineiro.API.Domain.Services
             foreach (var winningTeam in game.RoundWinners)
             {
                 teamWins[winningTeam] = teamWins.GetValueOrDefault(winningTeam, 0) + 1;
-            }            var winningTeamNumber = teamWins.FirstOrDefault(kvp => kvp.Value >= 2).Key;
-            return winningTeamNumber == 0 ? null : $"Team{winningTeamNumber}";
-        }        public async Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs)
+            }            
+              var winningTeamNumber = teamWins.FirstOrDefault(kvp => kvp.Value >= 2).Key;
+            return winningTeamNumber == 0 ? null : (Team)winningTeamNumber;
+        }        
+        
+        public async Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs)
         {
             // Use the proper hand resolution service to check completion
             if (IsHandComplete(game))
             {
                 // Determine the winning team and round information
-                var winningTeam = game.TurnWinner ?? TrucoConstants.Teams.PlayerTeam;
+                var winningTeam = game.TurnWinner;            if (winningTeam.HasValue)
+            {
                 var roundWinners = new List<int>(); // This would need to be tracked throughout the hand
                 var pointsAwarded = game.Stakes;
 
@@ -167,10 +171,11 @@ namespace TrucoMineiro.API.Domain.Services
                 await _eventPublisher.PublishAsync(new HandCompletedEvent(
                     Guid.Parse(game.Id), 
                     game.CurrentHand, 
-                    winningTeam,
+                    winningTeam.Value,
                     roundWinners,
                     pointsAwarded,
                     game));
+            }
 
                 // Use configuration-based delay before starting a new hand
                 var handResolutionDelayMs = _configuration.GetValue<int>("GameSettings:HandResolutionDelayMs", GameConfiguration.DefaultHandResolutionDelayMs);

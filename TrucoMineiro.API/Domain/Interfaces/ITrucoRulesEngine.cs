@@ -28,7 +28,7 @@ namespace TrucoMineiro.API.Domain.Interfaces
         /// <param name="game">The current game state</param>
         /// <param name="playerSeat">The seat of the player folding</param>
         /// <returns>True if the fold is valid and processed, false otherwise</returns>
-        bool ProcessFold(GameState game, int playerSeat);
+        bool ProcessSurrender(GameState game, int playerSeat);
 
         /// <summary>
         /// Checks if a Truco call is allowed in the current game state

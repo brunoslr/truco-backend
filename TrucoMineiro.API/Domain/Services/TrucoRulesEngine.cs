@@ -60,32 +60,33 @@ namespace TrucoMineiro.API.Domain.Services
             return false;
         }       
         
-        public bool ProcessFold(GameState game, int playerSeat)
+        public bool ProcessSurrender(GameState game, int playerSeat)
         {
-            var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
-            if (player == null)
-                return false;
-
+            var surrenderPlayer = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
+            if (surrenderPlayer == null)
+                return false;            
+            
             // Award points to opposing team
-            string opposingTeam = player.Team == TrucoConstants.Teams.PlayerTeam ? TrucoConstants.Teams.OpponentTeam : TrucoConstants.Teams.PlayerTeam;
+            Team teamReceivingPoints = surrenderPlayer.Team == Team.PlayerTeam ? Team.OpponentTeam : Team.PlayerTeam;
             int pointsToAward = Math.Max(1, game.Stakes);
             
-            if (!game.TeamScores.ContainsKey(opposingTeam))
-                game.TeamScores[opposingTeam] = 0;
+            if (!game.TeamScores.ContainsKey(teamReceivingPoints))
+                game.TeamScores[teamReceivingPoints] = 0;
             
-            game.TeamScores[opposingTeam] += pointsToAward;            // Log the fold
+            game.TeamScores[teamReceivingPoints] += pointsToAward;
+            // Log the surrender
             game.ActionLog.Add(new ActionLogEntry("button-pressed")
             {
-                PlayerSeat = player.Seat,
-                Action = $"{player.Name} folded, {opposingTeam} gains {pointsToAward} points"
+                PlayerSeat = surrenderPlayer.Seat,
+                Action = $"{surrenderPlayer.Name} surrenders, {teamReceivingPoints} gains {pointsToAward} points"
             });
 
             // Log hand result
             game.ActionLog.Add(new ActionLogEntry("hand-result")
             {
                 HandNumber = game.CurrentHand,
-                Winner = opposingTeam,
-                WinnerTeam = opposingTeam
+                Winner = teamReceivingPoints,
+                WinnerTeam = teamReceivingPoints
             });
 
             return true;

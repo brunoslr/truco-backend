@@ -7,7 +7,7 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
     /// </summary>
     public class GameCompletedEvent : GameEventBase
     {
-        public Player? Winner { get; set; }
+        public Team? Winner { get; set; }
         public Dictionary<Guid, int> FinalScores { get; set; } = new();
         public GameState FinalGameState { get; set; } = null!;
         public TimeSpan GameDuration { get; set; }
@@ -16,13 +16,13 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
 
         public GameCompletedEvent(
             Guid gameId, 
-            Player? winner, 
+            Team? winner, 
             Dictionary<Guid, int>? finalScores, 
             GameState finalGameState, 
             TimeSpan gameDuration,
             string completionReason = "normal",
             Dictionary<string, object>? gameStatistics = null) 
-            : base(gameId, GetPlayerGuid(winner))
+            : base(gameId)
         {
             Winner = winner;
             FinalScores = finalScores ?? new Dictionary<Guid, int>();
@@ -34,9 +34,6 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
 
         public GameCompletedEvent() : base()
         {
-        }        private static Guid? GetPlayerGuid(Player? player)
-        {
-            return player?.Id;  // player.Id is already a Guid
-        }
+        }        
     }
 }
