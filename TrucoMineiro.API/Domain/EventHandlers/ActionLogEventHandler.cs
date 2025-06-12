@@ -40,11 +40,11 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 var cardDisplay = gameEvent.Card.IsFold 
                     ? "FOLD" 
                     : $"{gameEvent.Card.Value} of {gameEvent.Card.Suit}";
-                
-                var actionLogEntry = new ActionLogEntry("card-played")
+                  var actionLogEntry = new ActionLogEntry("card-played")
                 {
                     PlayerSeat = gameEvent.Player.Seat,
-                    Card = cardDisplay
+                    Card = cardDisplay,
+                    RoundNumber = gameEvent.Round // Use round number from event
                 };
 
                 game.ActionLog.Add(actionLogEntry);
@@ -68,14 +68,12 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 {
                     _logger.LogWarning("Game {GameId} not found for action log creation", gameEvent.GameId);
                     return;
-                }
-
-                // Only log turn starts for human players or significant game state changes
+                }                // Only log turn starts for human players or significant game state changes
                 if (!gameEvent.Player.IsAI)
-                {
-                    var actionLogEntry = new ActionLogEntry("turn-start")
+                {                    var actionLogEntry = new ActionLogEntry("turn-start")
                     {
-                        PlayerSeat = gameEvent.Player.Seat
+                        PlayerSeat = gameEvent.Player.Seat,
+                        RoundNumber = gameEvent.Round // Use round number from event
                     };
 
                     game.ActionLog.Add(actionLogEntry);
@@ -100,14 +98,12 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 {
                     _logger.LogWarning("Game {GameId} not found for action log creation", gameEvent.GameId);
                     return;
-                }
-
-                // Create action log entry for round result
-                var winner = gameEvent.RoundWinner?.Name ?? "Draw";
-                var actionLogEntry = new ActionLogEntry("turn-result")
+                }                // Create action log entry for round result
+                var winner = gameEvent.RoundWinner?.Name ?? "Draw";                var actionLogEntry = new ActionLogEntry("turn-result")
                 {
                     Winner = winner,
-                    WinnerTeam = gameEvent.RoundWinner != null ? (gameEvent.RoundWinner.Seat % 2 == 0 ? "Team 1" : "Team 2") : null
+                    WinnerTeam = gameEvent.RoundWinner != null ? (gameEvent.RoundWinner.Seat % 2 == 0 ? "Team 1" : "Team 2") : null,
+                    RoundNumber = gameEvent.Round // Use round number from event
                 };
 
                 game.ActionLog.Add(actionLogEntry);
@@ -131,14 +127,12 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 {
                     _logger.LogWarning("Game {GameId} not found for action log creation", gameEvent.GameId);
                     return;
-                }
-
-                // Create action log entry for truco/raise
-                var action = gameEvent.IsInitialTruco ? "called Truco" : "raised stakes";
-                var actionLogEntry = new ActionLogEntry("button-pressed")
+                }                // Create action log entry for truco/raise
+                var action = gameEvent.IsInitialTruco ? "called Truco" : "raised stakes";                var actionLogEntry = new ActionLogEntry("button-pressed")
                 {
                     PlayerSeat = gameEvent.Player.Seat,
-                    Action = $"{action} to {gameEvent.NewStakes} points"
+                    Action = $"{action} to {gameEvent.NewStakes} points",
+                    RoundNumber = game.CurrentRound // Use current round from game state
                 };
 
                 game.ActionLog.Add(actionLogEntry);
@@ -160,11 +154,14 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 {
                     _logger.LogWarning("Game {GameId} not found for action log creation", gameEvent.GameId);
                     return;
-                }                // Create action log entry for hand surrender
+                }
+
+                // Create action log entry for hand surrender
                 var actionLogEntry = new ActionLogEntry("button-pressed")
                 {
                     PlayerSeat = gameEvent.Player.Seat,
-                    Action = $"surrendered hand, {gameEvent.WinningTeam} gains {gameEvent.CurrentStake} points"
+                    Action = $"surrendered hand, {gameEvent.WinningTeam} gains {gameEvent.CurrentStake} points",
+                    RoundNumber = game.CurrentRound // Use current round from game state
                 };
 
                 game.ActionLog.Add(actionLogEntry);

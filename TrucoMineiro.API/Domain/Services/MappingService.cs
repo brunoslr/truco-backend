@@ -66,10 +66,11 @@ namespace TrucoMineiro.API.Services
         /// Optimized to only include relevant fields based on action type
         /// </summary>
         public static ActionLogEntryDto MapActionLogEntryToDto(ActionLogEntry entry)
-        {
-            var dto = new ActionLogEntryDto
+        {            var dto = new ActionLogEntryDto
             {
                 Type = entry.Type,
+                Timestamp = entry.Timestamp,
+                RoundNumber = entry.RoundNumber,
                 PlayerSeat = entry.PlayerSeat
             };
 
@@ -98,7 +99,7 @@ namespace TrucoMineiro.API.Services
                 case "turn-start":
                 case "game-started":
                 default:
-                    // Only Type and PlayerSeat are needed for these action types
+                    // Only Type, Timestamp, RoundNumber and PlayerSeat are needed for these action types
                     break;
             }
 

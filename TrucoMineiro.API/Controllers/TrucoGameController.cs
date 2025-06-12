@@ -7,13 +7,13 @@ using TrucoMineiro.API.Domain.StateMachine.Commands;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Controllers
-{
-    /// <summary>
+{    /// <summary>
     /// Controller for managing Truco Mineiro games
     /// </summary>
     [Route("api/game")]
     [ApiController]
-    [Produces("application/json")]    public class TrucoGameController : ControllerBase
+    [Produces("application/json")]
+    public class TrucoGameController : ControllerBase
     {
         private readonly IGameStateManager _gameStateManager;
         private readonly IGameRepository _gameRepository;
@@ -207,7 +207,8 @@ namespace TrucoMineiro.API.Controllers
         /// <response code="400">If the request is invalid</response>
         [HttpPost("start")]
         [ProducesResponseType(typeof(StartGameResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]        public async Task<ActionResult<StartGameResponse>> StartGame([FromBody] StartGameRequest request)
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<StartGameResponse>> StartGame([FromBody] StartGameRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.PlayerName))
             {

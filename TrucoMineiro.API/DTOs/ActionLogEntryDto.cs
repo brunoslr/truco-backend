@@ -1,8 +1,7 @@
 using System.Text.Json.Serialization;
 
 namespace TrucoMineiro.API.DTOs
-{
-    /// <summary>
+{    /// <summary>
     /// Represents an entry in the game action log
     /// Optimized to exclude null/unused fields from JSON serialization for reduced payload size
     /// </summary>
@@ -12,6 +11,15 @@ namespace TrucoMineiro.API.DTOs
         /// The type of action (e.g., "card-played", "button-pressed", "hand-result", "turn-result")
         /// </summary>
         public string Type { get; set; } = string.Empty;
+
+        /// <summary>
+        /// When this action occurred (UTC timestamp for proper chronological ordering)
+        /// </summary>
+        public DateTime Timestamp { get; set; }        /// <summary>
+        /// The current round number within the hand (1, 2, or 3) when this action occurred
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RoundNumber { get; set; }
 
         /// <summary>
         /// The seat number of the player who performed the action (optional, depending on type)

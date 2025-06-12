@@ -1,10 +1,7 @@
-using Microsoft.AspNetCore.Mvc.Testing;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using TrucoMineiro.API;
 using TrucoMineiro.API.DTOs;
-using TrucoMineiro.Tests.Integration;
+using TrucoMineiro.Tests.TestUtilities;
 using Xunit;
 
 namespace TrucoMineiro.Tests.Integration
@@ -21,33 +18,15 @@ namespace TrucoMineiro.Tests.Integration
     /// - TODO: Reduce unit test mocking in favor of testing real component interactions
     /// - TODO: Add comprehensive integration tests for edge cases and error scenarios
     /// - TODO: Consider adding integration tests for event-driven race conditions
+    /// - Migrated from IClassFixture to EndpointTestBase for consistency
     /// </summary>
-    public class EndpointIntegrationTests : IClassFixture<TestWebApplicationFactory>
+    public class EndpointIntegrationTests : EndpointTestBase
     {
-        private readonly TestWebApplicationFactory _factory;
-        private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
-        public EndpointIntegrationTests(TestWebApplicationFactory factory)
-        {
-            _factory = factory;
-        }
-
         [Fact]
         public async Task CompleteHandFlow_ShouldHandleRealPlayerAndAIPlayers()
         {
-            // Arrange - Create HTTP client and start game
-            using var client = _factory.CreateClient();
-            
-            var startGameRequest = new StartGameRequest { PlayerName = "TestHuman" };
-            var startGameJson = JsonSerializer.Serialize(startGameRequest, _jsonOptions);
-            var startGameContent = new StringContent(startGameJson, Encoding.UTF8, "application/json");
-
-            // Act & Assert - Start game
-            var startResponse = await client.PostAsync("/api/game/start", startGameContent);
-            startResponse.EnsureSuccessStatusCode();
-
-            var startGameResponseJson = await startResponse.Content.ReadAsStringAsync();
-            var gameState = JsonSerializer.Deserialize<StartGameResponse>(startGameResponseJson, _jsonOptions);
+            // Arrange & Act - Start game using base class method
+            var gameState = await CreateGameAsync("TestHuman");
             
             Assert.NotNull(gameState);
             Assert.NotEmpty(gameState.GameId);
@@ -55,8 +34,10 @@ namespace TrucoMineiro.Tests.Integration
             Assert.Equal(4, gameState.Players.Count);
             Assert.Equal(3, gameState.Hand.Count);
 
-            var gameId = gameState.GameId;            // Verify initial game state
-            var getGameResponse = await client.GetAsync($"/api/game/{gameId}");
+            var gameId = gameState.GameId;
+
+            // Verify initial game state
+            var getGameResponse = await _client.GetAsync($"/api/game/{gameId}");
             getGameResponse.EnsureSuccessStatusCode();
 
             var gameStateJson = await getGameResponse.Content.ReadAsStringAsync();
@@ -78,8 +59,10 @@ namespace TrucoMineiro.Tests.Integration
             var playCardJson = JsonSerializer.Serialize(playCardRequest, _jsonOptions);
             var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");
 
-            var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
-            playCardResponse.EnsureSuccessStatusCode();            var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
+            var playCardResponse = await _client.PostAsync("/api/game/play-card", playCardContent);
+            playCardResponse.EnsureSuccessStatusCode();
+
+            var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
             var playCardResult = JsonSerializer.Deserialize<PlayCardResponseDto>(playCardResponseJson, _jsonOptions);
 
             // Verify human move was processed - Check simplified response
@@ -87,8 +70,9 @@ namespace TrucoMineiro.Tests.Integration
             Assert.True(playCardResult.Success);
             Assert.Equal("Card played successfully", playCardResult.Message);
             Assert.Null(playCardResult.Error);
-              // Poll game state to verify the move was processed
-            var playCardGameStateResponse = await client.GetAsync($"/api/game/{gameId}");
+
+            // Poll game state to verify the move was processed
+            var playCardGameStateResponse = await _client.GetAsync($"/api/game/{gameId}");
             playCardGameStateResponse.EnsureSuccessStatusCode();
             var playCardGameStateJson = await playCardGameStateResponse.Content.ReadAsStringAsync();
             var playCardGameState = JsonSerializer.Deserialize<GameStateDto>(playCardGameStateJson, _jsonOptions);
@@ -100,8 +84,10 @@ namespace TrucoMineiro.Tests.Integration
             Assert.True(playCardGameState.PlayedCards.Count >= 1);
 
             // Wait for AI players to automatically play their turns
-            await Task.Delay(4000);            // Verify final state after AI auto-play
-            var finalGameStateResponse = await client.GetAsync($"/api/game/{gameId}");
+            await Task.Delay(4000);
+
+            // Verify final state after AI auto-play
+            var finalGameStateResponse = await _client.GetAsync($"/api/game/{gameId}");
             finalGameStateResponse.EnsureSuccessStatusCode();
 
             var finalGameStateJson = await finalGameStateResponse.Content.ReadAsStringAsync();
@@ -121,28 +107,24 @@ namespace TrucoMineiro.Tests.Integration
         [Fact]
         public async Task AIAutoPlay_ShouldRespondAfterHumanMove()
         {
-            // Arrange - Start a game
-            using var client = _factory.CreateClient();
-            
-            var startGameRequest = new StartGameRequest { PlayerName = "AITest" };
-            var startGameJson = JsonSerializer.Serialize(startGameRequest, _jsonOptions);
-            var startGameContent = new StringContent(startGameJson, Encoding.UTF8, "application/json");            var startResponse = await client.PostAsync("/api/game/start", startGameContent);
-            var startGameResponseJson = await startResponse.Content.ReadAsStringAsync();
-            
-            var gameState = JsonSerializer.Deserialize<StartGameResponse>(startGameResponseJson, _jsonOptions);            var gameId = gameState!.GameId;
+            // Arrange - Start a game using base class method
+            var gameState = await CreateGameAsync("AITest");
+            var gameId = gameState.GameId;
             
             // Act - Human player makes a move
             var playCardRequest = new PlayCardRequestDto
             {
-                GameId = gameId ?? throw new InvalidOperationException("GameId cannot be null"),
+                GameId = gameId,
                 PlayerSeat = 0,
                 CardIndex = 0,
                 IsFold = false
             };
 
             var playCardJson = JsonSerializer.Serialize(playCardRequest, _jsonOptions);
-            var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");            var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
-              playCardResponse.EnsureSuccessStatusCode();
+            var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");
+
+            var playCardResponse = await _client.PostAsync("/api/game/play-card", playCardContent);
+            playCardResponse.EnsureSuccessStatusCode();
 
             var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
             var playCardResult = JsonSerializer.Deserialize<PlayCardResponseDto>(playCardResponseJson, _jsonOptions);
@@ -154,7 +136,7 @@ namespace TrucoMineiro.Tests.Integration
             Assert.Null(playCardResult.Error);
             
             // Poll game state to verify the move was processed
-            var playCardGameStateResponse = await client.GetAsync($"/api/game/{gameId}");
+            var playCardGameStateResponse = await _client.GetAsync($"/api/game/{gameId}");
             playCardGameStateResponse.EnsureSuccessStatusCode();
             var playCardGameStateJson = await playCardGameStateResponse.Content.ReadAsStringAsync();
             var playCardGameState = JsonSerializer.Deserialize<GameStateDto>(playCardGameStateJson, _jsonOptions);
@@ -163,8 +145,10 @@ namespace TrucoMineiro.Tests.Integration
             Assert.True(playCardGameState.PlayedCards.Count >= 1);
 
             // Wait for AI players to auto-play
-            await Task.Delay(5000);            // Assert - Verify AI players responded automatically
-            var finalStateResponse = await client.GetAsync($"/api/game/{gameId}");
+            await Task.Delay(5000);
+
+            // Assert - Verify AI players responded automatically
+            var finalStateResponse = await _client.GetAsync($"/api/game/{gameId}");
             finalStateResponse.EnsureSuccessStatusCode();
             var finalStateJson = await finalStateResponse.Content.ReadAsStringAsync();
             var finalState = JsonSerializer.Deserialize<GameStateDto>(finalStateJson, _jsonOptions);
@@ -191,19 +175,12 @@ namespace TrucoMineiro.Tests.Integration
         [Fact]
         public async Task SuitConstants_ShouldBeConsistentInAllEndpoints()
         {
-            // Arrange - Start a game
-            using var client = _factory.CreateClient();
+            // Arrange - Start a game using base class method
+            var gameState = await CreateGameAsync("SuitTest");
+            var gameId = gameState.GameId;
             
-            var startGameRequest = new StartGameRequest { PlayerName = "SuitTest" };
-            var startGameJson = JsonSerializer.Serialize(startGameRequest, _jsonOptions);
-            var startGameContent = new StringContent(startGameJson, Encoding.UTF8, "application/json");
-
-            var startResponse = await client.PostAsync("/api/game/start", startGameContent);
-            var startGameResponseJson = await startResponse.Content.ReadAsStringAsync();
-            var gameState = JsonSerializer.Deserialize<StartGameResponse>(startGameResponseJson, _jsonOptions);
-            var gameId = gameState!.GameId;            
             // Act & Assert - Verify all cards use Unicode suit symbols
-            var gameStateResponse = await client.GetAsync($"/api/game/{gameId}");
+            var gameStateResponse = await _client.GetAsync($"/api/game/{gameId}");
             var gameStateJson = await gameStateResponse.Content.ReadAsStringAsync();
             var currentGameState = JsonSerializer.Deserialize<GameStateDto>(gameStateJson, _jsonOptions);
 
@@ -224,21 +201,24 @@ namespace TrucoMineiro.Tests.Integration
                 PlayerSeat = 0,
                 CardIndex = 0,
                 IsFold = false
-            };            
-            var playCardJson = JsonSerializer.Serialize(playCardRequest, _jsonOptions);
-            var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");            
-            var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
-            playCardResponse.EnsureSuccessStatusCode();
-              var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
+            };
             
+            var playCardJson = JsonSerializer.Serialize(playCardRequest, _jsonOptions);
+            var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");
+            
+            var playCardResponse = await _client.PostAsync("/api/game/play-card", playCardContent);
+            playCardResponse.EnsureSuccessStatusCode();
+
+            var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
             var playCardResult = JsonSerializer.Deserialize<PlayCardResponseDto>(playCardResponseJson, _jsonOptions);
-              Assert.NotNull(playCardResult);
+
+            Assert.NotNull(playCardResult);
             Assert.True(playCardResult.Success);
             Assert.Equal("Card played successfully", playCardResult.Message);
             Assert.Null(playCardResult.Error);
             
             // Poll game state to verify played cards and their suit symbols
-            var suitTestGameStateResponse = await client.GetAsync($"/api/game/{gameId}");
+            var suitTestGameStateResponse = await _client.GetAsync($"/api/game/{gameId}");
             suitTestGameStateResponse.EnsureSuccessStatusCode();
             var suitTestGameStateJson = await suitTestGameStateResponse.Content.ReadAsStringAsync();
             var suitTestGameState = JsonSerializer.Deserialize<GameStateDto>(suitTestGameStateJson, _jsonOptions);

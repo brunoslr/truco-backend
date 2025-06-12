@@ -108,21 +108,32 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         /// </summary>
         private TimeSpan GetAIThinkingDelay()
         {
-            // Get the configured AI play delay (can be 0 for immediate play in tests)
-            var aiPlayDelayMs = _configuration.GetValue<int>("GameSettings:AIPlayDelayMs", GameConfiguration.DefaultMaxAIPlayDelayMs);
+            // Get the configured AI play delays with fallback to defaults
+            var minDelayMs = _configuration.GetValue<int>("GameSettings:AIMinPlayDelayMs", GameConfiguration.DefaultMinAIPlayDelayMs);
+            var maxDelayMs = _configuration.GetValue<int>("GameSettings:AIMaxPlayDelayMs", GameConfiguration.DefaultMaxAIPlayDelayMs);
             
-            // If delay is 0 or very small, return immediately (for tests)
-            if (aiPlayDelayMs <= 0)
+            // If either delay is 0 or negative, return immediately (for tests)
+            if (minDelayMs <= 0 || maxDelayMs <= 0)
             {
                 return TimeSpan.Zero;
             }
             
-            // For realistic gameplay, add some randomness (50% to 100% of configured delay)
-            var random = new Random();
-            var minDelayMs = Math.Max(0, aiPlayDelayMs / 2);
-            var maxDelayMs = aiPlayDelayMs;
+            // Validate configuration: ensure min <= max, swap if needed
+            if (minDelayMs > maxDelayMs)
+            {
+                _logger.LogWarning("AI configuration invalid: MinPlayDelayMs ({MinDelay}) > MaxPlayDelayMs ({MaxDelay}). Swapping values.",
+                    minDelayMs, maxDelayMs);
+                (minDelayMs, maxDelayMs) = (maxDelayMs, minDelayMs);
+            }
             
-            return TimeSpan.FromMilliseconds(random.Next(minDelayMs, maxDelayMs));
+            // Generate random delay between min and max values
+            var random = new Random();
+            var delayMs = random.Next(minDelayMs, maxDelayMs + 1); // +1 because Random.Next upper bound is exclusive
+            
+            _logger.LogDebug("AI thinking delay generated: {DelayMs}ms (range: {MinDelayMs}-{MaxDelayMs}ms)", 
+                delayMs, minDelayMs, maxDelayMs);
+                
+            return TimeSpan.FromMilliseconds(delayMs);
         }
     }
 }

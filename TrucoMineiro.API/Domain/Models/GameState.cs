@@ -1,8 +1,7 @@
 using TrucoMineiro.API.Constants;
 
 namespace TrucoMineiro.API.Domain.Models
-{
-    /// <summary>
+{    /// <summary>
     /// Represents an action in the game log
     /// </summary>
     public class ActionLogEntry
@@ -11,6 +10,15 @@ namespace TrucoMineiro.API.Domain.Models
         /// The type of action (e.g., "card-played", "button-pressed", "hand-result", "turn-result")
         /// </summary>
         public string Type { get; set; } = string.Empty;        
+        
+        /// <summary>
+        /// When this action occurred (UTC timestamp for proper chronological ordering)
+        /// </summary>
+        public DateTime Timestamp { get; set; }        /// <summary>
+        /// The current round number within the hand (1, 2, or 3) when this action occurred
+        /// </summary>
+        public int? RoundNumber { get; set; }
+
         /// <summary>
         /// The seat of the player who performed the action (optional, depending on type)
         /// </summary>
@@ -44,6 +52,7 @@ namespace TrucoMineiro.API.Domain.Models
         public ActionLogEntry(string type)
         {
             Type = type;
+            Timestamp = DateTime.UtcNow;
         }
 
         public ActionLogEntry() { }

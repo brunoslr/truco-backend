@@ -7,9 +7,29 @@ using TrucoMineiro.API.DTOs;
 using TrucoMineiro.Tests.Integration;
 
 namespace TrucoMineiro.Tests.TestUtilities
-{
-    /// <summary>
-    /// Base class for endpoint tests providing shared setup and utilities
+{    /// <summary>
+    /// Base class for integration tests requiring HTTP operations against the TrucoMineiro API.
+    /// 
+    /// CONFIGURATION STRATEGY:
+    /// - All test configuration is code-based for better visibility and maintainability
+    /// - No external config files (appsettings.Test.json) to avoid duplication and drift
+    /// - Default configuration optimized for fast test execution (zero delays)
+    /// - Override configuration through constructor for specific test scenarios
+    /// 
+    /// USAGE PATTERNS:
+    /// 1. Default fast testing: inherit from EndpointTestBase()
+    /// 2. Custom configuration: inherit from EndpointTestBase(configOverrides)
+    /// 3. DevMode testing: use GetFastTestConfigWithDevMode()
+    /// 4. No AutoAI testing: use GetConfigWithoutAutoAiPlay()
+    /// 5. Timing testing: use GetRealisticTimingConfig()
+    /// 
+    /// BEST PRACTICES:
+    /// - Use this base class for all tests requiring HTTP API operations
+    /// - Override configuration only when testing specific timing/behavior scenarios
+    /// - Keep test-specific configuration close to the test code for clarity
+    /// - Use predefined config methods for common scenarios to avoid duplication
+    /// - Always dispose properly - base class handles factory and client disposal
+    /// 
     /// Uses real event-driven architecture instead of mocks for authentic testing
     /// </summary>
     public abstract class EndpointTestBase : IDisposable
@@ -140,24 +160,26 @@ namespace TrucoMineiro.Tests.TestUtilities
                 factoryField?.SetValue(this, originalFactory);
                 clientField?.SetValue(this, originalClient);
             }
-        }
-
-        /// <summary>
-        /// Gets default fast test configuration with optimized delays for testing
-        /// Most tests should use this configuration unless specifically testing delay behavior
+        }        /// <summary>
+        /// Standard fast test configuration - zero delays, AutoAI enabled, DevMode disabled
+        /// Use for: Most integration tests requiring speed
         /// </summary>
         protected static Dictionary<string, string?> GetFastTestConfig()
         {
             return new Dictionary<string, string?>
             {
-                {"GameSettings:AIPlayDelayMs", "0"},    // Immediate AI play for tests
+                {"GameSettings:AIMinPlayDelayMs", "0"},    // Immediate AI play for tests
+                {"GameSettings:AIMaxPlayDelayMs", "0"},    // Immediate AI play for tests
                 {"GameSettings:NewHandDelayMs", "0"},   // Immediate hand transitions for tests
+                {"GameSettings:InitialDealerSeat", "3"}, // Consistent dealer for predictable tests
                 {"FeatureFlags:AutoAiPlay", "true"},    // Enable AI auto-play
                 {"FeatureFlags:DevMode", "false"}       // Default to normal mode
             };
-        }        /// <summary>
-        /// Gets default fast test configuration with DevMode enabled
-        /// Useful for tests that need to see all cards
+        }
+
+        /// <summary>
+        /// DevMode configuration - zero delays, AutoAI enabled, DevMode enabled  
+        /// Use for: Tests needing to inspect all player cards
         /// </summary>
         protected static Dictionary<string, string?> GetFastTestConfigWithDevMode()
         {
@@ -167,17 +189,36 @@ namespace TrucoMineiro.Tests.TestUtilities
         }
 
         /// <summary>
-        /// Gets test configuration with AI auto-play disabled
-        /// Useful for tests that need to verify intermediate game states before AI takes over
+        /// Manual control configuration - zero delays, AutoAI disabled
+        /// Use for: Tests needing to control AI timing manually
         /// </summary>
         protected static Dictionary<string, string?> GetConfigWithoutAutoAiPlay()
         {
             return new Dictionary<string, string?>
             {
-                {"GameSettings:AIPlayDelayMs", "0"},    // Immediate AI play when triggered
+                {"GameSettings:AIMinPlayDelayMs", "0"},    // Immediate AI play when triggered
+                {"GameSettings:AIMaxPlayDelayMs", "0"},    // Immediate AI play when triggered
                 {"GameSettings:NewHandDelayMs", "0"},   // Immediate hand transitions for tests
+                {"GameSettings:InitialDealerSeat", "3"}, // Consistent dealer for predictable tests
                 {"FeatureFlags:AutoAiPlay", "false"},   // Disable AI auto-play
                 {"FeatureFlags:DevMode", "false"}       // Default to normal mode
+            };
+        }
+
+        /// <summary>
+        /// Realistic timing configuration - production-like delays for timing tests
+        /// Use for: AI timing behavior validation tests
+        /// </summary>
+        protected static Dictionary<string, string?> GetRealisticTimingConfig()
+        {
+            return new Dictionary<string, string?>
+            {
+                {"GameSettings:AIMinPlayDelayMs", "100"},   // Realistic minimum AI delay
+                {"GameSettings:AIMaxPlayDelayMs", "300"},   // Realistic maximum AI delay
+                {"GameSettings:NewHandDelayMs", "0"},    // Keep hand transitions fast for tests
+                {"GameSettings:InitialDealerSeat", "3"},  // Consistent dealer for predictable tests
+                {"FeatureFlags:AutoAiPlay", "true"},     // Enable AI auto-play
+                {"FeatureFlags:DevMode", "false"}        // Default to normal mode
             };
         }
 

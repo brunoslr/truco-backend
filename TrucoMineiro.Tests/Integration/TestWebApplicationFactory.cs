@@ -30,11 +30,10 @@ namespace TrucoMineiro.Tests.Integration
             var factory = new TestWebApplicationFactory();
             factory._configOverrides = configOverrides;
             return factory;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        }        protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             // Apply configuration overrides if provided
+            // All test configuration is now code-based for better maintainability
             if (_configOverrides != null)
             {
                 builder.ConfigureAppConfiguration((context, config) =>
