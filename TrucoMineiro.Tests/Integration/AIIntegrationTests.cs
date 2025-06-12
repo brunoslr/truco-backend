@@ -1,32 +1,96 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 using TrucoMineiro.API.Domain.Services;
-using TrucoMineiro.API.Domain.Events;
+using TrucoMineiro.Tests.TestUtilities;
 using Xunit;
 
 namespace TrucoMineiro.Tests.Integration
-{
-    /// <summary>
-    /// Integration tests to verify AI behavior in realistic game scenarios
+{    /// <summary>
+    /// Integration tests to verify AI behavior in realistic game scenarios.
+    /// 
+    /// TESTING STRATEGY & BEST PRACTICES:
+    /// 
+    /// 1. TEST ARCHITECTURE DECISION - Service-Level Integration:
+    ///    - Uses manual DI configuration for focused service testing
+    ///    - Lighter weight than full EndpointTestBase web factory
+    ///    - More explicit about dependencies being tested
+    ///    - Clearer separation of concerns from HTTP layer
+    /// 
+    /// 2. PERFORMANCE OPTIMIZATION:
+    ///    - Fast test configuration: all delays set to 0ms
+    ///    - No actual HTTP calls (service-level testing)
+    ///    - Minimal service registration for speed
+    ///    - Tests run in isolation without web infrastructure overhead
+    /// 
+    /// 3. AI TESTING PRINCIPLES:
+    ///    - Tests logical decision-making, not random behavior
+    ///    - Uses deterministic scenarios with clear expected outcomes
+    ///    - Focuses on strategic AI behavior patterns
+    ///    - Verifies consistency in identical game situations
+    ///    - Tests edge cases and boundary conditions
+    /// 
+    /// 4. TEST DATA MANAGEMENT:
+    ///    - CreateTestGame() provides consistent baseline state
+    ///    - Each test manipulates specific game conditions
+    ///    - Hand compositions designed to trigger specific AI strategies
+    ///    - Clear separation between setup, action, and assertion phases
+    /// 
+    /// 5. SCOPE & BOUNDARIES:
+    ///    - Tests AI service logic without event system complexity
+    ///    - Covers core decision-making algorithms (card selection, Truco responses)
+    ///    - Validates strategic behavior patterns and consistency
+    ///    - Does not test HTTP endpoints, full game flow, or event handling
+    /// 
+    /// 6. MAINTENANCE CONSIDERATIONS:
+    ///    - Self-contained test scenarios with minimal dependencies
+    ///    - Clear documentation of test intent and expected behavior
+    ///    - Easy to extend with new AI behavior test cases
+    ///    - Disposable pattern for proper resource cleanup
+    /// 
+    /// 7. COMPARISON WITH OTHER TEST APPROACHES:
+    ///    - vs EndpointTestBase: Faster, more focused, less integration scope
+    ///    - vs Unit Tests: More realistic with actual service interactions
+    ///    - vs Full Integration: Lighter weight while maintaining realism
     /// </summary>
-    public class AIIntegrationTests
+    public class AIIntegrationTests : IDisposable
     {
+        private readonly ServiceProvider _serviceProvider;
         private readonly IAIPlayerService _aiPlayerService;
-        private readonly IHandResolutionService _handResolutionService;        public AIIntegrationTests()
-        {
-            var services = new ServiceCollection();
-            services.AddLogging(builder => builder.AddConsole());
-            
-            // Add required dependencies for HandResolutionService
-            services.AddSingleton<IEventPublisher, InMemoryEventPublisher>();
-            services.AddScoped<IHandResolutionService, HandResolutionService>();
-            services.AddScoped<IAIPlayerService, AIPlayerService>();
+        private readonly IHandResolutionService _handResolutionService;
 
-            var serviceProvider = services.BuildServiceProvider();
-            _aiPlayerService = serviceProvider.GetRequiredService<IAIPlayerService>();
-            _handResolutionService = serviceProvider.GetRequiredService<IHandResolutionService>();
+        public AIIntegrationTests()
+        {
+            // Create minimal service collection with fast test configuration
+            var services = new ServiceCollection();
+            
+            // Configure fast test settings (zero delays for speed)
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    {"GameSettings:AIMinPlayDelayMs", "0"},
+                    {"GameSettings:AIMaxPlayDelayMs", "0"},
+                    {"GameSettings:HandResolutionDelayMs", "0"},
+                    {"GameSettings:RoundResolutionDelayMs", "0"},
+                    {"FeatureFlags:AutoAiPlay", "true"},
+                    {"FeatureFlags:DevMode", "false"}
+                })
+                .Build();
+
+            services.AddSingleton<IConfiguration>(configuration);
+            services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
+            
+            // Register only the services needed for AI testing
+            services.AddScoped<IAIPlayerService, AIPlayerService>();
+            services.AddScoped<IHandResolutionService, HandResolutionService>();
+            services.AddScoped<IEventPublisher, TestEventPublisher>(); // Mock event publisher for tests
+
+            _serviceProvider = services.BuildServiceProvider();
+            _aiPlayerService = _serviceProvider.GetRequiredService<IAIPlayerService>();
+            _handResolutionService = _serviceProvider.GetRequiredService<IHandResolutionService>();
         }
 
         [Fact]
@@ -56,7 +120,6 @@ namespace TrucoMineiro.Tests.Integration
             // Arrange - Create scenario where partner has strongest card
             var game = CreateTestGame();
             var aiPlayer = game.Players[1]; // AI player at seat 1
-            var partnerPlayer = game.Players[3]; // Partner at seat 3            // Give AI medium cards
             aiPlayer.Hand = new List<Card>
             {
                 new Card("7", "♠"), // Strength 4
@@ -153,9 +216,7 @@ namespace TrucoMineiro.Tests.Integration
             // Assert - Should be consistent (same decision each time)
             Assert.True(decisions.All(d => d == decisions[0]), 
                 "AI should make consistent decisions in identical scenarios");
-        }
-
-        private GameState CreateTestGame()
+        }        private GameState CreateTestGame()
         {
             var game = new GameState();
             game.InitializeGame("TestPlayer");
@@ -166,6 +227,9 @@ namespace TrucoMineiro.Tests.Integration
             game.Players[3].IsAI = true;
 
             return game;
+        }        public void Dispose()
+        {
+            _serviceProvider?.Dispose();
         }
     }
 }

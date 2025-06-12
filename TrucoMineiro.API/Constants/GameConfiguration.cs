@@ -23,7 +23,8 @@ namespace TrucoMineiro.API.Constants
         /// Number of players in the game
         /// </summary>
         public const int MaxPlayers = 4;
-          /// <summary>
+
+        /// <summary>
         /// Minimum delay in milliseconds between AI player actions if not set in configuration
         /// </summary>
         public const int DefaultMinAIPlayDelayMs = 500;
@@ -32,11 +33,15 @@ namespace TrucoMineiro.API.Constants
         /// Maximum delay in milliseconds between AI player actions if not set in configuration
         /// </summary>
         public const int DefaultMaxAIPlayDelayMs = 2000;
-        
-        /// <summary>
-        /// Default delay in milliseconds before starting a new hand if not set in configuration
+          /// <summary>
+        /// Default delay in milliseconds after a hand was resolved before starting next hand if not set in configuration
         /// </summary>
-        public const int DefaultNewHandDelayMs = 5000;
+        public const int DefaultHandResolutionDelayMs = 5000;
+
+        /// <summary>
+        /// Default delay in milliseconds after a round was resolved before starting next round if not set in configuration
+        /// </summary>
+        public const int DefaultRoundResolutionDelayMs = 2000;
 
         /// <summary>
         /// Gets the first player seat based on the dealer seat.

@@ -46,7 +46,8 @@ namespace TrucoMineiro.Tests.Integration
             {
                 ["GameSettings:AIMinPlayDelayMs"] = "100",
                 ["GameSettings:AIMaxPlayDelayMs"] = "200",
-                ["GameSettings:NewHandDelayMs"] = "0",
+                ["GameSettings:HandResolutionDelayMs"] = "100",
+                ["GameSettings:RoundResolutionDelayMs"] = "100",
                 ["FeatureFlags:AutoAiPlay"] = "true",
                 ["FeatureFlags:DevMode"] = "false"
             };
@@ -69,15 +70,13 @@ namespace TrucoMineiro.Tests.Integration
             };
 
             await PlayCardAsync(client, playCardRequest);
-            stopwatch.Stop();
-
-            // Assert: Total time should be longer with custom delays
+            stopwatch.Stop();            // Assert: Total time should be longer with custom delays
             Assert.True(stopwatch.ElapsedMilliseconds >= 50, 
                 $"AI actions too fast: {stopwatch.ElapsedMilliseconds}ms (expected >= 50ms with custom delays)");
             
             // Should not be excessively long either (allowing for processing overhead)
-            Assert.True(stopwatch.ElapsedMilliseconds < 1000, 
-                $"AI actions took too long: {stopwatch.ElapsedMilliseconds}ms (expected < 1000ms)");
+            Assert.True(stopwatch.ElapsedMilliseconds < 2000, 
+                $"AI actions took too long: {stopwatch.ElapsedMilliseconds}ms (expected < 2000ms)");
         }
 
         /// <summary>

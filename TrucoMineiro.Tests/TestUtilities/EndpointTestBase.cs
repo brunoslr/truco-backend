@@ -170,7 +170,8 @@ namespace TrucoMineiro.Tests.TestUtilities
             {
                 {"GameSettings:AIMinPlayDelayMs", "0"},    // Immediate AI play for tests
                 {"GameSettings:AIMaxPlayDelayMs", "0"},    // Immediate AI play for tests
-                {"GameSettings:NewHandDelayMs", "0"},   // Immediate hand transitions for tests
+                {"GameSettings:HandResolutionDelayMs", "0"},   // Immediate hand resolution transitions for tests
+                {"GameSettings:RoundResolutionDelayMs", "0"},   // Immediate round resolution transitions for tests
                 {"GameSettings:InitialDealerSeat", "3"}, // Consistent dealer for predictable tests
                 {"FeatureFlags:AutoAiPlay", "true"},    // Enable AI auto-play
                 {"FeatureFlags:DevMode", "false"}       // Default to normal mode
@@ -194,15 +195,9 @@ namespace TrucoMineiro.Tests.TestUtilities
         /// </summary>
         protected static Dictionary<string, string?> GetConfigWithoutAutoAiPlay()
         {
-            return new Dictionary<string, string?>
-            {
-                {"GameSettings:AIMinPlayDelayMs", "0"},    // Immediate AI play when triggered
-                {"GameSettings:AIMaxPlayDelayMs", "0"},    // Immediate AI play when triggered
-                {"GameSettings:NewHandDelayMs", "0"},   // Immediate hand transitions for tests
-                {"GameSettings:InitialDealerSeat", "3"}, // Consistent dealer for predictable tests
-                {"FeatureFlags:AutoAiPlay", "false"},   // Disable AI auto-play
-                {"FeatureFlags:DevMode", "false"}       // Default to normal mode
-            };
+            var config = GetFastTestConfig();
+            config["FeatureFlags:AutoAiPlay"] = "false"; 
+            return config;
         }
 
         /// <summary>
@@ -215,7 +210,8 @@ namespace TrucoMineiro.Tests.TestUtilities
             {
                 {"GameSettings:AIMinPlayDelayMs", "100"},   // Realistic minimum AI delay
                 {"GameSettings:AIMaxPlayDelayMs", "300"},   // Realistic maximum AI delay
-                {"GameSettings:NewHandDelayMs", "0"},    // Keep hand transitions fast for tests
+                {"GameSettings:HandResolutionDelayMs", "100"},   // Realistic hand resolution transitions for tests
+                {"GameSettings:RoundResolutionDelayMs", "100"},   // Realistic round resolution transitions for tests
                 {"GameSettings:InitialDealerSeat", "3"},  // Consistent dealer for predictable tests
                 {"FeatureFlags:AutoAiPlay", "true"},     // Enable AI auto-play
                 {"FeatureFlags:DevMode", "false"}        // Default to normal mode

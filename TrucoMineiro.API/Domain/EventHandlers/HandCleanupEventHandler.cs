@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Events.GameEvents;
@@ -9,15 +11,22 @@ namespace TrucoMineiro.API.Domain.EventHandlers
     /// <summary>
     /// Event handler for cleaning up game state after hands are completed
     /// </summary>
-    public class HandCleanupEventHandler : IEventHandler<HandCompletedEvent>
-    {
+    public class HandCleanupEventHandler : IEventHandler<HandCompletedEvent>    {
         private readonly IGameRepository _gameRepository;
         private readonly IEventPublisher _eventPublisher;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<HandCleanupEventHandler> _logger;
 
-        public HandCleanupEventHandler(IGameRepository gameRepository, IEventPublisher eventPublisher)
+        public HandCleanupEventHandler(
+            IGameRepository gameRepository, 
+            IEventPublisher eventPublisher,
+            IConfiguration configuration,
+            ILogger<HandCleanupEventHandler> logger)
         {
             _gameRepository = gameRepository;
             _eventPublisher = eventPublisher;
+            _configuration = configuration;
+            _logger = logger;
         }
 
         /// <summary>
@@ -95,10 +104,19 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 );
                 await _eventPublisher.PublishAsync(gameCompletedEvent, cancellationToken);
                 return;
-            }
-            
-            // Move to next hand
+            }            // Move to next hand
             game.CurrentHand++;
+            
+            // Add hand resolution delay before starting next hand
+            var handResolutionDelay = GetHandResolutionDelay();
+            
+            _logger.LogDebug("Adding hand resolution delay of {DelayMs}ms before starting next hand in game {GameId}", 
+                handResolutionDelay.TotalMilliseconds, game.GameId);
+            
+            if (handResolutionDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(handResolutionDelay, cancellationToken);
+            }
             
             // Rotate dealer and set first player
             RotateDealer(game);
@@ -168,9 +186,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             
             // Deal cards to all players
             game.DealCards();
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Initialize played cards slots for the new hand
         /// </summary>
         private static void InitializePlayedCardsSlots(GameState game)
@@ -180,6 +196,24 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             {
                 game.PlayedCards.Add(new PlayedCard(seat));
             }
+        }
+
+        /// <summary>
+        /// Get hand resolution delay using configuration values with fallback to defaults
+        /// </summary>
+        private TimeSpan GetHandResolutionDelay()
+        {
+            var delayMs = _configuration.GetValue<int>("GameSettings:HandResolutionDelayMs", GameConfiguration.DefaultHandResolutionDelayMs);
+            
+            // If delay is 0 or negative, return immediately (for tests)
+            if (delayMs <= 0)
+            {
+                return TimeSpan.Zero;
+            }
+            
+            _logger.LogDebug("Hand resolution delay configured: {DelayMs}ms", delayMs);
+                
+            return TimeSpan.FromMilliseconds(delayMs);
         }
     }
 }

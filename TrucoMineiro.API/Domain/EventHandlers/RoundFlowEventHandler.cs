@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Events.GameEvents;
 using TrucoMineiro.API.Domain.Interfaces;
@@ -9,12 +11,12 @@ namespace TrucoMineiro.API.Domain.EventHandlers
     /// <summary>
     /// Specialized event handler for managing round progression after card plays
     /// </summary>
-    public class RoundFlowEventHandler : IEventHandler<CardPlayedEvent>
-    {
+    public class RoundFlowEventHandler : IEventHandler<CardPlayedEvent>    {
         private readonly IGameRepository _gameRepository;
         private readonly IEventPublisher _eventPublisher;
         private readonly IGameStateManager _gameStateManager;
         private readonly IHandResolutionService _handResolutionService;
+        private readonly IConfiguration _configuration;
         private readonly ILogger<RoundFlowEventHandler> _logger;
 
         public RoundFlowEventHandler(
@@ -22,12 +24,14 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             IEventPublisher eventPublisher,
             IGameStateManager gameStateManager,
             IHandResolutionService handResolutionService,
+            IConfiguration configuration,
             ILogger<RoundFlowEventHandler> logger)
         {
             _gameRepository = gameRepository;
             _eventPublisher = eventPublisher;
             _gameStateManager = gameStateManager;
             _handResolutionService = handResolutionService;
+            _configuration = configuration;
             _logger = logger;
         }        
         public async Task HandleAsync(CardPlayedEvent gameEvent, CancellationToken cancellationToken = default)
@@ -109,12 +113,19 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             {
                 _logger.LogWarning("No active player found for next turn in game {GameId}", gameId);
             }
-        }
-
-        private async Task HandleNewRoundStart(GameState game, Guid gameId, Player? winner, CancellationToken cancellationToken)
+        }        private async Task HandleNewRoundStart(GameState game, Guid gameId, Player? winner, CancellationToken cancellationToken)
         {
             _logger.LogDebug("Starting new round in game {GameId}, winner {WinnerName} plays first", 
-                gameId, winner?.Name ?? "Draw");
+                gameId, winner?.Name ?? "Draw");            // Add round resolution delay before starting next round
+            var roundResolutionDelay = GetRoundResolutionDelay();
+            
+            _logger.LogDebug("Adding round resolution delay of {DelayMs}ms before starting next round in game {GameId}", 
+                roundResolutionDelay.TotalMilliseconds, gameId);
+            
+            if (roundResolutionDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(roundResolutionDelay, cancellationToken);
+            }
 
             // Clear played cards for next round
             foreach (var pc in game.PlayedCards)
@@ -148,11 +159,27 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             // Hand completion will be handled by HandCompletionEventHandler
             // For now, just log it
             _logger.LogInformation("Hand completed in game {GameId} - Hand completion logic to be handled by specialized handler", gameId);
-        }
-
-        private static bool AreAllCardsPlayed(GameState game)
+        }        private static bool AreAllCardsPlayed(GameState game)
         {
             return game.Players.All(p => p.Hand.Count == 0);
+        }
+
+        /// <summary>
+        /// Get round resolution delay using configuration values with fallback to defaults
+        /// </summary>
+        private TimeSpan GetRoundResolutionDelay()
+        {
+            var delayMs = _configuration.GetValue<int>("GameSettings:RoundResolutionDelayMs", GameConfiguration.DefaultRoundResolutionDelayMs);
+            
+            // If delay is 0 or negative, return immediately (for tests)
+            if (delayMs <= 0)
+            {
+                return TimeSpan.Zero;
+            }
+            
+            _logger.LogDebug("Round resolution delay configured: {DelayMs}ms", delayMs);
+                
+            return TimeSpan.FromMilliseconds(delayMs);
         }
     }
 }

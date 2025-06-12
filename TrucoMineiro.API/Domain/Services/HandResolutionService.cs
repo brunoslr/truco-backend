@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Events.GameEvents;
@@ -5,16 +6,19 @@ using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Services
-{    /// <summary>
+{
+    /// <summary>
     /// Implementation of hand resolution logic for Truco Mineiro
     /// </summary>
     public class HandResolutionService : IHandResolutionService
     {
         private readonly IEventPublisher _eventPublisher;
+        private readonly IConfiguration _configuration;
 
-        public HandResolutionService(IEventPublisher eventPublisher)
+        public HandResolutionService(IEventPublisher eventPublisher, IConfiguration configuration)
         {
             _eventPublisher = eventPublisher;
+            _configuration = configuration;
         }
         
         // Truco Mineiro card hierarchy (higher values = stronger cards)
@@ -149,9 +153,7 @@ namespace TrucoMineiro.API.Domain.Services
                 teamWins[winningTeam] = teamWins.GetValueOrDefault(winningTeam, 0) + 1;
             }            var winningTeamNumber = teamWins.FirstOrDefault(kvp => kvp.Value >= 2).Key;
             return winningTeamNumber == 0 ? null : $"Team{winningTeamNumber}";
-        }
-
-        public async Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs)
+        }        public async Task ProcessHandCompletionAsync(GameState game, int newHandDelayMs)
         {
             // Use the proper hand resolution service to check completion
             if (IsHandComplete(game))
@@ -170,8 +172,13 @@ namespace TrucoMineiro.API.Domain.Services
                     pointsAwarded,
                     game));
 
-                // Add delay before starting a new hand
-                await Task.Delay(newHandDelayMs);
+                // Use configuration-based delay before starting a new hand
+                var handResolutionDelayMs = _configuration.GetValue<int>("GameSettings:HandResolutionDelayMs", GameConfiguration.DefaultHandResolutionDelayMs);
+                
+                if (handResolutionDelayMs > 0)
+                {
+                    await Task.Delay(handResolutionDelayMs);
+                }
 
                 // Determine new dealer and first player for next hand
                 var currentDealerSeat = game.Players.FindIndex(p => p.IsDealer);
