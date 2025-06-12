@@ -3,7 +3,6 @@ using TrucoMineiro.API.Domain.Events.GameEvents;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 using TrucoMineiro.API.DTOs;
-using TrucoMineiro.API.Services;
 
 namespace TrucoMineiro.API.Domain.Services
 {
@@ -132,9 +131,7 @@ namespace TrucoMineiro.API.Domain.Services
                     game
                 ));
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Creates an error response with consistent format
         /// </summary>
         private PlayCardResponseDto CreateErrorResponse(string message)
@@ -142,15 +139,11 @@ namespace TrucoMineiro.API.Domain.Services
             return new PlayCardResponseDto
             {
                 Success = false,
-                Message = message,
-                GameState = new GameStateDto(),
-                Hand = new List<CardDto>(),
-                PlayerHands = new List<PlayerHandDto>()
+                Message = null,
+                Error = message
             };
-        }
-
-        /// <summary>
-        /// Creates a success response with proper mapping
+        }        /// <summary>
+        /// Creates a success response with simplified format
         /// </summary>
         private PlayCardResponseDto CreateSuccessResponse(GameState game, int requestingPlayerSeat)
         {
@@ -158,16 +151,7 @@ namespace TrucoMineiro.API.Domain.Services
             {
                 Success = true,
                 Message = "Card played successfully",
-                GameState = MappingService.MapGameStateToDto(game, requestingPlayerSeat, _devMode),
-                Hand = game.Players.First(p => p.Seat == requestingPlayerSeat).Hand
-                    .Select(card => MappingService.MapCardToDto(card, false)).ToList(),
-                PlayerHands = game.Players.Select(p => new PlayerHandDto
-                {
-                    Seat = p.Seat,
-                    Cards = p.Seat == requestingPlayerSeat || _devMode 
-                        ? p.Hand.Select(card => MappingService.MapCardToDto(card, false)).ToList()
-                        : p.Hand.Select(_ => new CardDto { Value = null, Suit = null }).ToList()
-                }).ToList()
+                Error = null
             };
         }
     }

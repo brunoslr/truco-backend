@@ -244,54 +244,5 @@ namespace TrucoMineiro.API.Services
                 response.PlayerHands.Add(playerHandDto);
             }            return response;
         }
-
-        /// <summary>
-        /// Map GameState to PlayCardResponseDto with proper card visibility
-        /// </summary>
-        public static PlayCardResponseDto MapGameStateToPlayCardResponse(GameState gameState, int playerSeat = 0, bool showAllHands = false, bool success = true, string message = "")
-        {
-            var response = new PlayCardResponseDto
-            {
-                Success = success,
-                Message = message,
-                GameState = MapGameStateToDto(gameState)
-            };
-
-            // Add the requesting player's hand
-            var requestingPlayer = gameState.Players.FirstOrDefault(p => p.Seat == playerSeat);
-            if (requestingPlayer != null)
-            {
-                response.Hand = requestingPlayer.Hand.Select(card => MapCardToDto(card, false)).ToList();
-            }
-
-            // Handle all player hands with proper visibility
-            response.PlayerHands = new List<PlayerHandDto>();
-            foreach (var player in gameState.Players)
-            {
-                var playerHandDto = new PlayerHandDto
-                {
-                    Seat = player.Seat,
-                    Cards = new List<CardDto>()
-                };
-                
-                if (showAllHands || player.Seat == playerSeat)
-                {
-                    // In DevMode or for the requesting player, show actual cards
-                    playerHandDto.Cards = player.Hand.Select(card => MapCardToDto(card, false)).ToList();
-                }
-                else
-                {
-                    // For AI or other players, only show hidden card objects
-                    for (int i = 0; i < player.Hand.Count; i++)
-                    {
-                        playerHandDto.Cards.Add(new CardDto { Value = null, Suit = null });
-                    }
-                }
-                
-                response.PlayerHands.Add(playerHandDto);
-            }
-
-            return response;
-        }
     }
 }

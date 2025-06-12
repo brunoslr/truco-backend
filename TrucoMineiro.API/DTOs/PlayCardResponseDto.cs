@@ -1,25 +1,11 @@
 namespace TrucoMineiro.API.DTOs
 {
     /// <summary>
-    /// Response for the play card endpoint
+    /// Simplified response for the play card endpoint - status only approach
+    /// For updated game state, clients should poll GetGame endpoint for consistent data source
     /// </summary>
     public class PlayCardResponseDto
     {
-        /// <summary>
-        /// The current game state after the card was played
-        /// </summary>
-        public GameStateDto GameState { get; set; } = new();
-
-        /// <summary>
-        /// The requesting player's current hand
-        /// </summary>
-        public List<CardDto> Hand { get; set; } = new();
-
-        /// <summary>
-        /// All player hands with appropriate card visibility
-        /// </summary>
-        public List<PlayerHandDto> PlayerHands { get; set; } = new();
-
         /// <summary>
         /// Whether the action was successful
         /// </summary>
@@ -28,6 +14,11 @@ namespace TrucoMineiro.API.DTOs
         /// <summary>
         /// Message describing the result of the action
         /// </summary>
-        public string Message { get; set; } = string.Empty;
+        public string? Message { get; set; }
+
+        /// <summary>
+        /// Error details if the action failed
+        /// </summary>
+        public string? Error { get; set; }
     }
 }

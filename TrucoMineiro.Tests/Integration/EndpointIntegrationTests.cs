@@ -79,15 +79,25 @@ namespace TrucoMineiro.Tests.Integration
             var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");
 
             var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
-            playCardResponse.EnsureSuccessStatusCode();
-
-            var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
+            playCardResponse.EnsureSuccessStatusCode();            var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
             var playCardResult = JsonSerializer.Deserialize<PlayCardResponseDto>(playCardResponseJson, _jsonOptions);
 
+            // Verify human move was processed - Check simplified response
             Assert.NotNull(playCardResult);
             Assert.True(playCardResult.Success);
-            Assert.Equal(2, playCardResult.Hand.Count); // Human should have 2 cards left
-            Assert.True(playCardResult.GameState.PlayedCards.Count >= 1);
+            Assert.Equal("Card played successfully", playCardResult.Message);
+            Assert.Null(playCardResult.Error);
+              // Poll game state to verify the move was processed
+            var playCardGameStateResponse = await client.GetAsync($"/api/game/{gameId}");
+            playCardGameStateResponse.EnsureSuccessStatusCode();
+            var playCardGameStateJson = await playCardGameStateResponse.Content.ReadAsStringAsync();
+            var playCardGameState = JsonSerializer.Deserialize<GameStateDto>(playCardGameStateJson, _jsonOptions);
+            
+            Assert.NotNull(playCardGameState);
+            // Human should have 2 cards left after playing one
+            var humanPlayer = playCardGameState.Players.First(p => p.Seat == 0);
+            Assert.Equal(2, humanPlayer.Hand.Count);
+            Assert.True(playCardGameState.PlayedCards.Count >= 1);
 
             // Wait for AI players to automatically play their turns
             await Task.Delay(4000);            // Verify final state after AI auto-play
@@ -132,16 +142,25 @@ namespace TrucoMineiro.Tests.Integration
 
             var playCardJson = JsonSerializer.Serialize(playCardRequest, _jsonOptions);
             var playCardContent = new StringContent(playCardJson, Encoding.UTF8, "application/json");            var playCardResponse = await client.PostAsync("/api/game/play-card", playCardContent);
-            
-            playCardResponse.EnsureSuccessStatusCode();
+              playCardResponse.EnsureSuccessStatusCode();
 
             var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
             var playCardResult = JsonSerializer.Deserialize<PlayCardResponseDto>(playCardResponseJson, _jsonOptions);
 
-            // Verify human move was recorded
+            // Verify human move was recorded - Check simplified response
             Assert.NotNull(playCardResult);
             Assert.True(playCardResult.Success);
-            Assert.True(playCardResult.GameState.PlayedCards.Count >= 1);
+            Assert.Equal("Card played successfully", playCardResult.Message);
+            Assert.Null(playCardResult.Error);
+            
+            // Poll game state to verify the move was processed
+            var playCardGameStateResponse = await client.GetAsync($"/api/game/{gameId}");
+            playCardGameStateResponse.EnsureSuccessStatusCode();
+            var playCardGameStateJson = await playCardGameStateResponse.Content.ReadAsStringAsync();
+            var playCardGameState = JsonSerializer.Deserialize<GameStateDto>(playCardGameStateJson, _jsonOptions);
+            
+            Assert.NotNull(playCardGameState);
+            Assert.True(playCardGameState.PlayedCards.Count >= 1);
 
             // Wait for AI players to auto-play
             await Task.Delay(5000);            // Assert - Verify AI players responded automatically
@@ -213,11 +232,20 @@ namespace TrucoMineiro.Tests.Integration
               var playCardResponseJson = await playCardResponse.Content.ReadAsStringAsync();
             
             var playCardResult = JsonSerializer.Deserialize<PlayCardResponseDto>(playCardResponseJson, _jsonOptions);
-            
-            Assert.NotNull(playCardResult);
+              Assert.NotNull(playCardResult);
             Assert.True(playCardResult.Success);
-              // Verify played cards use proper suit symbols (skip empty placeholder cards)
-            foreach (var playedCard in playCardResult.GameState.PlayedCards)
+            Assert.Equal("Card played successfully", playCardResult.Message);
+            Assert.Null(playCardResult.Error);
+            
+            // Poll game state to verify played cards and their suit symbols
+            var suitTestGameStateResponse = await client.GetAsync($"/api/game/{gameId}");
+            suitTestGameStateResponse.EnsureSuccessStatusCode();
+            var suitTestGameStateJson = await suitTestGameStateResponse.Content.ReadAsStringAsync();
+            var suitTestGameState = JsonSerializer.Deserialize<GameStateDto>(suitTestGameStateJson, _jsonOptions);
+            
+            Assert.NotNull(suitTestGameState);
+            // Verify played cards use proper suit symbols (skip empty placeholder cards)
+            foreach (var playedCard in suitTestGameState.PlayedCards)
             {
                 Assert.NotNull(playedCard.Card);
                 

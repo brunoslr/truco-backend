@@ -46,16 +46,12 @@ namespace TrucoMineiro.Tests
             // Setup IPlayCardService.ProcessPlayCardRequestAsync to return successful responses
             mockPlayCardService.Setup(x => x.ProcessPlayCardRequestAsync(It.IsAny<PlayCardRequestDto>()))
                 .ReturnsAsync((PlayCardRequestDto request) => {
-                    var game = gameStorage.ContainsKey(request.GameId) ? gameStorage[request.GameId] : null;
-                    if (game == null)
+                    var game = gameStorage.ContainsKey(request.GameId) ? gameStorage[request.GameId] : null;                    if (game == null)
                     {
                         return new PlayCardResponseDto
                         {
                             Success = false,
-                            Message = "Game not found",
-                            GameState = new GameStateDto(),
-                            Hand = new List<CardDto>(),
-                            PlayerHands = new List<PlayerHandDto>()
+                            Error = "Game not found"
                         };
                     }
                     
@@ -65,10 +61,7 @@ namespace TrucoMineiro.Tests
                         return new PlayCardResponseDto
                         {
                             Success = false,
-                            Message = "Invalid move",
-                            GameState = new GameStateDto(),
-                            Hand = new List<CardDto>(),
-                            PlayerHands = new List<PlayerHandDto>()
+                            Error = "Invalid move"
                         };
                     }
                     
@@ -85,15 +78,11 @@ namespace TrucoMineiro.Tests
                     else
                     {
                         game.PlayedCards.Add(new PlayedCard(request.PlayerSeat, cardToPlay));
-                    }
-                    
+                    }                    
                     return new PlayCardResponseDto
                     {
                         Success = true,
-                        Message = "Card played successfully",
-                        GameState = new GameStateDto(),
-                        Hand = player.Hand.Select(card => new CardDto { Value = card.Value, Suit = card.Suit }).ToList(),
-                        PlayerHands = new List<PlayerHandDto>()
+                        Message = "Card played successfully"
                     };
                 });
 
