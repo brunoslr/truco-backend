@@ -61,22 +61,48 @@ namespace TrucoMineiro.API.Services
                 PlayerSeat = playedCard.PlayerSeat,
                 Card = MapCardToDto(playedCard.Card)
             };
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Map an ActionLogEntry model to an ActionLogEntryDto
+        /// Optimized to only include relevant fields based on action type
         /// </summary>
         public static ActionLogEntryDto MapActionLogEntryToDto(ActionLogEntry entry)
-        {            return new ActionLogEntryDto
+        {
+            var dto = new ActionLogEntryDto
             {
                 Type = entry.Type,
-                PlayerSeat = entry.PlayerSeat,
-                Card = entry.Card,
-                Action = entry.Action,
-                HandNumber = entry.HandNumber,
-                Winner = entry.Winner,
-                WinnerTeam = entry.WinnerTeam
+                PlayerSeat = entry.PlayerSeat
             };
+
+            // Only include type-specific fields to reduce payload size
+            switch (entry.Type)
+            {
+                case "card-played":
+                    dto.Card = entry.Card;
+                    break;
+                    
+                case "button-pressed":
+                    dto.Action = entry.Action;
+                    break;
+                    
+                case "hand-result":
+                    dto.HandNumber = entry.HandNumber;
+                    dto.Winner = entry.Winner;
+                    dto.WinnerTeam = entry.WinnerTeam;
+                    break;
+                    
+                case "turn-result":
+                    dto.Winner = entry.Winner;
+                    dto.WinnerTeam = entry.WinnerTeam;
+                    break;
+                    
+                case "turn-start":
+                case "game-started":
+                default:
+                    // Only Type and PlayerSeat are needed for these action types
+                    break;
+            }
+
+            return dto;
         }
 
         /// <summary>

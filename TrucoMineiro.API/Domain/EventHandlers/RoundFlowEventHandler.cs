@@ -95,9 +95,6 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             var activePlayer = game.Players.FirstOrDefault(p => p.IsActive);
             if (activePlayer != null)
             {
-                _logger.LogInformation("🔄 RoundFlowEventHandler: Publishing PlayerTurnStartedEvent for {PlayerName} (seat {PlayerSeat}, IsAI: {IsAI})", 
-                    activePlayer.Name, activePlayer.Seat, activePlayer.IsAI);
-
                 var nextTurnEvent = new PlayerTurnStartedEvent(
                     gameId,
                     activePlayer,
@@ -107,12 +104,10 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     new List<string> { "play-card" }
                 );
                 await _eventPublisher.PublishAsync(nextTurnEvent, cancellationToken);
-                
-                _logger.LogInformation("🔄 RoundFlowEventHandler: PlayerTurnStartedEvent published successfully");
             }
             else
             {
-                _logger.LogWarning("🔄 RoundFlowEventHandler: No active player found for next turn in game {GameId}", gameId);
+                _logger.LogWarning("No active player found for next turn in game {GameId}", gameId);
             }
         }
 
