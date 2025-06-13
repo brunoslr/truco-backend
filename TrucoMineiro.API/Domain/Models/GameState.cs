@@ -151,21 +151,37 @@ namespace TrucoMineiro.API.Domain.Models
         /// Cards played in the current round
         /// </summary>
         public List<PlayedCard> PlayedCards { get; set; } = new List<PlayedCard>();       
-        
-        /// <summary>
+          /// <summary>
         /// Current points at stake in the round
         /// </summary>
         public int Stakes { get; set; } = TrucoConstants.Stakes.Initial;
 
         /// <summary>
-        /// Whether Truco has been called in the current round
+        /// Current stake for this hand (same as Stakes, for clarity)
         /// </summary>
-        public bool IsTrucoCalled { get; set; }
+        public int CurrentStakes 
+        { 
+            get => Stakes; 
+            set => Stakes = value; 
+        }/// <summary>
+        /// Current state of Truco calls and raises
+        /// </summary>
+        public TrucoCallState TrucoCallState { get; set; } = TrucoCallState.None;
 
         /// <summary>
-        /// Whether raising the stakes is currently allowed
+        /// Team ID of the last team that called Truco or raised (-1 = no previous caller)
         /// </summary>
-        public bool IsRaiseEnabled { get; set; } = true;
+        public int LastTrucoCallerTeam { get; set; } = -1;
+
+        /// <summary>
+        /// Team ID that can raise next (null = either team can call truco)
+        /// </summary>
+        public int? CanRaiseTeam { get; set; } = null;
+
+        /// <summary>
+        /// Special case flag: both teams have 10 points, disable all truco actions
+        /// </summary>
+        public bool IsBothTeamsAt10 { get; set; } = false;
 
         /// <summary>
         /// The current hand number in the match
@@ -358,9 +374,11 @@ namespace TrucoMineiro.API.Domain.Models
 
             // Deal cards to the players
             DealCards();            // Reset the stakes and truco status
-            Stakes = TrucoConstants.Stakes.Initial;
-            IsTrucoCalled = false;
-            IsRaiseEnabled = true;
+            Stakes = TrucoConstants.Stakes.Initial;            // Reset Truco state for new hand
+            TrucoCallState = TrucoCallState.None;
+            LastTrucoCallerTeam = -1;
+            CanRaiseTeam = null;
+            IsBothTeamsAt10 = false;
             TurnWinner = null;
         }
 

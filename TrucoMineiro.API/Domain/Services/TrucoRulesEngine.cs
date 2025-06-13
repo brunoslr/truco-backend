@@ -16,11 +16,11 @@ namespace TrucoMineiro.API.Domain.Services
 
             var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
             if (player == null)
-                return false;// First Truco call raises stakes from 2 to 4 points
-            if (!game.IsTrucoCalled)
+                return false;            // First Truco call raises stakes from 2 to 4 points
+            if (game.TrucoCallState == TrucoCallState.None)
             {
                 game.Stakes = TrucoConstants.Stakes.TrucoCall;
-                game.IsTrucoCalled = true;
+                game.TrucoCallState = TrucoCallState.Truco;
             }
 
             // Log the action
@@ -91,35 +91,36 @@ namespace TrucoMineiro.API.Domain.Services
 
             return true;
         }        
-        
-        public bool CanCallTruco(GameState game, int playerSeat)
+          public bool CanCallTruco(GameState game, int playerSeat)
         {
             // Can only call Truco if:
-            // 1. Truco hasn't been called yet, OR
-            // 2. Player is responding to opponent's Truco/raise
-            // 3. Stakes are not at maximum (12)
-            return game.IsRaiseEnabled && game.Stakes < TrucoConstants.Stakes.Maximum;
+            // 1. No truco call in progress AND stakes are not at maximum
+            // 2. OR player can raise from current state
+            return (game.TrucoCallState == TrucoCallState.None || CanRaise(game, playerSeat)) 
+                   && game.Stakes < TrucoConstants.Stakes.Maximum 
+                   && !game.IsBothTeamsAt10;
         }
 
         public bool CanRaise(GameState game, int playerSeat)
         {
-            // Can raise if Truco has been called and stakes are below maximum
-            return game.IsTrucoCalled && game.IsRaiseEnabled && game.Stakes < TrucoConstants.Stakes.Maximum;
+            // Can raise if there's a truco call in progress and stakes are below maximum
+            return game.TrucoCallState != TrucoCallState.None 
+                   && game.TrucoCallState != TrucoCallState.Doze // Can't raise beyond Doze
+                   && game.Stakes < TrucoConstants.Stakes.Maximum
+                   && !game.IsBothTeamsAt10;
         }
 
         public bool IsMaoDe10Active(GameState game)
         {
             // "Mão de 10" is active when either team has exactly 10 points
             return game.TeamScores.Values.Any(score => score == 10);
-        }
-
-        public void ApplyMaoDe10Rule(GameState game)
+        }        public void ApplyMaoDe10Rule(GameState game)
         {           
             if (IsMaoDe10Active(game))
             {
                 // In "Mão de 10", the hand is automatically worth 4 points
                 game.Stakes = TrucoConstants.Stakes.TrucoCall;
-                game.IsTrucoCalled = true; // Considered as if Truco was automatically called
+                game.TrucoCallState = TrucoCallState.Truco; // Considered as if Truco was automatically called
                 
                 game.ActionLog.Add(new ActionLogEntry("game-event")
                 {
@@ -134,12 +135,10 @@ namespace TrucoMineiro.API.Domain.Services
             if (IsMaoDe10Active(game))
             {
                 return 4;
-            }
-
-            // Regular stakes calculation
-            if (!game.IsTrucoCalled)
+            }            // Regular stakes calculation
+            if (game.TrucoCallState == TrucoCallState.None)
             {
-                return 1; // Base hand value
+                return 2; // Base hand value (updated from 1 to 2 per new rules)
             }
 
             return game.Stakes;

@@ -87,9 +87,8 @@ namespace TrucoMineiro.Tests
 
             // Assert
             Assert.NotNull(game);
-            Assert.Equal(4, game.Players.Count);
-            Assert.False(game.IsTrucoCalled);
-            Assert.True(game.IsRaiseEnabled);
+            Assert.Equal(4, game.Players.Count);            Assert.Equal(TrucoCallState.None, game.TrucoCallState);
+            Assert.Equal(2, game.CurrentStakes);
             Assert.Equal(1, game.CurrentHand);
             Assert.Equal(2, game.TeamScores.Count);
             Assert.Equal(0, game.TeamScores[Team.PlayerTeam]);

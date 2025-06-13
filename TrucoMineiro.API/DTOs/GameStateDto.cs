@@ -20,17 +20,30 @@ namespace TrucoMineiro.API.DTOs
         /// <summary>
         /// Current points at stake in the round
         /// </summary>
-        public int Stakes { get; set; }
+        public int Stakes { get; set; }        /// <summary>
+        /// Current state of Truco calls and raises
+        /// </summary>
+        public string TrucoCallState { get; set; } = "None";
 
         /// <summary>
-        /// Whether Truco has been called in the current round
+        /// Current stakes for this hand
         /// </summary>
-        public bool IsTrucoCalled { get; set; }
+        public int CurrentStakes { get; set; } = 2;
 
         /// <summary>
-        /// Whether raising the stakes is currently allowed
+        /// Team that called the last Truco/raise (-1 if none)
         /// </summary>
-        public bool IsRaiseEnabled { get; set; }        /// <summary>
+        public int LastTrucoCallerTeam { get; set; } = -1;
+
+        /// <summary>
+        /// Team that can raise next (null if either team can call truco)
+        /// </summary>
+        public int? CanRaiseTeam { get; set; } = null;
+
+        /// <summary>
+        /// Special case: both teams have 10 points, truco disabled
+        /// </summary>
+        public bool IsBothTeamsAt10 { get; set; } = false;/// <summary>
         /// The current hand number in the match
         /// </summary>
         public int CurrentHand { get; set; }

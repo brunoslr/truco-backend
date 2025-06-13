@@ -116,14 +116,16 @@ namespace TrucoMineiro.API.Services
         /// Map a GameState model to a GameStateDto
         /// </summary>
         public static GameStateDto MapGameStateToDto(GameState gameState)
-        {
-            return new GameStateDto
+        {            return new GameStateDto
             {
                 Players = gameState.Players.Select(p => MapPlayerToDto(p, gameState.FirstPlayerSeat)).ToList(),
                 PlayedCards = gameState.PlayedCards.Select(MapPlayedCardToDto).ToList(),
                 Stakes = gameState.Stakes,
-                IsTrucoCalled = gameState.IsTrucoCalled,
-                IsRaiseEnabled = gameState.IsRaiseEnabled,
+                TrucoCallState = gameState.TrucoCallState.ToString(),
+                CurrentStakes = gameState.CurrentStakes,
+                LastTrucoCallerTeam = gameState.LastTrucoCallerTeam,
+                CanRaiseTeam = gameState.CanRaiseTeam,
+                IsBothTeamsAt10 = gameState.IsBothTeamsAt10,
                 CurrentHand = gameState.CurrentHand,
                 RoundWinners = gameState.RoundWinners.ToList(),
                 TeamScores = gameState.TeamScores,
@@ -138,14 +140,16 @@ namespace TrucoMineiro.API.Services
         /// <param name="requestingPlayerSeat">The seat of the player requesting the game state (for card visibility)</param>
         /// <param name="showAllHands">Whether to reveal all player hands (DevMode)</param>
         public static GameStateDto MapGameStateToDto(GameState gameState, int requestingPlayerSeat, bool showAllHands = false)
-        {
-            return new GameStateDto
+        {            return new GameStateDto
             {
                 Players = gameState.Players.Select(p => MapPlayerToDto(p, gameState.FirstPlayerSeat, requestingPlayerSeat, showAllHands)).ToList(),
                 PlayedCards = gameState.PlayedCards.Select(MapPlayedCardToDto).ToList(),
                 Stakes = gameState.Stakes,
-                IsTrucoCalled = gameState.IsTrucoCalled,
-                IsRaiseEnabled = gameState.IsRaiseEnabled,
+                TrucoCallState = gameState.TrucoCallState.ToString(),
+                CurrentStakes = gameState.CurrentStakes,
+                LastTrucoCallerTeam = gameState.LastTrucoCallerTeam,
+                CanRaiseTeam = gameState.CanRaiseTeam,
+                IsBothTeamsAt10 = gameState.IsBothTeamsAt10,
                 CurrentHand = gameState.CurrentHand,
                 RoundWinners = gameState.RoundWinners.ToList(),
                 TeamScores = gameState.TeamScores,
