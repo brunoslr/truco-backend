@@ -28,7 +28,7 @@ Truco Mineiro is typically played with two or four players divided into two team
 5. 3s, 2s, Aces, Kings, Jacks, Queens, 7 of Spades, 7 of Clubs, 6s, 5s, 4s
 
 ### Objective
-The objective is to win rounds (hands) and accumulate points. The first team to reach 12 points wins the game.
+The objective is to win hands and accumulate points. The first team to reach 12 points wins the game.
 
 ---
 
@@ -50,33 +50,74 @@ The objective is to win rounds (hands) and accumulate points. The first team to 
 - **Draw in the first round:** All players may show their highest card. The player with the highest card wins the hand. Players can choose to play or fold in this case.
 - **Draw in the second or third rounds:** The team that won the first round wins the hand.
 
----
 
-### Truco Call
-- At any point during the hand, a player can call "Truco" to raise the stakes.
-- The opposing team can accept, raise further, or fold.
-- If accepted, the points at stake increase by increments of 4 points.
+## Stakes Progression
 
----
+| Call/Raise | Points at Stake |
+|------------|----------------|
+| Initial    | 2              |
+| Truco      | 4              |
+| Seis       | 8              |
+| Doze       | 12             |
 
-### Scoring
-- **Winning a hand without Truco:** 2 points
-- **Winning a hand with Truco:** 4 points (or more if raised by increments of 4)
+- **Truco:** When a team calls Truco and the opposing team accepts, the round is now worth 4 points.
+- **Seis (Raise):** After Truco is called, only the opposing team can raise to Seis. If accepted, the round is now worth 8 points.
+- **Doze (Raise):** After Seis is called, only the opposing team can raise to Doze. If accepted, the round is now worth 12 points (maximum).
+- **Surrender:** If a team surrenders to a call or raise, a surrender event is triggered and the opposing team is awarded the points from the previous stake level.
 
----
+## Raise Logic and Team Alternation
 
-### Special Rule: "Mão de 10"
+- A **Raise** (Seis or Doze) is always a combination of accepting the current stake and either immediately proposing a higher stake (accept + new Truco back), or raising later in the same hand.
+- Once a team calls Truco, the opposing team can either surrender, accept, or raise back (Seis). If they just accept, they retain the possibility to raise (Seis) at any time until the hand is completed.
+- After a raise from a team, the opposing team has the opportunity to raise back at any time until the end of the hand.
+- At the start of a new hand, stakes reset to 2 and either team can call Truco first.
 
-If either team reaches 10 points, the next hand is automatically worth 4 points (regardless of Truco calls), unless the leading team chooses to forfeit. In this case:
-- The team with 10 points (the leading team) can either:
-  - **Play the hand for 4 points** (normal play, no Truco call needed), or
-  - **Fold before playing any cards**, immediately giving 2 points to the opposing team (the hand is not played).
-- This rule is known as "Mão de 10" in Truco Mineiro.
+## Special Rule: "Mão de 10"
 
----
+- When a team reaches 10 points, the next hand starts in a Truco state ("Mão de 10").
+    - The team with 10 points must decide: surrender (opposing team gets 2 points) or play (hand is worth 4 points).
+    - In this special case, further raises (Seis, Doze) are **disabled**.
+- **If both teams have 10 points:**
+    - The hand is played normally (stakes = 2), but Truco and all raises are **disabled**.
+    - Whoever wins this hand, wins the match.
 
-### Winning the Game
-- The first team to reach 12 points wins the game.
+## State Transitions
+
+The valid transitions are:
+
+- `None` → `Truco` (any team calls Truco)
+- `Truco` → `Accept` / `Surrender` / `Seis (Raise)` (only opposing team can respond)
+- `Seis` → `Accept` / `Surrender` / `Doze (Raise)` (only opposing team can respond)
+- `Doze` → `Accept` / `Surrender` (only opposing team can respond)
+
+## Call & Raise Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> None
+    None --> Truco: Any team calls Truco
+    Truco --> Accepted: Opponent accepts (stakes=4)
+    Truco --> Surrendered: Opponent surrenders (2 points to caller)
+    Truco --> Seis: Opponent raises to Seis (stakes=8)
+    Accepted --> Seis: Opponent raises to Seis (stakes=8)
+    Seis --> Accepted: Opponent accepts (stakes=8)
+    Seis --> Surrendered: Opponent surrenders (4 points to caller)
+    Seis --> Doze: Opponent raises to Doze (stakes=12)
+    Doze --> Accepted: Opponent accepts (stakes=12)
+    Doze --> Surrendered: Opponent surrenders (8 points to caller)
+```
+
+### Notes
+
+- Only one call/raise can be in progress at a time.
+- Stakes are updated immediately upon acceptance of a call/raise.
+- Surrender events award points to the opposing team based on the previous stake level.
+- Maximum stake is 12 (Doze), but this can be configured.
+- After each raise, only the opposing team can respond with accept, surrender, or a further raise (if allowed).
+- After a raise, the possibility to raise remains open for the opposing team until the end of the hand.
+- At the start of a new hand, stakes reset to 2 and either team can call Truco.
+- **Mão de 10:** When a team reaches 10 points, the hand starts in Truco state, only surrender or play (worth 4 points) is allowed, and further raises are disabled.
+- **Both teams with 10 points:** Hand is played for 2 points, Truco and raises are disabled, and the winner of the hand wins the match.
 
 ---
 
