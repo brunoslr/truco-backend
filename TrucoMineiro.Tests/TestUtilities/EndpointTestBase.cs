@@ -92,9 +92,47 @@ namespace TrucoMineiro.Tests.TestUtilities
 
             var responseJson = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<GameStateDto>(responseJson, _jsonOptions)!;
+        }        /// <summary>
+        /// Presses a button (truco actions) using the ButtonPress endpoint
+        /// </summary>
+        public async Task<GameStateDto> PressButtonAsync(ButtonPressRequest request)
+        {
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _client.PostAsync("/api/game/press-button", content);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                // Read the error message from the response body and include it in the exception
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException($"Response status code does not indicate success: {(int)response.StatusCode} ({response.ReasonPhrase}). {errorContent}");
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<GameStateDto>(responseJson, _jsonOptions)!;
         }
 
         /// <summary>
+        /// Presses a button (truco actions) using the ButtonPress endpoint with error handling
+        /// Returns the error message if the request fails, null if successful
+        /// </summary>
+        public async Task<string?> PressButtonWithErrorAsync(ButtonPressRequest request)
+        {
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _client.PostAsync("/api/game/press-button", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return null; // Success, no error
+            }
+            
+            // Read the error message from the response body
+            var errorContent = await response.Content.ReadAsStringAsync();
+            return errorContent;
+        }        /// <summary>
         /// Creates a PlayCardRequestDto with common defaults
         /// </summary>
         protected PlayCardRequestDto CreatePlayCardRequest(string gameId, int playerSeat = 0, int cardIndex = 0, bool isFold = false)
@@ -105,6 +143,19 @@ namespace TrucoMineiro.Tests.TestUtilities
                 PlayerSeat = playerSeat,
                 CardIndex = cardIndex,
                 IsFold = isFold
+            };
+        }
+
+        /// <summary>
+        /// Creates a ButtonPressRequest with common defaults
+        /// </summary>
+        protected ButtonPressRequest CreateButtonPressRequest(string gameId, int playerSeat, string action)
+        {
+            return new ButtonPressRequest
+            {
+                GameId = gameId,
+                PlayerSeat = playerSeat,
+                Action = action
             };
         }
 

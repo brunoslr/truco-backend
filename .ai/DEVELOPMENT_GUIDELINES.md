@@ -6,6 +6,13 @@
 
 ## Core Implementation Principles
 
+### **Best Practices First, Ask When Needed**
+- **Follow established patterns** and coding standards as the default approach
+- **When best practices conflict** or are unclear, ask for guidance/clarification
+- **Don't guess implementation details** - it's better to ask than assume
+- **Clarify requirements** if business rules or expected behavior are ambiguous
+- **Document any guidance received** for future reference and consistency
+
 ### **No Partial Implementations Rule**
 - **Complete removal** of old code before adding new code
 - **One concept, one implementation** - never leave multiple ways to do the same thing

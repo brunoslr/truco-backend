@@ -248,6 +248,14 @@ namespace TrucoMineiro.API.Domain.StateMachine
                     return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
                 }
 
+                var playerTeam = (int)player.Team;
+                
+                // Validate that the same team cannot call/raise consecutively
+                if (game.LastTrucoCallerTeam == playerTeam)
+                {
+                    return CommandResult.Failure("Cannot call/raise consecutively. The opposing team must respond first.");
+                }
+
                 // Determine call type and stakes progression
                 var previousStakes = game.Stakes;
                 var callType = game.TrucoCallState switch
@@ -264,19 +272,20 @@ namespace TrucoMineiro.API.Domain.StateMachine
                     TrucoCallState.Truco => 8,  // Truco -> Seis = 8 points
                     TrucoCallState.Seis => 12,  // Seis -> Doze = 12 points
                     _ => throw new InvalidOperationException($"Cannot raise from state {game.TrucoCallState}")
-                };
-
-                // Update game state
+                };                // Update game state
                 game.TrucoCallState = game.TrucoCallState switch
                 {
                     TrucoCallState.None => TrucoCallState.Truco,
                     TrucoCallState.Truco => TrucoCallState.Seis,
                     TrucoCallState.Seis => TrucoCallState.Doze,
                     _ => throw new InvalidOperationException($"Cannot raise from state {game.TrucoCallState}")
-                };
+                };                game.Stakes = newStakes; // Set the new stakes
 
-                var playerTeam = (int)player.Team;
                 game.LastTrucoCallerTeam = playerTeam;
+                
+                // The opposing team can now raise (until accepted/surrendered)
+                var opposingTeam = playerTeam == 0 ? 1 : 0;
+                game.CanRaiseTeam = game.TrucoCallState != TrucoCallState.Doze ? opposingTeam : null;
 
                 // Publish event
                 if (Guid.TryParse(command.GameId, out var gameGuid))
@@ -322,11 +331,9 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 };
 
                 game.Stakes = confirmedStakes;
-                
-                // Set which team can raise next (opposing team)
+                  // Set which team can raise next (accepting team)
                 var acceptingTeam = (int)player.Team;
-                var opposingTeam = acceptingTeam == 0 ? 1 : 0;
-                game.CanRaiseTeam = game.TrucoCallState != TrucoCallState.Doze ? opposingTeam : null;
+                game.CanRaiseTeam = game.TrucoCallState != TrucoCallState.Doze ? acceptingTeam : null;
 
                 // Publish event
                 if (Guid.TryParse(command.GameId, out var gameGuid))
@@ -361,11 +368,18 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 if (player == null)
                 {
                     return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
-                }
-
-                // Points are awarded based on current stakes (what was at risk)
+                }                // Points are awarded based on current stakes (what was at risk)
                 var pointsAwarded = game.Stakes;
                 var surrenderingTeam = (int)player.Team;
+                var winningTeam = surrenderingTeam == (int)Team.PlayerTeam ? Team.OpponentTeam : Team.PlayerTeam;
+                
+                // Award points to the winning team
+                game.TeamScores[winningTeam] += pointsAwarded;
+                
+                // Reset truco state
+                game.TrucoCallState = TrucoCallState.None;
+                game.LastTrucoCallerTeam = -1;
+                game.CanRaiseTeam = null;
 
                 // Publish event
                 if (Guid.TryParse(command.GameId, out var gameGuid))
@@ -389,7 +403,8 @@ namespace TrucoMineiro.API.Domain.StateMachine
             {
                 return CommandResult.Failure($"Failed to surrender to Truco: {ex.Message}");
             }
-        }        private async Task<CommandResult> ProcessSurrenderHandCommand(SurrenderHandCommand command, GameState game)
+        }        
+        private async Task<CommandResult> ProcessSurrenderHandCommand(SurrenderHandCommand command, GameState game)
         {
             try
             {
@@ -589,43 +604,54 @@ namespace TrucoMineiro.API.Domain.StateMachine
         }        private List<string> GetAvailableActions(Player player, GameState game)
         {
             var actions = new List<string>();
+            var playerTeam = (int)player.Team;
 
-            if (game.GameStatus == "active")
+            // If game is not active, no actions available
+            if (game.GameStatus != "active")
+                return actions;
+
+            // Truco-related actions based on game state
+            if (game.TrucoCallState == TrucoCallState.None)
             {
-                // Check if there's a pending truco call that this player's team needs to respond to
-                var playerTeam = (int)player.Team;
-                bool hasPendingTrucoCall = game.TrucoCallState != TrucoCallState.None && 
-                                          game.LastTrucoCallerTeam != playerTeam;                if (!hasPendingTrucoCall)
-                {
-                    // Normal game actions
+                // No truco called yet - can call truco and play cards (if it's player's turn)
+                actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
+                if (game.CurrentPlayerIndex == player.Seat)
                     actions.Add(TrucoConstants.PlayerActions.PlayCard);
-                    
-                    // Can call/raise truco if:
-                    // - Not at max level (Doze)
-                    // - Not in "Mão de 10" situation  
-                    // - This team didn't make the last call
-                    if (game.TrucoCallState != TrucoCallState.Doze && 
-                        !game.IsBothTeamsAt10 && 
-                        game.LastTrucoCallerTeam != playerTeam)
-                    {
-                        actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
-                    }
-                    
-                    actions.Add(TrucoConstants.PlayerActions.Fold);
-                }
-                else
+            }
+            else if (game.TrucoCallState == TrucoCallState.Truco || game.TrucoCallState == TrucoCallState.Seis)
+            {
+                // Truco/seis has been called - ONLY the opposing team can respond
+                // No card play until truco is resolved
+                if (game.LastTrucoCallerTeam != playerTeam)
                 {
-                    // Responding to a truco call
+                    // Opposing team must respond
                     actions.Add(TrucoConstants.PlayerActions.AcceptTruco);
                     actions.Add(TrucoConstants.PlayerActions.SurrenderTruco);
                     
-                    // Can raise if not at max level
-                    if (game.TrucoCallState != TrucoCallState.Doze && !game.IsBothTeamsAt10)
+                    // Can raise if not at maximum stakes
+                    if (game.Stakes < TrucoConstants.Stakes.Maximum)
                     {
                         actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
                     }
                 }
+                // Team that called truco gets no actions - must wait for response
             }
+            else
+            {
+                // Normal play - truco has been resolved or no truco state
+                if (game.CurrentPlayerIndex == player.Seat)
+                    actions.Add(TrucoConstants.PlayerActions.PlayCard);
+                
+                // Can call truco again if not at maximum stakes and can raise
+                if (game.Stakes < TrucoConstants.Stakes.Maximum && 
+                    (game.CanRaiseTeam == null || game.CanRaiseTeam == playerTeam))
+                {
+                    actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
+                }
+            }
+
+            // Always available: fold (surrender hand)
+            actions.Add(TrucoConstants.PlayerActions.Fold);
 
             return actions;
         }

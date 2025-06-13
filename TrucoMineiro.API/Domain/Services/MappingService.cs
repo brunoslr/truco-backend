@@ -1,3 +1,4 @@
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Models;
 using TrucoMineiro.API.DTOs;
 
@@ -136,11 +137,13 @@ namespace TrucoMineiro.API.Services
         }        /// <summary>
         /// Map a GameState model to a GameStateDto with player-specific card visibility
         /// </summary>
-        /// <param name="gameState">The game state to map</param>
-        /// <param name="requestingPlayerSeat">The seat of the player requesting the game state (for card visibility)</param>
+        /// <param name="gameState">The game state to map</param>        /// <param name="requestingPlayerSeat">The seat of the player requesting the game state (for card visibility)</param>
         /// <param name="showAllHands">Whether to reveal all player hands (DevMode)</param>
         public static GameStateDto MapGameStateToDto(GameState gameState, int requestingPlayerSeat, bool showAllHands = false)
-        {            return new GameStateDto
+        {
+            var currentPlayer = gameState.Players.FirstOrDefault(p => p.Seat == requestingPlayerSeat);
+            
+            return new GameStateDto
             {
                 Players = gameState.Players.Select(p => MapPlayerToDto(p, gameState.FirstPlayerSeat, requestingPlayerSeat, showAllHands)).ToList(),
                 PlayedCards = gameState.PlayedCards.Select(MapPlayedCardToDto).ToList(),
@@ -155,7 +158,8 @@ namespace TrucoMineiro.API.Services
                 TeamScores = gameState.TeamScores,
                 IsGameComplete = gameState.IsCompleted,
                 WinningTeam = gameState.IsCompleted ? gameState.WinningTeam : null,
-                ActionLog = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList()
+                ActionLog = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList(),
+                AvailableActions = currentPlayer != null ? GetAvailableActions(currentPlayer, gameState) : new List<string>()
             };
         }
 
@@ -261,6 +265,61 @@ namespace TrucoMineiro.API.Services
             }
 
             return response;
+        }
+
+        /// <summary>
+        /// Get available actions for a player based on current game state
+        /// </summary>
+        /// <param name="player">The player to get actions for</param>
+        /// <param name="gameState">Current game state</param>
+        /// <returns>List of available action strings</returns>
+        private static List<string> GetAvailableActions(Player player, GameState gameState)
+        {
+            var actions = new List<string>();
+
+            if (gameState.Status != GameStatus.Active)
+            {
+                return actions; // No actions available if game is not active
+            }            // Check if there's a pending truco call (no card play allowed until resolved)
+            var playerTeam = (int)player.Team;
+            bool hasPendingTrucoCall = gameState.TrucoCallState != TrucoCallState.None;
+            bool isRespondingTeam = gameState.LastTrucoCallerTeam != playerTeam;
+
+            if (!hasPendingTrucoCall)
+            {
+                // Normal game actions
+                actions.Add(TrucoConstants.PlayerActions.PlayCard);
+                
+                // Can call/raise truco if:
+                // - Not at max level (Doze)
+                // - Not in "Mão de 10" situation  
+                // - This team didn't make the last call
+                if (gameState.TrucoCallState != TrucoCallState.Doze && 
+                    !gameState.IsBothTeamsAt10 && 
+                    gameState.LastTrucoCallerTeam != playerTeam)
+                {
+                    actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
+                }
+                
+                actions.Add(TrucoConstants.PlayerActions.Fold);
+            }            else
+            {
+                // Responding to a truco call - only the opposing team can respond
+                if (isRespondingTeam)
+                {
+                    actions.Add(TrucoConstants.PlayerActions.AcceptTruco);
+                    actions.Add(TrucoConstants.PlayerActions.SurrenderTruco);
+                    
+                    // Can raise if not at max level
+                    if (gameState.TrucoCallState != TrucoCallState.Doze && !gameState.IsBothTeamsAt10)
+                    {
+                        actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
+                    }
+                }
+                // Team that called truco has no actions until the call is resolved
+            }
+
+            return actions;
         }
     }
 }

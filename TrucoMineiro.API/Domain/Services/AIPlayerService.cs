@@ -278,12 +278,14 @@ namespace TrucoMineiro.API.Domain.Services
             }
 
             return bestIndex;
-        }
-
-        public bool ShouldCallTruco(Player player, GameState game)
+        }        public bool ShouldCallTruco(Player player, GameState game)
         {
-            // Don't call if already at high stakes or pending call exists
-            if (game.CurrentStake >= 6 || game.PendingTrucoCall)
+            // Don't call if already at high stakes or if in "Mão de 10"
+            if (game.Stakes >= 8 || game.IsBothTeamsAt10)
+                return false;
+                
+            // Don't call if there's already a pending truco call
+            if (game.TrucoCallState != TrucoCallState.None)
                 return false;
 
             var handStrength = AnalyzeHandStrength(player.Hand);
@@ -296,20 +298,22 @@ namespace TrucoMineiro.API.Domain.Services
             if (opponentScore > teamScore) callProbability += 0.2;
 
             return _random.NextDouble() < callProbability;
-        }
-
-        public bool ShouldRaise(Player player, GameState game)
+        }        public bool ShouldRaise(Player player, GameState game)
         {
-            if (game.CurrentStake >= 12 || !game.PendingTrucoCall)
+            // Can't raise if at max stakes or no truco call pending
+            if (game.Stakes >= 12 || game.TrucoCallState == TrucoCallState.None)
+                return false;
+                
+            // Can't raise if at max truco level (Doze) or in "Mão de 10"
+            if (game.TrucoCallState == TrucoCallState.Doze || game.IsBothTeamsAt10)
                 return false;
 
             var handStrength = AnalyzeHandStrength(player.Hand);
             return handStrength > 0.8 && _random.NextDouble() < 0.3;
-        }
-
-        public bool ShouldFold(Player player, GameState game)
+        }public bool ShouldFold(Player player, GameState game)
         {
-            if (!game.PendingTrucoCall) return false;
+            // Only consider folding if there's a pending truco call to respond to
+            if (game.TrucoCallState == TrucoCallState.None) return false;
 
             var handStrength = AnalyzeHandStrength(player.Hand);
             var isPlayerTeam = GetPlayerTeam(player.Seat) == 1;

@@ -38,12 +38,15 @@ namespace TrucoMineiro.API.DTOs
         /// <summary>
         /// Team that can raise next (null if either team can call truco)
         /// </summary>
-        public int? CanRaiseTeam { get; set; } = null;
-
-        /// <summary>
+        public int? CanRaiseTeam { get; set; } = null;        /// <summary>
         /// Special case: both teams have 10 points, truco disabled
         /// </summary>
-        public bool IsBothTeamsAt10 { get; set; } = false;/// <summary>
+        public bool IsBothTeamsAt10 { get; set; } = false;
+
+        /// <summary>
+        /// Available actions for the current player (helps frontend show correct buttons)
+        /// </summary>
+        public List<string> AvailableActions { get; set; } = new List<string>();/// <summary>
         /// The current hand number in the match
         /// </summary>
         public int CurrentHand { get; set; }

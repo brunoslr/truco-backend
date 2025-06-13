@@ -127,17 +127,26 @@ namespace TrucoMineiro.API.Domain.Models
         { 
             get => Stakes; 
             set => Stakes = value; 
+        }        /// <summary>
+        /// Whether there's a pending Truco call (computed from new state model)
+        /// </summary>
+        public bool PendingTrucoCall 
+        { 
+            get => TrucoCallState != TrucoCallState.None;
+            set { } // Setter kept for backward compatibility but does nothing
+        }        /// <summary>
+        /// Seat of the player who called Truco (computed from new state model)
+        /// </summary>
+        public int? TrucoCallerSeat 
+        { 
+            get 
+            {
+                if (LastTrucoCallerTeam == -1) return null;
+                // Return the first player seat of the team that made the call
+                return Players.FirstOrDefault(p => (int)p.Team == LastTrucoCallerTeam)?.Seat;
+            }
+            set { } // Setter kept for backward compatibility but does nothing
         }
-
-        /// <summary>
-        /// Whether there's a pending Truco call
-        /// </summary>
-        public bool PendingTrucoCall { get; set; } = false;
-
-        /// <summary>
-        /// Seat of the player who called Truco
-        /// </summary>
-        public int? TrucoCallerSeat { get; set; }
 
         /// <summary>
         /// Last response to a Truco call

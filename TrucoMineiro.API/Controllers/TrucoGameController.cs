@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.DTOs;
 using TrucoMineiro.API.Services;
 using TrucoMineiro.API.Domain.Interfaces;
@@ -159,36 +160,53 @@ namespace TrucoMineiro.API.Controllers
                 string.IsNullOrEmpty(request.Action))
             {
                 return BadRequest("Invalid request parameters. PlayerSeat must be 0-3.");
-            }            CommandResult result;
-
-            switch (request.Action.ToLower())
+            }            CommandResult result;            switch (request.Action)
             {
-                case "calltrucooraise":
+                case TrucoConstants.ButtonActions.CallTrucoOrRaise:
+                case "calltrucooraise": // Legacy support
+                case "truco": // Legacy support
+                case "raise": // Legacy support
                     var trucoOrRaiseCommand = new CallTrucoOrRaiseCommand(request.GameId, request.PlayerSeat);
                     result = await _gameStateMachine.ProcessCommandAsync(trucoOrRaiseCommand);
                     break;
-                case "accepttruco":
+                    
+                case TrucoConstants.ButtonActions.AcceptTruco:
+                case "accepttruco": // Legacy support
+                case "accept": // Legacy support
                     var acceptCommand = new AcceptTrucoCommand(request.GameId, request.PlayerSeat);
                     result = await _gameStateMachine.ProcessCommandAsync(acceptCommand);
                     break;
-                case "surrendertruco":
+                    
+                case TrucoConstants.ButtonActions.SurrenderTruco:
+                case "surrendertruco": // Legacy support
+                case "surrender": // Legacy support
                     var surrenderTrucoCommand = new SurrenderTrucoCommand(request.GameId, request.PlayerSeat);
                     result = await _gameStateMachine.ProcessCommandAsync(surrenderTrucoCommand);
                     break;
-                default:
-                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.CallTrucoOrRaise}, {ButtonPressActions.AcceptTruco}, {ButtonPressActions.SurrenderTruco}");
+                    
+                case TrucoConstants.ButtonActions.SurrenderHand:
+                case "surrenderhand": // Legacy support
+                case "fold": // Common alias
+                    var foldCommand = new SurrenderHandCommand(request.GameId, request.PlayerSeat);
+                    result = await _gameStateMachine.ProcessCommandAsync(foldCommand);
+                    break;
+                      default:
+                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {TrucoConstants.ButtonActions.CallTrucoOrRaise}, {TrucoConstants.ButtonActions.AcceptTruco}, {TrucoConstants.ButtonActions.SurrenderTruco}, {TrucoConstants.ButtonActions.SurrenderHand}");
             }
 
             if (!result.IsSuccess)
             {
-                return BadRequest(result.ErrorMessage);
-            }
+                return BadRequest(result.ErrorMessage);            }
             var game = await _gameRepository.GetGameAsync(request.GameId);
             if (game == null)
             {
                 return NotFound("Game not found");
             }
-            var gameStateDto = MappingService.MapGameStateToDto(game);
+            
+            // Check if DevMode is enabled to show all hands
+            bool showAllHands = _configuration.GetValue<bool>("FeatureFlags:DevMode", false);
+            
+            var gameStateDto = MappingService.MapGameStateToDto(game, request.PlayerSeat, showAllHands);
             return Ok(gameStateDto);
         }
 
