@@ -24,7 +24,7 @@ The button press action values have been modernized to support the new event-dri
 
 ### API Endpoint Changes
 
-#### Button Press Endpoint: `POST /api/truco/button-press`
+#### Button Press Endpoint: `POST /api/game/press-button`
 
 **Request Body** (unchanged structure, updated action values):
 ```json
@@ -35,11 +35,23 @@ The button press action values have been modernized to support the new event-dri
 }
 ```
 
-**Error Response** for invalid actions:
+**Success Response** (returns full game state):
 ```json
 {
-  "error": "Invalid action: old_action. Valid actions are: CallTrucoOrRaise, AcceptTruco, SurrenderTruco"
+  "players": [...],
+  "trucoCallState": "Truco",
+  "currentStakes": 4,
+  "lastTrucoCallerTeam": 1,
+  "canRaiseTeam": 2,
+  "availableActions": ["accept-truco", "surrender-truco"],  // NEW: Dynamic actions
+  // ... other game state properties
 }
+```
+
+**Error Response** for invalid actions:
+```json
+HTTP 400 Bad Request
+"Invalid action: old_action. Valid actions are: CallTrucoOrRaise, AcceptTruco, SurrenderTruco, SurrenderHand"
 ```
 
 ### Game State Changes
@@ -51,7 +63,14 @@ The button press action values have been modernized to support the new event-dri
   "lastTrucoCallerTeam": 0,                  // Team that made last call
   "canRaiseTeam": 1,                         // Team that can raise (null if none)
   "isBothTeamsAt10": false,                  // "Mão de 10" detection
-  "currentStakes": 4                         // Current points at stake
+  "currentStakes": 4,                        // Current points at stake
+  "availableActions": [                      // NEW: Dynamic action list for current player
+    "play-card",                             // Can play a card
+    "call-truco-or-raise",                   // Can call truco or raise
+    "accept-truco",                          // Can accept truco call
+    "surrender-truco",                       // Can surrender to truco
+    "fold"                                   // Can fold hand
+  ]
 }
 ```
 
@@ -156,16 +175,70 @@ if (gameState.isBothTeamsAt10) {
 }
 ```
 
+### 🚀 **NEW FEATURE**: Dynamic Available Actions
+
+The `availableActions` array in the game state response tells the frontend exactly which buttons to show for the current player. This eliminates complex frontend logic for determining button visibility.
+
+#### Available Action Values
+```javascript
+const AVAILABLE_ACTIONS = {
+  PLAY_CARD: "play-card",              // Player can play a card
+  CALL_TRUCO_OR_RAISE: "call-truco-or-raise", // Player can call truco or raise
+  ACCEPT_TRUCO: "accept-truco",        // Player can accept truco call
+  SURRENDER_TRUCO: "surrender-truco",  // Player can surrender to truco
+  FOLD: "fold"                         // Player can fold the hand
+};
+```
+
+#### Implementation Example
+```javascript
+// Simple button visibility logic
+function updateButtonVisibility(gameState) {
+  const actions = gameState.availableActions;
+  
+  // Show/hide buttons based on available actions
+  playCardButton.style.display = actions.includes("play-card") ? "block" : "none";
+  trucoButton.style.display = actions.includes("call-truco-or-raise") ? "block" : "none";
+  acceptButton.style.display = actions.includes("accept-truco") ? "block" : "none";
+  surrenderButton.style.display = actions.includes("surrender-truco") ? "block" : "none";
+  foldButton.style.display = actions.includes("fold") ? "block" : "none";
+}
+```
+
+#### Truco Flow Behavior
+- **After calling truco**: Calling player has NO available actions (waits for response)
+- **Responding to truco**: Responding team gets `["accept-truco", "surrender-truco", "call-truco-or-raise"]`
+- **Normal game**: Players get `["play-card", "call-truco-or-raise", "fold"]` (if truco rules allow)
+- **"Mão de 10"**: Truco actions are excluded, only `["play-card", "fold"]` available
+```
+
 ### Testing Checklist
 
-- [ ] Update all button click handlers to use new action values
-- [ ] Remove references to deprecated game state properties
-- [ ] Test truco call/raise flow with new unified button
-- [ ] Test accept/surrender response flow
-- [ ] Verify "Mão de 10" rule enforcement
+#### Button Actions & API
+- [ ] Update all button click handlers to use new action values (`CallTrucoOrRaise`, `AcceptTruco`, `SurrenderTruco`)
+- [ ] Test button press endpoint with correct URL: `/api/game/press-button`
+- [ ] Verify error messages are properly displayed for invalid actions
+
+#### Game State Integration  
+- [ ] Remove references to deprecated game state properties (`isTrucoCalled`, `isRaiseEnabled`, etc.)
+- [ ] Implement `availableActions` array for dynamic button visibility
+- [ ] Test that buttons appear/disappear correctly based on game state
+
+#### Truco Flow Testing
+- [ ] Test truco call flow: call → opponent gets response options → caller waits
+- [ ] Test accept/surrender response flow with point awarding
+- [ ] Test raise progression: Truco → Seis → Doze → maximum reached
+- [ ] Verify consecutive call prevention (same team cannot call twice)
+
+#### Special Rules
+- [ ] Verify "Mão de 10" rule enforcement (truco disabled when both teams at 10 points)
 - [ ] Test stakes progression display (2→4→8→12)
-- [ ] Validate team alternation logic
-- [ ] Test error handling for invalid actions
+- [ ] Validate team alternation logic for truco calls
+
+#### Error Handling
+- [ ] Test network error handling for button press requests
+- [ ] Verify proper error messages for invalid game states
+- [ ] Test validation error display for malformed requests
 
 ### Backward Compatibility
 
