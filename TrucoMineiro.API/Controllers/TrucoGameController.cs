@@ -159,27 +159,24 @@ namespace TrucoMineiro.API.Controllers
                 string.IsNullOrEmpty(request.Action))
             {
                 return BadRequest("Invalid request parameters. PlayerSeat must be 0-3.");
-            }
-
-            CommandResult result;
+            }            CommandResult result;
 
             switch (request.Action.ToLower())
             {
-                case ButtonPressActions.Truco:
-                    var trucoCommand = new CallTrucoCommand(request.GameId, request.PlayerSeat);
-                    result = await _gameStateMachine.ProcessCommandAsync(trucoCommand);
+                case "calltrucooraise":
+                    var trucoOrRaiseCommand = new CallTrucoOrRaiseCommand(request.GameId, request.PlayerSeat);
+                    result = await _gameStateMachine.ProcessCommandAsync(trucoOrRaiseCommand);
                     break;
-                case ButtonPressActions.Raise:
-                    // For "raise", we need to respond to an existing Truco with a counter-raise
-                    var raiseCommand = new RespondToTrucoCommand(request.GameId, request.PlayerSeat, TrucoResponse.Raise);
-                    result = await _gameStateMachine.ProcessCommandAsync(raiseCommand);
+                case "accepttruco":
+                    var acceptCommand = new AcceptTrucoCommand(request.GameId, request.PlayerSeat);
+                    result = await _gameStateMachine.ProcessCommandAsync(acceptCommand);
                     break;
-                case ButtonPressActions.SurrenderTruco:
-                    var surrenderCommand = new SurrenderHandCommand(request.GameId, request.PlayerSeat);
-                    result = await _gameStateMachine.ProcessCommandAsync(surrenderCommand);
+                case "surrendertruco":
+                    var surrenderTrucoCommand = new SurrenderTrucoCommand(request.GameId, request.PlayerSeat);
+                    result = await _gameStateMachine.ProcessCommandAsync(surrenderTrucoCommand);
                     break;
                 default:
-                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.Truco}, {ButtonPressActions.Raise}, {ButtonPressActions.SurrenderTruco}");
+                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.CallTrucoOrRaise}, {ButtonPressActions.AcceptTruco}, {ButtonPressActions.SurrenderTruco}");
             }
 
             if (!result.IsSuccess)

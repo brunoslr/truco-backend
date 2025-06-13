@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Events.GameEvents;
 using TrucoMineiro.API.Domain.Interfaces;
@@ -59,8 +60,9 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 {
                     StartGameCommand startCmd => await ProcessStartGameCommand(startCmd, game),
                     PlayCardCommand playCmd => await ProcessPlayCardCommand(playCmd, game),
-                    CallTrucoCommand trucoCmd => await ProcessCallTrucoCommand(trucoCmd, game),
-                    RespondToTrucoCommand respondCmd => await ProcessRespondToTrucoCommand(respondCmd, game),
+                    CallTrucoOrRaiseCommand trucoRaiseCmd => await ProcessCallTrucoOrRaiseCommand(trucoRaiseCmd, game),
+                    AcceptTrucoCommand acceptCmd => await ProcessAcceptTrucoCommand(acceptCmd, game),
+                    SurrenderTrucoCommand surrenderTrucoCmd => await ProcessSurrenderTrucoCommand(surrenderTrucoCmd, game),
                     SurrenderHandCommand surrenderCmd => await ProcessSurrenderHandCommand(surrenderCmd, game),
                     _ => CommandResult.Failure($"Unknown command type: {command.CommandType}")
                 };
@@ -95,15 +97,14 @@ namespace TrucoMineiro.API.Domain.StateMachine
             if (game == null)
             {
                 return CommandResult.Failure($"Game {command.GameId} not found");
-            }
-
-            // Validate based on command type and game state
+            }            // Validate based on command type and game state
             return command switch
             {
                 StartGameCommand => ValidateStartGameCommand(game),
                 PlayCardCommand playCmd => ValidatePlayCardCommand(playCmd, game),
-                CallTrucoCommand trucoCmd => ValidateCallTrucoCommand(trucoCmd, game),
-                RespondToTrucoCommand respondCmd => ValidateRespondToTrucoCommand(respondCmd, game),
+                CallTrucoOrRaiseCommand trucoRaiseCmd => ValidateCallTrucoOrRaiseCommand(trucoRaiseCmd, game),
+                AcceptTrucoCommand acceptCmd => ValidateAcceptTrucoCommand(acceptCmd, game),
+                SurrenderTrucoCommand surrenderTrucoCmd => ValidateSurrenderTrucoCommand(surrenderTrucoCmd, game),
                 SurrenderHandCommand surrenderCmd => ValidateSurrenderHandCommand(surrenderCmd, game),
                 _ => CommandResult.Failure($"Unknown command type: {command.CommandType}")
             };
@@ -117,7 +118,8 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 if (game.GameStatus == "waiting")
                 {
                     game.GameStatus = "active";
-                    game.StartGame();                    // Publish game started event
+                    game.StartGame();                    
+                    // Publish game started event
                     if (Guid.TryParse(command.GameId, out var gameGuid))
                     {
                         await _eventPublisher.PublishAsync(new GameStartedEvent(
@@ -153,7 +155,8 @@ namespace TrucoMineiro.API.Domain.StateMachine
             catch (Exception ex)
             {
                 return CommandResult.Failure($"Failed to start game: {ex.Message}");
-            }        }
+            }        
+        }
 
         private async Task<CommandResult> ProcessPlayCardCommand(PlayCardCommand command, GameState game)
         {
@@ -235,9 +238,7 @@ namespace TrucoMineiro.API.Domain.StateMachine
             {
                 return CommandResult.Failure($"Failed to play card: {ex.Message}");
             }
-        }
-
-        private async Task<CommandResult> ProcessCallTrucoCommand(CallTrucoCommand command, GameState game)
+        }        private async Task<CommandResult> ProcessCallTrucoOrRaiseCommand(CallTrucoOrRaiseCommand command, GameState game)
         {
             try
             {
@@ -247,33 +248,61 @@ namespace TrucoMineiro.API.Domain.StateMachine
                     return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
                 }
 
-                // Update game state for Truco call
-                game.TrucoLevel++;
-                game.TrucoCalledBy = player.Id;
-                game.WaitingForTrucoResponse = true;                // Publish Truco called event
+                // Determine call type and stakes progression
+                var previousStakes = game.Stakes;
+                var callType = game.TrucoCallState switch
+                {
+                    TrucoCallState.None => "Truco",
+                    TrucoCallState.Truco => "Seis", 
+                    TrucoCallState.Seis => "Doze",
+                    _ => throw new InvalidOperationException($"Cannot raise from state {game.TrucoCallState}")
+                };
+
+                var newStakes = game.TrucoCallState switch
+                {
+                    TrucoCallState.None => 4,   // None -> Truco = 4 points
+                    TrucoCallState.Truco => 8,  // Truco -> Seis = 8 points
+                    TrucoCallState.Seis => 12,  // Seis -> Doze = 12 points
+                    _ => throw new InvalidOperationException($"Cannot raise from state {game.TrucoCallState}")
+                };
+
+                // Update game state
+                game.TrucoCallState = game.TrucoCallState switch
+                {
+                    TrucoCallState.None => TrucoCallState.Truco,
+                    TrucoCallState.Truco => TrucoCallState.Seis,
+                    TrucoCallState.Seis => TrucoCallState.Doze,
+                    _ => throw new InvalidOperationException($"Cannot raise from state {game.TrucoCallState}")
+                };
+
+                var playerTeam = (int)player.Team;
+                game.LastTrucoCallerTeam = playerTeam;
+
+                // Publish event
                 if (Guid.TryParse(command.GameId, out var gameGuid))
                 {
-                    await _eventPublisher.PublishAsync(new TrucoCalledEvent(
+                    await _eventPublisher.PublishAsync(new TrucoOrRaiseCalledEvent(
                         gameGuid,
                         player,
-                        game.TrucoLevel,
+                        playerTeam,
+                        callType,
+                        previousStakes,
+                        newStakes,
                         game
                     ));
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoCalledEvent", command.GameId);
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoOrRaiseCalledEvent", command.GameId);
                 }
 
-                return CommandResult.Success("Truco called successfully");
+                return CommandResult.Success($"{callType} called successfully");
             }
             catch (Exception ex)
             {
-                return CommandResult.Failure($"Failed to call Truco: {ex.Message}");
+                return CommandResult.Failure($"Failed to call truco/raise: {ex.Message}");
             }
-        }
-
-        private async Task<CommandResult> ProcessRespondToTrucoCommand(RespondToTrucoCommand command, GameState game)
+        }        private async Task<CommandResult> ProcessAcceptTrucoCommand(AcceptTrucoCommand command, GameState game)
         {
             try
             {
@@ -283,52 +312,84 @@ namespace TrucoMineiro.API.Domain.StateMachine
                     return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
                 }
 
-                game.WaitingForTrucoResponse = false;                if (command.Accept)
+                // Update stakes to confirmed value
+                var confirmedStakes = game.TrucoCallState switch
                 {
-                    // Truco accepted, continue game with higher stakes
-                    if (Guid.TryParse(command.GameId, out var gameGuid))
-                    {
-                        await _eventPublisher.PublishAsync(new TrucoAcceptedEvent(
-                            gameGuid,
-                            player,
-                            game.TrucoLevel,
-                            game
-                        ));
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoAcceptedEvent", command.GameId);
-                    }
+                    TrucoCallState.Truco => 4,
+                    TrucoCallState.Seis => 8,
+                    TrucoCallState.Doze => 12,
+                    _ => throw new InvalidOperationException($"Cannot accept from state {game.TrucoCallState}")
+                };
+
+                game.Stakes = confirmedStakes;
+                
+                // Set which team can raise next (opposing team)
+                var acceptingTeam = (int)player.Team;
+                var opposingTeam = acceptingTeam == 0 ? 1 : 0;
+                game.CanRaiseTeam = game.TrucoCallState != TrucoCallState.Doze ? opposingTeam : null;
+
+                // Publish event
+                if (Guid.TryParse(command.GameId, out var gameGuid))
+                {
+                    await _eventPublisher.PublishAsync(new TrucoAcceptedEvent(
+                        gameGuid,
+                        player,
+                        acceptingTeam,
+                        confirmedStakes,
+                        game.CanRaiseTeam,
+                        game
+                    ));
                 }
                 else
                 {
-                    // Truco rejected, calling team wins the hand
-                    var callingPlayer = game.Players.FirstOrDefault(p => p.Id == game.TrucoCalledBy);
-                    if (callingPlayer != null && Guid.TryParse(command.GameId, out var gameGuid))
-                    {
-                        await _eventPublisher.PublishAsync(new TrucoRejectedEvent(
-                            gameGuid,
-                            player,
-                            callingPlayer,
-                            game.TrucoLevel - 1, // Points awarded for rejection
-                            game
-                        ));
-                    }
-                    else if (callingPlayer != null)
-                    {
-                        _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoRejectedEvent", command.GameId);
-                    }
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoAcceptedEvent", command.GameId);
                 }
 
-                return CommandResult.Success("Truco response processed successfully");
+                return CommandResult.Success("Truco accepted successfully");
             }
             catch (Exception ex)
             {
-                return CommandResult.Failure($"Failed to respond to Truco: {ex.Message}");
+                return CommandResult.Failure($"Failed to accept Truco: {ex.Message}");
             }
         }
 
-        private async Task<CommandResult> ProcessSurrenderHandCommand(SurrenderHandCommand command, GameState game)
+        private async Task<CommandResult> ProcessSurrenderTrucoCommand(SurrenderTrucoCommand command, GameState game)
+        {
+            try
+            {
+                var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);
+                if (player == null)
+                {
+                    return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
+                }
+
+                // Points are awarded based on current stakes (what was at risk)
+                var pointsAwarded = game.Stakes;
+                var surrenderingTeam = (int)player.Team;
+
+                // Publish event
+                if (Guid.TryParse(command.GameId, out var gameGuid))
+                {
+                    await _eventPublisher.PublishAsync(new TrucoSurrenderedEvent(
+                        gameGuid,
+                        player,
+                        surrenderingTeam,
+                        pointsAwarded,
+                        game
+                    ));
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for TrucoSurrenderedEvent", command.GameId);
+                }
+
+                return CommandResult.Success("Surrendered to Truco successfully");
+            }
+            catch (Exception ex)
+            {
+                return CommandResult.Failure($"Failed to surrender to Truco: {ex.Message}");
+            }
+        }        private async Task<CommandResult> ProcessSurrenderHandCommand(SurrenderHandCommand command, GameState game)
         {
             try
             {
@@ -340,22 +401,22 @@ namespace TrucoMineiro.API.Domain.StateMachine
 
                 // Mark player as folded
                 player.HasFolded = true;
-                game.GameStatus = "completed";                // Determine winning team (opponent team wins)
+                game.GameStatus = "completed";
+
+                // Determine winning team (opponent team wins)
                 var winningTeam = player.Team == Team.PlayerTeam ? Team.OpponentTeam : Team.PlayerTeam;
                   if (Guid.TryParse(command.GameId, out var gameGuid))
-                {                    await _eventPublisher.PublishAsync(new SurrenderTrucoEvent(
+                {
+                    await _eventPublisher.PublishAsync(new PlayerFoldedEvent(
                         gameGuid,
-                        player.Id,
                         player,
-                        game.CurrentHand,
-                        game.CurrentStake,
-                        winningTeam,
+                        winningTeam.ToString(),
                         game
                     ));
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to parse GameId '{GameId}' for SurrenderTrucoEvent", command.GameId);
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for PlayerFoldedEvent", command.GameId);
                 }
 
                 return CommandResult.Success("Player folded successfully");
@@ -379,21 +440,24 @@ namespace TrucoMineiro.API.Domain.StateMachine
             }
 
             return CommandResult.Success();
-        }
-
-        private CommandResult ValidatePlayCardCommand(PlayCardCommand command, GameState game)
+        }        private CommandResult ValidatePlayCardCommand(PlayCardCommand command, GameState game)
         {
             if (game.GameStatus != "active")
             {
                 return CommandResult.Failure("Game is not active");
             }
 
-            if (game.WaitingForTrucoResponse)
+            // Check if there's a pending truco call from the opposing team
+            var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);
+            if (player != null && game.TrucoCallState != TrucoCallState.None)
             {
-                return CommandResult.Failure("Cannot play card while waiting for Truco response");
+                var playerTeam = (int)player.Team;
+                if (game.LastTrucoCallerTeam != playerTeam)
+                {
+                    return CommandResult.Failure("Cannot play card while there's a pending Truco call to respond to");
+                }
             }
 
-            var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);
             if (player == null)
             {
                 return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
@@ -414,44 +478,49 @@ namespace TrucoMineiro.API.Domain.StateMachine
             }
 
             return CommandResult.Success();
-        }
-
-        private CommandResult ValidateCallTrucoCommand(CallTrucoCommand command, GameState game)
+        }        private CommandResult ValidateCallTrucoOrRaiseCommand(CallTrucoOrRaiseCommand command, GameState game)
         {
             if (game.GameStatus != "active")
             {
                 return CommandResult.Failure("Game is not active");
             }
 
-            if (game.WaitingForTrucoResponse)
+            if (game.IsBothTeamsAt10)
             {
-                return CommandResult.Failure("Already waiting for Truco response");
+                return CommandResult.Failure("Truco calls are disabled when both teams have 10 points");
             }
 
-            if (game.TrucoLevel >= 12) // Maximum Truco level
+            if (game.TrucoCallState == TrucoCallState.Doze)
             {
-                return CommandResult.Failure("Maximum Truco level reached");
+                return CommandResult.Failure("Maximum truco level reached");
             }
 
             var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);
             if (player == null)
             {
                 return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
+            }
+
+            // Check if this team can call/raise
+            var playerTeam = (int)player.Team;
+            if (game.LastTrucoCallerTeam == playerTeam)
+            {
+                return CommandResult.Failure("Cannot call/raise consecutively by the same team");
             }
 
             return CommandResult.Success();
         }
 
-        private CommandResult ValidateRespondToTrucoCommand(RespondToTrucoCommand command, GameState game)
+        private CommandResult ValidateAcceptTrucoCommand(AcceptTrucoCommand command, GameState game)
         {
             if (game.GameStatus != "active")
             {
                 return CommandResult.Failure("Game is not active");
             }
 
-            if (!game.WaitingForTrucoResponse)
+            if (game.TrucoCallState == TrucoCallState.None)
             {
-                return CommandResult.Failure("Not waiting for Truco response");
+                return CommandResult.Failure("No truco call to accept");
             }
 
             var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);
@@ -460,11 +529,39 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
             }
 
-            // Check if player belongs to the team that should respond
-            var callingPlayer = game.Players.FirstOrDefault(p => p.Id == game.TrucoCalledBy);
-            if (callingPlayer != null && player.Team == callingPlayer.Team)
+            // Check if player's team can respond
+            var playerTeam = (int)player.Team;
+            if (game.LastTrucoCallerTeam == playerTeam)
             {
-                return CommandResult.Failure("Cannot respond to your own team's Truco call");
+                return CommandResult.Failure("Cannot accept your own team's truco call");
+            }
+
+            return CommandResult.Success();
+        }
+
+        private CommandResult ValidateSurrenderTrucoCommand(SurrenderTrucoCommand command, GameState game)
+        {
+            if (game.GameStatus != "active")
+            {
+                return CommandResult.Failure("Game is not active");
+            }
+
+            if (game.TrucoCallState == TrucoCallState.None)
+            {
+                return CommandResult.Failure("No truco call to surrender to");
+            }
+
+            var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);
+            if (player == null)
+            {
+                return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
+            }
+
+            // Check if player's team can respond
+            var playerTeam = (int)player.Team;
+            if (game.LastTrucoCallerTeam == playerTeam)
+            {
+                return CommandResult.Failure("Cannot surrender to your own team's truco call");
             }
 
             return CommandResult.Success();
@@ -489,33 +586,43 @@ namespace TrucoMineiro.API.Domain.StateMachine
             }
 
             return CommandResult.Success();
-        }
-
-        private List<string> GetAvailableActions(Player player, GameState game)
+        }        private List<string> GetAvailableActions(Player player, GameState game)
         {
             var actions = new List<string>();
 
             if (game.GameStatus == "active")
             {
-                if (!game.WaitingForTrucoResponse)
+                // Check if there's a pending truco call that this player's team needs to respond to
+                var playerTeam = (int)player.Team;
+                bool hasPendingTrucoCall = game.TrucoCallState != TrucoCallState.None && 
+                                          game.LastTrucoCallerTeam != playerTeam;                if (!hasPendingTrucoCall)
                 {
-                    actions.Add("play-card");
+                    // Normal game actions
+                    actions.Add(TrucoConstants.PlayerActions.PlayCard);
                     
-                    if (game.TrucoLevel < 12)
+                    // Can call/raise truco if:
+                    // - Not at max level (Doze)
+                    // - Not in "Mão de 10" situation  
+                    // - This team didn't make the last call
+                    if (game.TrucoCallState != TrucoCallState.Doze && 
+                        !game.IsBothTeamsAt10 && 
+                        game.LastTrucoCallerTeam != playerTeam)
                     {
-                        actions.Add("call-truco");
+                        actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
                     }
                     
-                    actions.Add("fold");
+                    actions.Add(TrucoConstants.PlayerActions.Fold);
                 }
                 else
                 {
-                    // Check if this player should respond to Truco
-                    var callingPlayer = game.Players.FirstOrDefault(p => p.Id == game.TrucoCalledBy);
-                    if (callingPlayer != null && player.Team != callingPlayer.Team)
+                    // Responding to a truco call
+                    actions.Add(TrucoConstants.PlayerActions.AcceptTruco);
+                    actions.Add(TrucoConstants.PlayerActions.SurrenderTruco);
+                    
+                    // Can raise if not at max level
+                    if (game.TrucoCallState != TrucoCallState.Doze && !game.IsBothTeamsAt10)
                     {
-                        actions.Add("accept-truco");
-                        actions.Add("reject-truco");
+                        actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
                     }
                 }
             }

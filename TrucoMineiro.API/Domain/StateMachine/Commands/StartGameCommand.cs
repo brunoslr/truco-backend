@@ -1,3 +1,5 @@
+using TrucoMineiro.API.Constants;
+
 namespace TrucoMineiro.API.Domain.StateMachine.Commands
 {
     /// <summary>
@@ -5,7 +7,7 @@ namespace TrucoMineiro.API.Domain.StateMachine.Commands
     /// </summary>
     public class StartGameCommand : GameCommandBase
     {
-        public override string CommandType => "StartGame";
+        public override string CommandType => TrucoConstants.Commands.StartGame;
         
         /// <summary>
         /// Optional custom name for the human player

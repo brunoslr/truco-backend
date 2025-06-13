@@ -1,35 +1,11 @@
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.Interfaces
-{
-    /// <summary>
-    /// Interface for handling Truco calls, stakes, and special rules
+{    /// <summary>
+    /// Interface for handling Truco calls, stakes, and special rules validation
     /// </summary>
     public interface ITrucoRulesEngine
-    {        /// <summary>
-        /// Validates and processes a Truco call
-        /// </summary>
-        /// <param name="game">The current game state</param>
-        /// <param name="playerSeat">The seat of the player making the Truco call</param>
-        /// <returns>True if the call is valid and processed, false otherwise</returns>
-        bool ProcessTrucoCall(GameState game, int playerSeat);
-
-        /// <summary>
-        /// Validates and processes a raise (after Truco)
-        /// </summary>
-        /// <param name="game">The current game state</param>
-        /// <param name="playerSeat">The seat of the player raising the stakes</param>
-        /// <returns>True if the raise is valid and processed, false otherwise</returns>
-        bool ProcessRaise(GameState game, int playerSeat);
-
-        /// <summary>
-        /// Validates and processes a fold
-        /// </summary>
-        /// <param name="game">The current game state</param>
-        /// <param name="playerSeat">The seat of the player folding</param>
-        /// <returns>True if the fold is valid and processed, false otherwise</returns>
-        bool ProcessSurrender(GameState game, int playerSeat);
-
+    {        
         /// <summary>
         /// Checks if a Truco call is allowed in the current game state
         /// </summary>
@@ -45,6 +21,22 @@ namespace TrucoMineiro.API.Domain.Interfaces
         /// <param name="playerSeat">The seat of the player wanting to raise</param>
         /// <returns>True if allowed, false otherwise</returns>
         bool CanRaise(GameState game, int playerSeat);
+
+        /// <summary>
+        /// Checks if accepting a truco call is allowed
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        /// <param name="playerSeat">The seat of the player wanting to accept</param>
+        /// <returns>True if allowed, false otherwise</returns>
+        bool CanAcceptTruco(GameState game, int playerSeat);
+
+        /// <summary>
+        /// Checks if surrendering to a truco call is allowed
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        /// <param name="playerSeat">The seat of the player wanting to surrender</param>
+        /// <returns>True if allowed, false otherwise</returns>
+        bool CanSurrenderTruco(GameState game, int playerSeat);
 
         /// <summary>
         /// Checks if "Mão de 10" special rule applies

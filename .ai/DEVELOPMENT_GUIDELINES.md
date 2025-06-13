@@ -1,5 +1,9 @@
 # AI Development Guidelines for Truco Mineiro
 
+> **Note**: This document focuses on implementation methodology. See also:
+> - [`CODING_STANDARDS.md`](CODING_STANDARDS.md) - Code quality and formatting standards
+> - [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) - Project architecture and business rules
+
 ## Core Implementation Principles
 
 ### **No Partial Implementations Rule**
@@ -40,13 +44,19 @@
 
 ### **Domain Model Integrity**
 - GameState is single source of truth
-- Validate all state transitions through TrucoEngineRules
+- Validate all state transitions through TrucoRulesEngine
 - Keep DTOs in sync with domain models
 
 ### **API Consistency**
 - Leverage existing button press system for new actions
 - Maintain backward compatibility where possible
 - Use consistent error handling patterns
+
+### **Constants and Type Safety**
+- Use enums over string literals for state values
+- Consolidate constants in TrucoConstants.cs
+- Eliminate magic strings throughout codebase
+- See [`CODING_STANDARDS.md`](CODING_STANDARDS.md) for detailed standards
 
 ## Implementation Workflow
 
@@ -72,3 +82,11 @@
 ✅ Clean, testable, maintainable code
 ✅ Consistent architectural patterns throughout
 ✅ Complete feature implementations per phase
+
+### **Structured Legacy Code Removal**
+- **Complete audit** of legacy code including tests, properties, methods, and patterns
+- **Systematic removal** of deprecated implementations after new system validation
+- **Test modernization** - update or remove tests that no longer match current architecture
+- **API change documentation** - clearly document breaking changes for frontend integration
+- **Breaking changes allowed** - prioritize clean architecture over backward compatibility
+- **Frontend coordination** - provide clear migration guide for API changes

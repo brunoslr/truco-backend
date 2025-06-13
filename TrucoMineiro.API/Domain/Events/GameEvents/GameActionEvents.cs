@@ -3,79 +3,95 @@ using TrucoMineiro.API.Domain.Models;
 namespace TrucoMineiro.API.Domain.Events.GameEvents
 {
     /// <summary>
-    /// Event published when Truco is called
+    /// Event published when Truco is called or raised (Seis/Doze)
     /// </summary>
-    public class TrucoCalledEvent : GameEventBase
+    public class TrucoOrRaiseCalledEvent : GameEventBase
     {
         public Player CallingPlayer { get; set; } = null!;
-        public int TrucoLevel { get; set; }
+        public int CallerTeam { get; set; }
+        public string CallType { get; set; } = string.Empty; // "Truco", "Seis", "Doze"
+        public int PreviousStakes { get; set; }
+        public int NewPotentialStakes { get; set; }
         public GameState GameState { get; set; } = null!;
 
-        public TrucoCalledEvent(Guid gameId, Player callingPlayer, int trucoLevel, GameState gameState)
+        public TrucoOrRaiseCalledEvent(Guid gameId, Player callingPlayer, int callerTeam, string callType, int previousStakes, int newPotentialStakes, GameState gameState)
             : base(gameId, GetPlayerGuid(callingPlayer))
         {
             CallingPlayer = callingPlayer;
-            TrucoLevel = trucoLevel;
+            CallerTeam = callerTeam;
+            CallType = callType;
+            PreviousStakes = previousStakes;
+            NewPotentialStakes = newPotentialStakes;
             GameState = gameState;
-        }        public TrucoCalledEvent() : base()
+        }
+
+        public TrucoOrRaiseCalledEvent() : base()
         {
         }
 
         private static Guid? GetPlayerGuid(Player? player)
         {
-            return player?.Id;  // player.Id is already a Guid
+            return player?.Id;
         }
-    }
-
+    }    
+    
     /// <summary>
     /// Event published when Truco is accepted
     /// </summary>
     public class TrucoAcceptedEvent : GameEventBase
     {
-        public Player RespondingPlayer { get; set; } = null!;
-        public int TrucoLevel { get; set; }
+        public Player AcceptingPlayer { get; set; } = null!;
+        public int AcceptingTeam { get; set; }
+        public int ConfirmedStakes { get; set; }
+        public int? CanRaiseTeam { get; set; }
         public GameState GameState { get; set; } = null!;
 
-        public TrucoAcceptedEvent(Guid gameId, Player respondingPlayer, int trucoLevel, GameState gameState)
-            : base(gameId, GetPlayerGuid(respondingPlayer))
+        public TrucoAcceptedEvent(Guid gameId, Player acceptingPlayer, int acceptingTeam, int confirmedStakes, int? canRaiseTeam, GameState gameState)
+            : base(gameId, GetPlayerGuid(acceptingPlayer))
         {
-            RespondingPlayer = respondingPlayer;
-            TrucoLevel = trucoLevel;
+            AcceptingPlayer = acceptingPlayer;
+            AcceptingTeam = acceptingTeam;
+            ConfirmedStakes = confirmedStakes;
+            CanRaiseTeam = canRaiseTeam;
             GameState = gameState;
-        }        public TrucoAcceptedEvent() : base()
+        }
+
+        public TrucoAcceptedEvent() : base()
         {
         }
 
         private static Guid? GetPlayerGuid(Player? player)
         {
-            return player?.Id;  // player.Id is already a Guid
+            return player?.Id;
         }
-    }
-
+    }    
+    
     /// <summary>
-    /// Event published when Truco is rejected
+    /// Event published when a team surrenders to a Truco call
     /// </summary>
-    public class TrucoRejectedEvent : GameEventBase
+    public class TrucoSurrenderedEvent : GameEventBase
     {
-        public Player RespondingPlayer { get; set; } = null!;
-        public Player CallingPlayer { get; set; } = null!;
+        public Player SurrenderingPlayer { get; set; } = null!;
+        public int SurrenderingTeam { get; set; }
         public int PointsAwarded { get; set; }
         public GameState GameState { get; set; } = null!;
 
-        public TrucoRejectedEvent(Guid gameId, Player respondingPlayer, Player callingPlayer, int pointsAwarded, GameState gameState)
-            : base(gameId, GetPlayerGuid(respondingPlayer))
+        public TrucoSurrenderedEvent(Guid gameId, Player surrenderingPlayer, int surrenderingTeam, int pointsAwarded, GameState gameState)
+            : base(gameId, GetPlayerGuid(surrenderingPlayer))
         {
-            RespondingPlayer = respondingPlayer;
-            CallingPlayer = callingPlayer;
+            SurrenderingPlayer = surrenderingPlayer;
+            SurrenderingTeam = surrenderingTeam;
             PointsAwarded = pointsAwarded;
             GameState = gameState;
-        }        public TrucoRejectedEvent() : base()
+        }
+
+        public TrucoSurrenderedEvent() : base()
         {
         }
 
         private static Guid? GetPlayerGuid(Player? player)
         {
-            return player?.Id;  // player.Id is already a Guid
+            return player?.Id;
         }
     }
 
@@ -94,7 +110,9 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
             FoldingPlayer = foldingPlayer;
             WinningTeam = winningTeam;
             GameState = gameState;
-        }        public PlayerFoldedEvent() : base()
+        }        
+        
+        public PlayerFoldedEvent() : base()
         {
         }
 

@@ -1,3 +1,4 @@
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.StateMachine.Commands
@@ -7,7 +8,7 @@ namespace TrucoMineiro.API.Domain.StateMachine.Commands
     /// </summary>
     public class PlayCardCommand : GameCommandBase
     {
-        public override string CommandType => "PlayCard";
+        public override string CommandType => TrucoConstants.Commands.PlayCard;
         
         /// <summary>
         /// The index of the card in the player's hand to play (0-based)

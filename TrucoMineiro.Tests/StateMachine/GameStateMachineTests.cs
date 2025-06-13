@@ -173,17 +173,13 @@ public class GameStateMachineTests
         Assert.False(result.IsSuccess);
         Assert.Equal("Card not found in player's hand", result.ErrorMessage);
     }    [Fact]
-    public async Task ProcessCommandAsync_CallTrucoCommand_ShouldPublishTrucoCalledEvent()
+    public async Task ProcessCommandAsync_CallTrucoOrRaiseCommand_ShouldPublishTrucoOrRaiseCalledEvent()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
         var playerId = Guid.NewGuid();
         
-        var command = new CallTrucoCommand
-        {
-            GameId = gameId,
-            PlayerSeat = 1
-        };
+        var command = new CallTrucoOrRaiseCommand(gameId, 1);
         
         var player = new Player("Test Player", Team.PlayerTeam, 1)
         {
@@ -194,7 +190,7 @@ public class GameStateMachineTests
             Id = gameId,
             GameStatus = "active",
             Players = new List<Player> { player },
-            TrucoLevel = 1 // Can call truco
+            TrucoCallState = TrucoCallState.None // Can call truco
         };
         
         _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
@@ -202,41 +198,39 @@ public class GameStateMachineTests
         
         // Act
         var result = await _gameStateMachine.ProcessCommandAsync(command);
-        
-        // Assert
+          // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal(2, gameState.TrucoLevel); // Truco increases level
-        Assert.Equal(playerId, gameState.TrucoCalledBy);
-        Assert.True(gameState.WaitingForTrucoResponse);
+        Assert.Equal(TrucoCallState.Truco, gameState.TrucoCallState);
+        Assert.Equal((int)player.Team, gameState.LastTrucoCallerTeam);
         
-        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoCalledEvent>()), Times.Once);
+        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoOrRaiseCalledEvent>()), Times.Once);
     }    [Fact]
-    public async Task ProcessCommandAsync_RespondToTrucoCommand_Accept_ShouldPublishTrucoAcceptedEvent()
+    public async Task ProcessCommandAsync_AcceptTrucoCommand_ShouldPublishTrucoAcceptedEvent()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
         var playerId = Guid.NewGuid();
         var trucoCallerId = Guid.NewGuid();
-          var command = new RespondToTrucoCommand
-        {
-            GameId = gameId,
-            PlayerSeat = 2,
-            Accept = true
-        };
+        
+        var command = new AcceptTrucoCommand(gameId, 2);
         
         var player = new Player("Test Player", Team.OpponentTeam, 2)
         {
             Id = playerId
+        };
+          var callingPlayer = new Player("Calling Player", Team.PlayerTeam, 1)
+        {
+            Id = trucoCallerId
         };
         
         var gameState = new GameState
         {
             Id = gameId,
             GameStatus = "active",
-            Players = new List<Player> { player },
-            TrucoLevel = 2,
-            TrucoCalledBy = trucoCallerId,
-            WaitingForTrucoResponse = true
+            Players = new List<Player> { callingPlayer, player }, // Include both players
+            TrucoCallState = TrucoCallState.Truco, // There's a pending truco call
+            LastTrucoCallerTeam = (int)callingPlayer.Team, // Calling player's team made the call
+            Stakes = 2 // Current stakes before confirmation
         };
         
         _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
@@ -244,25 +238,20 @@ public class GameStateMachineTests
         
         // Act
         var result = await _gameStateMachine.ProcessCommandAsync(command);
-        
-        // Assert
+          // Assert
         Assert.True(result.IsSuccess);
-        Assert.False(gameState.WaitingForTrucoResponse);
+        Assert.Equal(4, gameState.Stakes); // Stakes confirmed at Truco level
         
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoAcceptedEvent>()), Times.Once);
     }    [Fact]
-    public async Task ProcessCommandAsync_RespondToTrucoCommand_Reject_ShouldPublishTrucoRejectedEvent()
+    public async Task ProcessCommandAsync_SurrenderTrucoCommand_ShouldPublishTrucoSurrenderedEvent()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
         var playerId = Guid.NewGuid();
         var trucoCallerId = Guid.NewGuid();
-          var command = new RespondToTrucoCommand
-        {
-            GameId = gameId,
-            PlayerSeat = 2,
-            Accept = false
-        };
+        
+        var command = new SurrenderTrucoCommand(gameId, 2);
         
         var respondingPlayer = new Player("Test Player", Team.OpponentTeam, 2)
         {
@@ -273,15 +262,14 @@ public class GameStateMachineTests
         {
             Id = trucoCallerId
         };
-        
-        var gameState = new GameState
+          var gameState = new GameState
         {
             Id = gameId,
             GameStatus = "active",
             Players = new List<Player> { callingPlayer, respondingPlayer }, // Include both players
-            TrucoLevel = 2,
-            TrucoCalledBy = trucoCallerId,
-            WaitingForTrucoResponse = true
+            TrucoCallState = TrucoCallState.Truco, // There's a pending truco call
+            LastTrucoCallerTeam = (int)callingPlayer.Team, // Calling player's team made the call
+            Stakes = 4 // Current potential stakes for Truco
         };
         
         _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
@@ -289,24 +277,17 @@ public class GameStateMachineTests
         
         // Act
         var result = await _gameStateMachine.ProcessCommandAsync(command);
-        
-        // Assert
+          // Assert
         Assert.True(result.IsSuccess);
-        Assert.False(gameState.WaitingForTrucoResponse);
-        Assert.Equal("active", gameState.GameStatus); // Game remains active after Truco rejection
+        Assert.Equal("active", gameState.GameStatus); // Game remains active after Truco surrender
         
-        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoRejectedEvent>()), Times.Once);
+        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoSurrenderedEvent>()), Times.Once);
     }    [Fact]
     public async Task ProcessCommandAsync_SurrenderHandCommand_ShouldMarkPlayerAsFoldedAndPublishEvent()
     {
         // Arrange
         var gameId = Guid.NewGuid().ToString();
-        var playerId = Guid.NewGuid();
-          var command = new SurrenderHandCommand
-        {
-            GameId = gameId,
-            PlayerSeat = 1
-        };
+        var playerId = Guid.NewGuid();        var command = new SurrenderHandCommand(gameId, 1);
         
         var player = new Player("Test Player", Team.PlayerTeam, 1)
         {
@@ -330,7 +311,7 @@ public class GameStateMachineTests
         Assert.True(result.IsSuccess);
         Assert.True(player.HasFolded);
         
-        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<SurrenderTrucoEvent>()), Times.Once);
+        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<PlayerFoldedEvent>()), Times.Once);
     }    [Fact]
     public async Task ProcessCommandAsync_WrongPlayerTurn_ShouldReturnFailure()
     {

@@ -104,5 +104,42 @@ namespace TrucoMineiro.API.Constants
             /// </summary>
             public const int EmptyStrength = 0;
         }
+
+        /// <summary>
+        /// Command type constants for state machine operations
+        /// </summary>
+        public static class Commands
+        {
+            public const string StartGame = "StartGame";
+            public const string PlayCard = "PlayCard";
+            public const string CallTrucoOrRaise = "CallTrucoOrRaise";
+            public const string AcceptTruco = "AcceptTruco";
+            public const string SurrenderTruco = "SurrenderTruco";
+            public const string SurrenderHand = "SurrenderHand";
+        }
+
+        /// <summary>
+        /// Button action constants for API requests
+        /// </summary>
+        public static class ButtonActions
+        {
+            public const string CallTrucoOrRaise = "CallTrucoOrRaise";
+            public const string AcceptTruco = "AcceptTruco";
+            public const string SurrenderTruco = "SurrenderTruco";
+            public const string SurrenderHand = "SurrenderHand";
+            public const string PlayCard = "PlayCard";
+        }
+
+        /// <summary>
+        /// Player action constants for game state available actions
+        /// </summary>
+        public static class PlayerActions
+        {
+            public const string PlayCard = "play-card";
+            public const string CallTrucoOrRaise = "call-truco-or-raise";
+            public const string AcceptTruco = "accept-truco";
+            public const string SurrenderTruco = "surrender-truco";
+            public const string Fold = "fold";
+        }
     }
 }

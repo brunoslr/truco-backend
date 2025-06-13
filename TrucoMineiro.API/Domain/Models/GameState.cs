@@ -14,7 +14,8 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// When this action occurred (UTC timestamp for proper chronological ordering)
         /// </summary>
-        public DateTime Timestamp { get; set; }        /// <summary>
+        public DateTime Timestamp { get; set; }        
+        /// <summary>
         /// The current round number within the hand (1, 2, or 3) when this action occurred
         /// </summary>
         public int? RoundNumber { get; set; }
@@ -37,7 +38,8 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// The hand number (optional, for "hand-result" type)
         /// </summary>
-        public int? HandNumber { get; set; }        /// <summary>
+        public int? HandNumber { get; set; }        
+        /// <summary>
         /// The winner (optional, for "hand-result" or "turn-result" type)
         /// </summary>
         public Team? Winner { get; set; }
@@ -262,21 +264,7 @@ namespace TrucoMineiro.API.Domain.Models
             { 
                 if (Enum.TryParse<GameStatus>(value, true, out var status))
                     Status = status;
-            }
-        }
-
-        /// <summary>
-        /// Current Truco level (1 = Truco, 3 = Seis, 6 = Nove, 9 = Doze, 12 = maximum)
-        /// </summary>
-        public int TrucoLevel { get; set; } = 1;        /// <summary>
-        /// ID of the player who called Truco
-        /// </summary>
-        public Guid? TrucoCalledBy { get; set; }
-
-        /// <summary>
-        /// Whether we're waiting for a Truco response
-        /// </summary>
-        public bool WaitingForTrucoResponse { get; set; } = false;
+            }        }
 
         /// <summary>
         /// The maximum number of players (typically 4 for Truco)
@@ -435,14 +423,12 @@ namespace TrucoMineiro.API.Domain.Models
                     ActionLog.Add(new ActionLogEntry("game-result") { WinnerTeam = team });
                 }
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Start the game by setting status to active
         /// </summary>
         public void StartGame()
         {
-            GameStatus = "active";
+            Status = Models.GameStatus.Active;
             LastActivity = DateTime.UtcNow;
             
             // Set first player as active

@@ -29,7 +29,7 @@ Truco Mineiro is typically played with two or four players divided into two team
 
 ### Objective
 The objective is to win hands and accumulate points. The first team to reach 12 points wins the game.
-
+l
 ---
 
 ### Turn Structure
@@ -236,16 +236,19 @@ public class ButtonPressRequest
 #### GameStateDto
 ```csharp
 public class GameStateDto
-{
-    public List<PlayerDto> Players { get; set; } = new();
+{    public List<PlayerDto> Players { get; set; } = new();
     public List<PlayedCardDto> PlayedCards { get; set; } = new();
     public int Stakes { get; set; }
-    public bool IsTrucoCalled { get; set; }
-    public bool IsRaiseEnabled { get; set; }
+    public string TrucoCallState { get; set; } = "None"; // None|Truco|Seis|Doze
+    public int? LastTrucoCallerTeam { get; set; }
+    public int? CanRaiseTeam { get; set; }
+    public bool IsBothTeamsAt10 { get; set; }
+    public int CurrentStakes { get; set; }
     public int CurrentHand { get; set; }
     public Dictionary<string, int> TeamScores { get; set; } = new();
     public string? TurnWinner { get; set; }
     public List<ActionLogEntryDto> ActionLog { get; set; } = new();
+}
 }
 ```
 

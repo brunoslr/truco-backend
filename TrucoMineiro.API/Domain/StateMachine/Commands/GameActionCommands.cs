@@ -1,12 +1,14 @@
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Domain.StateMachine.Commands
-{    /// <summary>
+{
+    /// <summary>
     /// Command to surrender/give up the current hand
     /// </summary>
     public class SurrenderHandCommand : GameCommandBase
     {
-        public override string CommandType => "SurrenderHand";
+        public override string CommandType => TrucoConstants.Commands.SurrenderHand;
         
         /// <summary>
         /// Optional reason for surrendering
@@ -25,47 +27,51 @@ namespace TrucoMineiro.API.Domain.StateMachine.Commands
     }
 
     /// <summary>
-    /// Command to call Truco (raise the stakes)
+    /// Command to call Truco or raise (Seis/Doze)
     /// </summary>
-    public class CallTrucoCommand : GameCommandBase
+    public class CallTrucoOrRaiseCommand : GameCommandBase
     {
-        public override string CommandType => "CallTruco";
+        public override string CommandType => TrucoConstants.Commands.CallTrucoOrRaise;
 
-        public CallTrucoCommand() : base()
+        public CallTrucoOrRaiseCommand() : base()
         {
         }
 
-        public CallTrucoCommand(string gameId, int playerSeat) 
+        public CallTrucoOrRaiseCommand(string gameId, int playerSeat) 
             : base(gameId, playerSeat)
         {
         }
     }
 
     /// <summary>
-    /// Command to respond to a Truco call
+    /// Command to accept a Truco call or raise
     /// </summary>
-    public class RespondToTrucoCommand : GameCommandBase
+    public class AcceptTrucoCommand : GameCommandBase
     {
-        public override string CommandType => "RespondToTruco";
-        
-        /// <summary>
-        /// The response to the Truco call
-        /// </summary>
-        public TrucoResponse Response { get; set; }
+        public override string CommandType => TrucoConstants.Commands.AcceptTruco;
 
-        /// <summary>
-        /// Whether to accept the Truco call (true = accept, false = reject)
-        /// </summary>
-        public bool Accept { get; set; }
-
-        public RespondToTrucoCommand() : base()
+        public AcceptTrucoCommand() : base()
         {
         }
 
-        public RespondToTrucoCommand(string gameId, int playerSeat, TrucoResponse response) 
+        public AcceptTrucoCommand(string gameId, int playerSeat) 
             : base(gameId, playerSeat)
         {
-            Response = response;
+        }
+    }
+
+    /// <summary>
+    /// Command to surrender to a Truco call
+    /// </summary>
+    public class SurrenderTrucoCommand : GameCommandBase
+    {
+        public override string CommandType => TrucoConstants.Commands.SurrenderTruco;        public SurrenderTrucoCommand() : base()
+        {
+        }
+
+        public SurrenderTrucoCommand(string gameId, int playerSeat) 
+            : base(gameId, playerSeat)
+        {
         }
     }
 }
