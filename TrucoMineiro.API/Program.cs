@@ -52,7 +52,7 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMin
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.PlayerTurnStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.RoundCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.TrucoRaiseEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
-builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.SurrenderHandEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.SurrenderTrucoEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
 
 // Register state machine
 builder.Services.AddScoped<TrucoMineiro.API.Domain.StateMachine.IGameStateMachine, TrucoMineiro.API.Domain.StateMachine.GameStateMachine>();

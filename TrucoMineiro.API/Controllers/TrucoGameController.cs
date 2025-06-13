@@ -8,8 +8,8 @@ using TrucoMineiro.API.Domain.Models;
 
 namespace TrucoMineiro.API.Controllers
 {    /// <summary>
-    /// Controller for managing Truco Mineiro games
-    /// </summary>
+     /// Controller for managing Truco Mineiro games
+     /// </summary>
     [Route("api/game")]
     [ApiController]
     [Produces("application/json")]
@@ -24,7 +24,7 @@ namespace TrucoMineiro.API.Controllers
         public TrucoGameController(
             IGameStateManager gameStateManager,
             IGameRepository gameRepository,
-            IPlayCardService playCardService, 
+            IPlayCardService playCardService,
             IGameStateMachine gameStateMachine,
             IConfiguration configuration)
         {
@@ -50,9 +50,9 @@ namespace TrucoMineiro.API.Controllers
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public ActionResult<object> Health()
         {
-            return Ok(new 
-            { 
-                status = "healthy", 
+            return Ok(new
+            {
+                status = "healthy",
                 timestamp = DateTime.UtcNow,
                 service = "TrucoMineiro.API",
                 version = "1.0.0"
@@ -84,7 +84,8 @@ namespace TrucoMineiro.API.Controllers
         [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<GameStateDto>> GetGameState(string gameId, [FromQuery] int? playerSeat = null)        {
+        public async Task<ActionResult<GameStateDto>> GetGameState(string gameId, [FromQuery] int? playerSeat = null)
+        {
             var game = await _gameRepository.GetGameAsync(gameId);
             if (game == null)
             {
@@ -93,7 +94,7 @@ namespace TrucoMineiro.API.Controllers
 
             // Determine the requesting player's seat
             int requestingPlayerSeat = playerSeat ?? 0; // Default to seat 0 (human player)
-            
+
             if (requestingPlayerSeat < 0 || requestingPlayerSeat > 3)
             {
                 return BadRequest("Player seat must be between 0 and 3");
@@ -150,9 +151,10 @@ namespace TrucoMineiro.API.Controllers
         [HttpPost("press-button")]
         [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]        public async Task<ActionResult<GameStateDto>> PressButton([FromBody] ButtonPressRequest request)
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<GameStateDto>> PressButton([FromBody] ButtonPressRequest request)
         {
-            if (string.IsNullOrEmpty(request.GameId) || 
+            if (string.IsNullOrEmpty(request.GameId) ||
                 request.PlayerSeat < 0 || request.PlayerSeat > 3 ||
                 string.IsNullOrEmpty(request.Action))
             {
@@ -171,21 +173,25 @@ namespace TrucoMineiro.API.Controllers
                     // For "raise", we need to respond to an existing Truco with a counter-raise
                     var raiseCommand = new RespondToTrucoCommand(request.GameId, request.PlayerSeat, TrucoResponse.Raise);
                     result = await _gameStateMachine.ProcessCommandAsync(raiseCommand);
-                    break;                case ButtonPressActions.Surrender:
+                    break;
+                case ButtonPressActions.SurrenderTruco:
                     var surrenderCommand = new SurrenderHandCommand(request.GameId, request.PlayerSeat);
                     result = await _gameStateMachine.ProcessCommandAsync(surrenderCommand);
-                    break;                default:
-                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.Truco}, {ButtonPressActions.Raise}, {ButtonPressActions.Surrender}");
+                    break;
+                default:
+                    return BadRequest($"Invalid action: {request.Action}. Valid actions are: {ButtonPressActions.Truco}, {ButtonPressActions.Raise}, {ButtonPressActions.SurrenderTruco}");
             }
 
             if (!result.IsSuccess)
             {
                 return BadRequest(result.ErrorMessage);
-            }            var game = await _gameRepository.GetGameAsync(request.GameId);
+            }
+            var game = await _gameRepository.GetGameAsync(request.GameId);
             if (game == null)
             {
                 return NotFound("Game not found");
-            }            var gameStateDto = MappingService.MapGameStateToDto(game);
+            }
+            var gameStateDto = MappingService.MapGameStateToDto(game);
             return Ok(gameStateDto);
         }
 
@@ -262,7 +268,7 @@ namespace TrucoMineiro.API.Controllers
         public async Task<ActionResult<PlayCardResponseDto>> PlayCard([FromBody] PlayCardRequestDto request)
         {
             var response = await _playCardService.ProcessPlayCardRequestAsync(request);
-            
+
             if (!response.Success)
             {
                 return BadRequest(response);

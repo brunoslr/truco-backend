@@ -6,14 +6,14 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
     /// Event raised when a player surrenders the entire hand (gives up all remaining cards).
     /// This is different from folding a single round via PlayCardRequest.IsFold.
     /// </summary>
-    public class SurrenderHandEvent : GameEventBase
+    public class SurrenderTrucoEvent : GameEventBase
     {       
          public Player Player { get; set; } = null!;
         public int HandNumber { get; set; }
         public int CurrentStake { get; set; }
         public Team WinningTeam { get; set; }
         public GameState GameState { get; set; } = null!;
-        public SurrenderHandEvent(
+        public SurrenderTrucoEvent(
             Guid gameId,
             Guid playerId,
             Player player,
@@ -30,7 +30,7 @@ namespace TrucoMineiro.API.Domain.Events.GameEvents
             GameState = gameState;
         }
 
-        public SurrenderHandEvent() : base()
+        public SurrenderTrucoEvent() : base()
         {
         }
     }

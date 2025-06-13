@@ -330,7 +330,7 @@ public class GameStateMachineTests
         Assert.True(result.IsSuccess);
         Assert.True(player.HasFolded);
         
-        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<SurrenderHandEvent>()), Times.Once);
+        _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<SurrenderTrucoEvent>()), Times.Once);
     }    [Fact]
     public async Task ProcessCommandAsync_WrongPlayerTurn_ShouldReturnFailure()
     {

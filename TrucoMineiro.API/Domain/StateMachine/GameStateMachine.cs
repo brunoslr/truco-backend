@@ -343,7 +343,7 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 game.GameStatus = "completed";                // Determine winning team (opponent team wins)
                 var winningTeam = player.Team == Team.PlayerTeam ? Team.OpponentTeam : Team.PlayerTeam;
                   if (Guid.TryParse(command.GameId, out var gameGuid))
-                {                    await _eventPublisher.PublishAsync(new SurrenderHandEvent(
+                {                    await _eventPublisher.PublishAsync(new SurrenderTrucoEvent(
                         gameGuid,
                         player.Id,
                         player,
@@ -355,7 +355,7 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to parse GameId '{GameId}' for SurrenderHandEvent", command.GameId);
+                    _logger.LogWarning("Failed to parse GameId '{GameId}' for SurrenderTrucoEvent", command.GameId);
                 }
 
                 return CommandResult.Success("Player folded successfully");

@@ -14,7 +14,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         IEventHandler<PlayerTurnStartedEvent>,
         IEventHandler<RoundCompletedEvent>,
         IEventHandler<TrucoRaiseEvent>,
-        IEventHandler<SurrenderHandEvent>
+        IEventHandler<SurrenderTrucoEvent>
     {
         private readonly IGameRepository _gameRepository;
         private readonly ILogger<ActionLogEventHandler> _logger;
@@ -144,7 +144,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             {
                 _logger.LogError(ex, "Error creating action log entry for truco/raise event in game {GameId}", gameEvent.GameId);
             }
-        }        public async Task HandleAsync(SurrenderHandEvent gameEvent, CancellationToken cancellationToken = default)
+        }        public async Task HandleAsync(SurrenderTrucoEvent gameEvent, CancellationToken cancellationToken = default)
         {
             try
             {

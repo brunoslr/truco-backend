@@ -13,7 +13,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
     /// </summary>
     public class HandCompletionEventHandler : 
         IEventHandler<HandCompletedEvent>, 
-        IEventHandler<SurrenderHandEvent>
+        IEventHandler<SurrenderTrucoEvent>
     {
         private readonly IGameRepository _gameRepository;
         private readonly IEventPublisher _eventPublisher;
@@ -53,7 +53,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         /// <summary>
         /// Handle surrender scenarios
         /// </summary>
-        public async Task HandleAsync(SurrenderHandEvent gameEvent, CancellationToken cancellationToken = default)
+        public async Task HandleAsync(SurrenderTrucoEvent gameEvent, CancellationToken cancellationToken = default)
         {
             var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
             if (game == null)
