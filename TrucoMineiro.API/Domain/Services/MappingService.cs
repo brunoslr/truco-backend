@@ -1,6 +1,7 @@
 using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Models;
 using TrucoMineiro.API.DTOs;
+using TrucoMineiro.API.Domain.Interfaces;
 
 namespace TrucoMineiro.API.Services
 {
@@ -9,6 +10,12 @@ namespace TrucoMineiro.API.Services
     /// </summary>
     public class MappingService
     {
+        private readonly ITrucoRulesEngine _trucoRulesEngine;
+
+        public MappingService(ITrucoRulesEngine trucoRulesEngine)
+        {
+            _trucoRulesEngine = trucoRulesEngine;
+        }
         /// <summary>
         /// Map a Card model to a CardDto with optional card hiding
         /// </summary>
@@ -139,7 +146,7 @@ namespace TrucoMineiro.API.Services
         /// </summary>
         /// <param name="gameState">The game state to map</param>        /// <param name="requestingPlayerSeat">The seat of the player requesting the game state (for card visibility)</param>
         /// <param name="showAllHands">Whether to reveal all player hands (DevMode)</param>
-        public static GameStateDto MapGameStateToDto(GameState gameState, int requestingPlayerSeat, bool showAllHands = false)
+        public GameStateDto MapGameStateToDto(GameState gameState, int requestingPlayerSeat, bool showAllHands = false)
         {
             var currentPlayer = gameState.Players.FirstOrDefault(p => p.Seat == requestingPlayerSeat);
             
@@ -191,7 +198,7 @@ namespace TrucoMineiro.API.Services
         /// <param name="gameState">The game state to map</param>
         /// <param name="playerSeat">The seat of the requesting player</param>
         /// <param name="showAllHands">Whether to reveal all player hands (DevMode)</param>
-        public static StartGameResponse MapGameStateToStartGameResponse(GameState gameState, int playerSeat = 0, bool showAllHands = false)
+        public StartGameResponse MapGameStateToStartGameResponse(GameState gameState, int playerSeat = 0, bool showAllHands = false)
         {
             var response = new StartGameResponse
             {
@@ -264,8 +271,7 @@ namespace TrucoMineiro.API.Services
                 response.PlayerHands.Add(playerHandDto);
             }
 
-            return response;
-        }
+            return response;        }
 
         /// <summary>
         /// Get available actions for a player based on current game state
@@ -273,47 +279,62 @@ namespace TrucoMineiro.API.Services
         /// <param name="player">The player to get actions for</param>
         /// <param name="gameState">Current game state</param>
         /// <returns>List of available action strings</returns>
-        private static List<string> GetAvailableActions(Player player, GameState gameState)
+        private List<string> GetAvailableActions(Player player, GameState gameState)
         {
             var actions = new List<string>();
 
             if (gameState.Status != GameStatus.Active)
             {
                 return actions; // No actions available if game is not active
-            }            // Check if there's a pending truco call (no card play allowed until resolved)
+            }
+
+            // Check if there's a pending truco call (no card play allowed until resolved)
             var playerTeam = (int)player.Team;
             bool hasPendingTrucoCall = gameState.TrucoCallState != TrucoCallState.None;
             bool isRespondingTeam = gameState.LastTrucoCallerTeam != playerTeam;
+
+            // Use TrucoRulesEngine for proper "Mão de 10" detection
+            bool isMaoDe10Active = _trucoRulesEngine.IsMaoDe10Active(gameState);
+            bool isOneTeamAt10 = _trucoRulesEngine.IsOneTeamAt10(gameState);
+            bool areBothTeamsAt10 = _trucoRulesEngine.AreBothTeamsAt10(gameState);
 
             if (!hasPendingTrucoCall)
             {
                 // Normal game actions
                 actions.Add(TrucoConstants.PlayerActions.PlayCard);
-                
-                // Can call/raise truco if:
-                // - Not at max level (Doze)
-                // - Not in "Mão de 10" situation  
+                  // Can call/raise truco if:
+                // - Not at max level (stakes not at 12 and not pending Doze call)
+                // - Not in "Mão de 10" situation where truco is disabled
                 // - This team didn't make the last call
-                if (gameState.TrucoCallState != TrucoCallState.Doze && 
-                    !gameState.IsBothTeamsAt10 && 
+                if (gameState.Stakes < TrucoConstants.Stakes.Maximum && // Not already at max stakes (12)
+                    gameState.TrucoCallState != TrucoCallState.Doze && // No pending Doze call
+                    !areBothTeamsAt10 && // Truco completely disabled when both teams at 10
                     gameState.LastTrucoCallerTeam != playerTeam)
-                {
-                    actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
+                {                    // Special rule: if only one team is at 10, only that team can call truco
+                    if (!isOneTeamAt10 || (isOneTeamAt10 && (int)_trucoRulesEngine.GetTeamAt10(gameState)! == playerTeam))
+                    {
+                        actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
+                    }
                 }
                 
                 actions.Add(TrucoConstants.PlayerActions.Fold);
-            }            else
+            }
+            else
             {
                 // Responding to a truco call - only the opposing team can respond
                 if (isRespondingTeam)
                 {
                     actions.Add(TrucoConstants.PlayerActions.AcceptTruco);
                     actions.Add(TrucoConstants.PlayerActions.SurrenderTruco);
-                    
-                    // Can raise if not at max level
-                    if (gameState.TrucoCallState != TrucoCallState.Doze && !gameState.IsBothTeamsAt10)
-                    {
-                        actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
+                      // Can raise if not at max level and "Mão de 10" allows it
+                    if (gameState.Stakes < TrucoConstants.Stakes.Maximum && // Not already at max stakes (12)
+                        gameState.TrucoCallState != TrucoCallState.Doze && // No pending Doze call
+                        !areBothTeamsAt10) // Truco raising disabled when both teams at 10
+                    {                        // Special rule: if only one team is at 10, only that team can raise
+                        if (!isOneTeamAt10 || (isOneTeamAt10 && (int)_trucoRulesEngine.GetTeamAt10(gameState)! == playerTeam))
+                        {
+                            actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
+                        }
                     }
                 }
                 // Team that called truco has no actions until the call is resolved

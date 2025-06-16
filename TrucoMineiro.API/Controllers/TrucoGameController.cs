@@ -13,27 +13,28 @@ namespace TrucoMineiro.API.Controllers
      /// </summary>
     [Route("api/game")]
     [ApiController]
-    [Produces("application/json")]
-    public class TrucoGameController : ControllerBase
+    [Produces("application/json")]    public class TrucoGameController : ControllerBase
     {
         private readonly IGameStateManager _gameStateManager;
         private readonly IGameRepository _gameRepository;
         private readonly IPlayCardService _playCardService;
         private readonly IGameStateMachine _gameStateMachine;
         private readonly IConfiguration _configuration;
+        private readonly MappingService _mappingService;
 
         public TrucoGameController(
             IGameStateManager gameStateManager,
             IGameRepository gameRepository,
             IPlayCardService playCardService,
             IGameStateMachine gameStateMachine,
-            IConfiguration configuration)
-        {
+            IConfiguration configuration,
+            MappingService mappingService)        {
             _gameStateManager = gameStateManager;
             _gameRepository = gameRepository;
             _playCardService = playCardService;
             _gameStateMachine = gameStateMachine;
             _configuration = configuration;
+            _mappingService = mappingService;
         }
 
         /// <summary>
@@ -109,7 +110,7 @@ namespace TrucoMineiro.API.Controllers
             bool showAllHands = _configuration.GetValue<bool>("FeatureFlags:DevMode", false);
 
             // Map the game state with player-specific visibility
-            var gameStateDto = MappingService.MapGameStateToDto(game, requestingPlayerSeat, showAllHands);
+            var gameStateDto = _mappingService.MapGameStateToDto(game, requestingPlayerSeat, showAllHands);
             return Ok(gameStateDto);
         }
 
@@ -206,7 +207,7 @@ namespace TrucoMineiro.API.Controllers
             // Check if DevMode is enabled to show all hands
             bool showAllHands = _configuration.GetValue<bool>("FeatureFlags:DevMode", false);
             
-            var gameStateDto = MappingService.MapGameStateToDto(game, request.PlayerSeat, showAllHands);
+            var gameStateDto = _mappingService.MapGameStateToDto(game, request.PlayerSeat, showAllHands);
             return Ok(gameStateDto);
         }
 
@@ -254,7 +255,7 @@ namespace TrucoMineiro.API.Controllers
             }
 
             bool showAllHands = _configuration.GetValue<bool>("FeatureFlags:DevMode", false);
-            var response = MappingService.MapGameStateToStartGameResponse(updatedGame, 0, showAllHands);
+            var response = _mappingService.MapGameStateToStartGameResponse(updatedGame, 0, showAllHands);
             return Ok(response);
         }
         /// <summary>

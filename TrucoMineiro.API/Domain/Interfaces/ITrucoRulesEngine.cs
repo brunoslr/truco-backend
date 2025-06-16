@@ -39,6 +39,27 @@ namespace TrucoMineiro.API.Domain.Interfaces
         bool CanSurrenderTruco(GameState game, int playerSeat);
 
         /// <summary>
+        /// Checks if exactly one team has 10 points
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        /// <returns>True if exactly one team has 10 points</returns>
+        bool IsOneTeamAt10(GameState game);
+
+        /// <summary>
+        /// Checks if both teams have 10 points
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        /// <returns>True if both teams have 10 points</returns>
+        bool AreBothTeamsAt10(GameState game);
+
+        /// <summary>
+        /// Gets the team that has 10 points
+        /// </summary>
+        /// <param name="game">The current game state</param>
+        /// <returns>The team with 10 points, or null if none or both teams have 10</returns>
+        Team? GetTeamAt10(GameState game);
+
+        /// <summary>
         /// Checks if "Mão de 10" special rule applies
         /// </summary>
         /// <param name="game">The current game state</param>

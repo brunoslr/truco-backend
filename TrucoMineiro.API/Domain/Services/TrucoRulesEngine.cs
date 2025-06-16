@@ -61,24 +61,69 @@ namespace TrucoMineiro.API.Domain.Services
         {
             // Same logic as accepting - must be able to respond to the call
             return CanAcceptTruco(game, playerSeat);
+        }        public bool IsMaoDe10Active(GameState game)
+        {
+            // "Mão de 10" is active when any team has exactly 10 points
+            return game.TeamScores.Values.Any(score => score == 10);
         }
 
-        public bool IsMaoDe10Active(GameState game)
+        public bool IsOneTeamAt10(GameState game)
         {
-            // "Mão de 10" is active when either team has exactly 10 points
-            return game.TeamScores.Values.Any(score => score == 10);
-        }        public void ApplyMaoDe10Rule(GameState game)
-        {           
-            if (IsMaoDe10Active(game))
+            // Check if exactly one team has 10 points
+            var teamsAt10 = game.TeamScores.Values.Count(score => score == 10);
+            return teamsAt10 == 1;
+        }
+
+        public bool AreBothTeamsAt10(GameState game)
+        {
+            // Check if both teams have 10 points
+            var teamsAt10 = game.TeamScores.Values.Count(score => score == 10);
+            return teamsAt10 == 2;
+        }        public Team? GetTeamAt10(GameState game)
+        {
+            // Returns the team that has 10 points, or null if none/both have 10
+            if (AreBothTeamsAt10(game))
+                return null; // When both teams are at 10, return null
+                
+            foreach (var teamScore in game.TeamScores)
             {
-                // In "Mão de 10", the hand is automatically worth 4 points
-                game.Stakes = TrucoConstants.Stakes.TrucoCall;
-                game.TrucoCallState = TrucoCallState.Truco; // Considered as if Truco was automatically called
+                if (teamScore.Value == 10)
+                    return teamScore.Key;
+            }
+            return null;
+        }public void ApplyMaoDe10Rule(GameState game)
+        {           
+            if (AreBothTeamsAt10(game))
+            {
+                // Case 2: Both teams at 10 - normal hand, no truco allowed
+                game.IsBothTeamsAt10 = true;
+                game.Stakes = TrucoConstants.Stakes.Initial; // Normal 2-point hand
+                game.TrucoCallState = TrucoCallState.None;
+                game.LastTrucoCallerTeam = -1;
+                game.CanRaiseTeam = null;
                 
                 game.ActionLog.Add(new ActionLogEntry("game-event")
                 {
-                    Action = "Mão de 10 activated - hand automatically worth 4 points"
+                    Action = "Both teams at 10 points - hand worth 2 points, truco disabled"
                 });
+            }
+            else if (IsOneTeamAt10(game))
+            {
+                // Case 1: One team at 10 - automatic truco state
+                var teamAt10 = GetTeamAt10(game);
+                if (teamAt10.HasValue)
+                {
+                    game.Stakes = TrucoConstants.Stakes.TrucoCall; // 4 points
+                    game.TrucoCallState = TrucoCallState.Truco;
+                    game.LastTrucoCallerTeam = (int)teamAt10.Value;
+                    game.CanRaiseTeam = null; // No raises allowed in "Mão de 10"
+                    game.IsBothTeamsAt10 = false; // Explicitly set for clarity
+                    
+                    game.ActionLog.Add(new ActionLogEntry("game-event")
+                    {
+                        Action = $"Mão de 10 activated - Team {teamAt10.Value} at 10 points, hand automatically worth 4 points"
+                    });
+                }
             }
         }
 

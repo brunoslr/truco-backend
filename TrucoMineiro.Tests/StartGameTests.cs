@@ -4,12 +4,16 @@ using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Events;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
+using TrucoMineiro.API.Domain.Services;
 using TrucoMineiro.API.Services;
 
 namespace TrucoMineiro.Tests
 {    public class StartGameTests
     {
-        private readonly IConfiguration _configuration;        public StartGameTests()
+        private readonly IConfiguration _configuration;
+        private readonly MappingService _mappingService;
+
+        public StartGameTests()
         {
             // Set up test configuration
             var inMemorySettings = new Dictionary<string, string?> {
@@ -19,7 +23,11 @@ namespace TrucoMineiro.Tests
             _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(inMemorySettings)
                 .Build();
-        }        private IGameStateManager CreateGameStateManager(IConfiguration? config = null)
+
+            // Set up MappingService
+            var trucoRulesEngine = new TrucoRulesEngine();
+            _mappingService = new MappingService(trucoRulesEngine);
+        }private IGameStateManager CreateGameStateManager(IConfiguration? config = null)
         {
             var configuration = config ?? _configuration;
               // Create a dictionary to store created games (simulating repository storage)
@@ -116,7 +124,7 @@ namespace TrucoMineiro.Tests
             var game = await gameStateManager.CreateGameAsync(playerName);
 
             // Act
-            var response = MappingService.MapGameStateToStartGameResponse(game);
+            var response = _mappingService.MapGameStateToStartGameResponse(game);
 
             // Assert
             Assert.NotNull(response);
@@ -173,7 +181,7 @@ namespace TrucoMineiro.Tests
             var game = await gameStateManager.CreateGameAsync(playerName);
 
             // Act - Note we pass true for showAllHands param
-            var response = MappingService.MapGameStateToStartGameResponse(game, 0, true);            
+            var response = _mappingService.MapGameStateToStartGameResponse(game, 0, true);            
             // Assert
             Assert.NotNull(response);
             Assert.Equal(3, response.Hand.Count); // Player's cards should be visible

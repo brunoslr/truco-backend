@@ -6,8 +6,7 @@ namespace TrucoMineiro.Tests.TestUtilities
     /// Factory class for creating test game instances with consistent baseline state
     /// </summary>
     public static class TestGameFactory
-    {
-        /// <summary>
+    {        /// <summary>
         /// Creates a test game with properly initialized players and state
         /// </summary>
         /// <returns>A GameState instance ready for testing</returns>
@@ -15,6 +14,7 @@ namespace TrucoMineiro.Tests.TestUtilities
         {
             var game = new GameState();
             game.InitializeGame("TestPlayer");
+            game.StartGame(); // Ensure game is in Active status for testing
             
             // Ensure AI players are properly marked
             game.Players[1].IsAI = true;
@@ -22,7 +22,7 @@ namespace TrucoMineiro.Tests.TestUtilities
             game.Players[3].IsAI = true;
 
             return game;
-        }        /// <summary>
+        }/// <summary>
         /// Creates a test game with all cards played (empty hands)
         /// Sets up PlayedCards collection to simulate a completed round
         /// </summary>

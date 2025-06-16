@@ -35,7 +35,7 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IGameStateManager,
 
 // Register application services
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Interfaces.IPlayCardService, TrucoMineiro.API.Domain.Services.PlayCardService>();
-builder.Services.AddSingleton<TrucoMineiro.API.Services.MappingService>();
+builder.Services.AddScoped<TrucoMineiro.API.Services.MappingService>();
 
 // Register event system
 builder.Services.AddSingleton<TrucoMineiro.API.Domain.Events.IEventPublisher, TrucoMineiro.API.Domain.Services.InMemoryEventPublisher>();
@@ -44,6 +44,7 @@ builder.Services.AddSingleton<TrucoMineiro.API.Domain.Events.IEventPublisher, Tr
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.PlayerTurnStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.AIPlayerEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.RoundCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.RoundCleanupEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.HandCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.HandCompletionEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.HandStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.HandStartedEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.CardPlayedEvent>, TrucoMineiro.API.Domain.EventHandlers.RoundFlowEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.TrucoRaiseEvent>, TrucoMineiro.API.Domain.EventHandlers.TrucoResponseFlowEventHandler>();
 
