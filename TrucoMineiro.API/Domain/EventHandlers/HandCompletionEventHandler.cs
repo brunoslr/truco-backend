@@ -212,13 +212,11 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             game.RoundWinners.Clear();
             
             // Reset round counter
-            game.CurrentRound = TrucoConstants.Game.FirstRound;
-              // Reset stakes and truco state
+            game.CurrentRound = TrucoConstants.Game.FirstRound;            // Reset stakes and truco state
             game.Stakes = TrucoConstants.Stakes.Initial;
             game.TrucoCallState = TrucoCallState.None;
             game.LastTrucoCallerTeam = -1;
             game.CanRaiseTeam = null;
-            game.IsBothTeamsAt10 = false;
             
             // Clear all player hands
             foreach (var player in game.Players)

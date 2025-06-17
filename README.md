@@ -58,28 +58,58 @@ l
 | Initial    | 2              |
 | Truco      | 4              |
 | Seis       | 8              |
+| Nove       | 10             |
 | Doze       | 12             |
 
 - **Truco:** When a team calls Truco and the opposing team accepts, the round is now worth 4 points.
 - **Seis (Raise):** After Truco is called, only the opposing team can raise to Seis. If accepted, the round is now worth 8 points.
-- **Doze (Raise):** After Seis is called, only the opposing team can raise to Doze. If accepted, the round is now worth 12 points (maximum).
+- **Nove (Raise):** After Seis is called, only the opposing team can raise to Nove. If accepted, the round is now worth 10 points.
+- **Doze (Raise):** After Nove is called, only the opposing team can raise to Doze. If accepted, the round is now worth 12 points (maximum).
 - **Surrender:** If a team surrenders to a call or raise, a surrender event is triggered and the opposing team is awarded the points from the previous stake level.
 
 ## Raise Logic and Team Alternation
 
-- A **Raise** (Seis or Doze) is always a combination of accepting the current stake and either immediately proposing a higher stake (accept + new Truco back), or raising later in the same hand.
+- A **Raise** (Seis, Nove, or Doze) is always a combination of accepting the current stake and either immediately proposing a higher stake (accept + new Truco back), or raising later in the same hand.
 - Once a team calls Truco, the opposing team can either surrender, accept, or raise back (Seis). If they just accept, they retain the possibility to raise (Seis) at any time until the hand is completed.
 - After a raise from a team, the opposing team has the opportunity to raise back at any time until the end of the hand.
+- The complete progression is: Initial(2) → Truco(4) → Seis(8) → Nove(10) → Doze(12).
 - At the start of a new hand, stakes reset to 2 and either team can call Truco first.
 
-## Special Rule: "Mão de 10"
+## Special Rule: "Last Hand" (Dynamic Calculation)
 
-- When a team reaches 10 points, the next hand starts in a Truco state ("Mão de 10").
-    - The team with 10 points must decide: surrender (opposing team gets 2 points) or play (hand is worth 4 points).
-    - In this special case, further raises (Seis, Doze) are **disabled**.
-- **If both teams have 10 points:**
-    - The hand is played normally (stakes = 2), but Truco and all raises are **disabled**.
-    - Whoever wins this hand, wins the match.
+The "Last Hand" occurs when a team reaches a score where winning the minimum stakes would achieve victory. By default, this happens when a team reaches 10 points (since 10 + 2 = 12, the victory threshold).
+
+### When ONE team is at "Last Hand":
+- The team at last hand is **automatically in a truco-like state** before the hand begins.
+- They must choose between two options:
+  - **A) Surrender:** The opposing team gets 2 points and a new hand starts
+  - **B) Play:** The hand continues with stakes set to 4 points (equivalent to accepting truco)
+- **NO ONE can call truco** during this hand (truco calls are completely disabled)
+- **Team Advantage:** The team at last hand can see their partner's cards (visibility advantage)
+
+### When BOTH teams are at "Last Hand":
+- The hand is played normally with initial stakes (2 points)
+- **Truco and all raises are completely disabled**
+- Whoever wins this hand wins the entire match
+- **Iron Hand Rule** (configurable): If enabled, players cannot see their own cards until they are played
+
+## Iron Hand Feature
+
+Iron Hand is a special rule that can be enabled when both teams are at the last hand:
+
+- **Card Visibility:** Players cannot see their own cards before playing them
+- **Card Selection:** Players choose cards by index position (0, 1, 2) in their hand
+- **Card Reveal:** Cards are only revealed when played in the trick area
+- **Configuration:** Controlled by the `IronHandFlag` setting (default: disabled)
+
+## Game Configuration
+
+The following values can be configured for different Truco variants:
+
+- **Victory Points:** Points needed to win the game (default: 12)
+- **Minimum Stakes:** Starting stakes value for each hand (default: 2)  
+- **Iron Hand Flag:** Enable/disable Iron Hand feature (default: false)
+- **Stakes Progression:** The sequence of stake values (default: [2, 4, 8, 10, 12])
 
 ## State Transitions
 
@@ -87,7 +117,8 @@ The valid transitions are:
 
 - `None` → `Truco` (any team calls Truco)
 - `Truco` → `Accept` / `Surrender` / `Seis (Raise)` (only opposing team can respond)
-- `Seis` → `Accept` / `Surrender` / `Doze (Raise)` (only opposing team can respond)
+- `Seis` → `Accept` / `Surrender` / `Nove (Raise)` (only opposing team can respond)
+- `Nove` → `Accept` / `Surrender` / `Doze (Raise)` (only opposing team can respond)
 - `Doze` → `Accept` / `Surrender` (only opposing team can respond)
 
 ## Call & Raise Flow
@@ -102,9 +133,12 @@ stateDiagram-v2
     Accepted --> Seis: Opponent raises to Seis (stakes=8)
     Seis --> Accepted: Opponent accepts (stakes=8)
     Seis --> Surrendered: Opponent surrenders (4 points to caller)
-    Seis --> Doze: Opponent raises to Doze (stakes=12)
+    Seis --> Nove: Opponent raises to Nove (stakes=10)
+    Nove --> Accepted: Opponent accepts (stakes=10)
+    Nove --> Surrendered: Opponent surrenders (8 points to caller)
+    Nove --> Doze: Opponent raises to Doze (stakes=12)
     Doze --> Accepted: Opponent accepts (stakes=12)
-    Doze --> Surrendered: Opponent surrenders (8 points to caller)
+    Doze --> Surrendered: Opponent surrenders (10 points to caller)
 ```
 
 ### Notes

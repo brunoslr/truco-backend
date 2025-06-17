@@ -1,5 +1,6 @@
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
+using TrucoMineiro.API.Constants;
 
 namespace TrucoMineiro.API.Domain.Services
 {
@@ -8,8 +9,6 @@ namespace TrucoMineiro.API.Domain.Services
     /// </summary>
     public class ScoreCalculationService : IScoreCalculationService
     {
-        private const int WinningScore = 12;
-        private const int MaoDe10Threshold = 10;
 
         public int CalculateHandPoints(GameState game)
         {
@@ -83,15 +82,14 @@ namespace TrucoMineiro.API.Domain.Services
         public bool IsGameComplete(GameState game)
         {
             return IsGameOver(game);
-        }
-
-        public int CalculateHandPoints(int currentStake, int team1Score, int team2Score)
+        }        public int CalculateHandPoints(int currentStake, int team1Score, int team2Score)
         {
-            // Check for "Mão de 10" rule - when either team reaches 10 points,
-            // all subsequent hands are worth 4 points regardless of stake
-            if (team1Score >= MaoDe10Threshold || team2Score >= MaoDe10Threshold)
+            // Check for last hand rule - when either team reaches victory threshold,
+            // all subsequent hands are worth TrucoCall points regardless of stake
+            if (team1Score >= TrucoConstants.Game.WinningScore - TrucoConstants.Stakes.Initial || 
+                team2Score >= TrucoConstants.Game.WinningScore - TrucoConstants.Stakes.Initial)
             {
-                return 4;
+                return TrucoConstants.Stakes.TrucoCall;
             }
 
             // Normal scoring based on current stake
@@ -104,43 +102,44 @@ namespace TrucoMineiro.API.Domain.Services
                 12 => 12,    // After Doze (maximum)
                 _ => 1       // Default fallback
             };
-        }
-
-        public bool IsGameComplete(int team1Score, int team2Score)
+        }        public bool IsGameComplete(int team1Score, int team2Score)
         {
-            return team1Score >= WinningScore || team2Score >= WinningScore;
+            return team1Score >= TrucoConstants.Game.WinningScore || team2Score >= TrucoConstants.Game.WinningScore;
         }
 
         public int? GetWinningTeam(int team1Score, int team2Score)
         {
-            if (team1Score >= WinningScore && team2Score >= WinningScore)
+            if (team1Score >= TrucoConstants.Game.WinningScore && team2Score >= TrucoConstants.Game.WinningScore)
             {
-                // Both teams reached 12+ points, winner is the one with higher score
+                // Both teams reached winning score, winner is the one with higher score
                 return team1Score > team2Score ? 1 : 2;
             }
-            else if (team1Score >= WinningScore)
+            else if (team1Score >= TrucoConstants.Game.WinningScore)
             {
                 return 1;
-            }
-            else if (team2Score >= WinningScore)
+            }            else if (team2Score >= TrucoConstants.Game.WinningScore)
             {
                 return 2;
             }
             
             return null; // Game not complete
-        }        public int CalculateTotalGamePoints(int team1Score, int team2Score)
+        }
+
+        public int CalculateTotalGamePoints(int team1Score, int team2Score)
         {
             return team1Score + team2Score;
         }
 
         public bool IsMaoDe10Active(int team1Score, int team2Score)
         {
-            return team1Score >= MaoDe10Threshold || team2Score >= MaoDe10Threshold;
+            // Legacy method - replaced with dynamic last hand calculation
+            var lastHandThreshold = TrucoConstants.Game.WinningScore - TrucoConstants.Stakes.Initial;
+            return team1Score >= lastHandThreshold || team2Score >= lastHandThreshold;
         }
 
         public int GetPointsUntilWin(int teamScore)
         {
-            return Math.Max(0, WinningScore - teamScore);
+            return Math.Max(0, TrucoConstants.Game.WinningScore - teamScore);
         }
     }
 }

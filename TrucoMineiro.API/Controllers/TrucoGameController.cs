@@ -112,10 +112,8 @@ namespace TrucoMineiro.API.Controllers
             // Map the game state with player-specific visibility
             var gameStateDto = _mappingService.MapGameStateToDto(game, requestingPlayerSeat, showAllHands);
             return Ok(gameStateDto);
-        }
-
-        /// <summary>
-        /// Unified endpoint for button press actions (Truco, Raise, Fold)
+        }        /// <summary>
+        /// Unified endpoint for button press actions (Truco/Raise, Accept, Surrender, Fold)
         /// </summary>
         /// <remarks>
         /// Sample requests:
@@ -124,27 +122,39 @@ namespace TrucoMineiro.API.Controllers
         ///     {
         ///         "gameId": "abc123",
         ///         "playerSeat": 0,
-        ///         "action": "truco"
+        ///         "action": "CallTrucoOrRaise"
         ///     }
         ///     
         ///     POST /api/game/press-button
         ///     {
         ///         "gameId": "abc123",
         ///         "playerSeat": 1,
-        ///         "action": "raise"
+        ///         "action": "AcceptTruco"
         ///     }
         ///     
         ///     POST /api/game/press-button
         ///     {
         ///         "gameId": "abc123",
         ///         "playerSeat": 2,
+        ///         "action": "SurrenderTruco"
+        ///     }
+        ///     
+        ///     POST /api/game/press-button
+        ///     {
+        ///         "gameId": "abc123",
+        ///         "playerSeat": 3,
         ///         "action": "fold"
         ///     }
         ///     
-        /// This unified endpoint handles all button press actions:
-        /// - "truco": Calls Truco to raise the stakes
-        /// - "raise": Raises the stakes further after a Truco call
-        /// - "fold": Folds the current hand, giving points to the opposing team
+        /// This unified endpoint handles all button press actions with modern action constants:
+        /// - "CallTrucoOrRaise": Calls Truco or raises stakes (unified action)
+        /// - "AcceptTruco": Accepts a Truco call from opponent
+        /// - "SurrenderTruco": Surrenders to a Truco call, awarding points to opponent
+        /// - "SurrenderHand": Surrenders/folds the current hand
+        /// - "fold": Alias for SurrenderHand (kept for usability)
+        /// 
+        /// Stakes Progression: 2 → 4 → 8 → 10 → 12 points
+        /// Last Hand Rule: When a team reaches 10+ points, truco calls are disabled
         /// </remarks>
         /// <param name="request">The button press request containing game ID, player seat, and action</param>
         /// <response code="200">Returns the updated game state after the action</response>
@@ -164,30 +174,22 @@ namespace TrucoMineiro.API.Controllers
             }            CommandResult result;            switch (request.Action)
             {
                 case TrucoConstants.ButtonActions.CallTrucoOrRaise:
-                case "calltrucooraise": // Legacy support
-                case "truco": // Legacy support
-                case "raise": // Legacy support
                     var trucoOrRaiseCommand = new CallTrucoOrRaiseCommand(request.GameId, request.PlayerSeat);
                     result = await _gameStateMachine.ProcessCommandAsync(trucoOrRaiseCommand);
                     break;
                     
                 case TrucoConstants.ButtonActions.AcceptTruco:
-                case "accepttruco": // Legacy support
-                case "accept": // Legacy support
                     var acceptCommand = new AcceptTrucoCommand(request.GameId, request.PlayerSeat);
                     result = await _gameStateMachine.ProcessCommandAsync(acceptCommand);
                     break;
                     
                 case TrucoConstants.ButtonActions.SurrenderTruco:
-                case "surrendertruco": // Legacy support
-                case "surrender": // Legacy support
                     var surrenderTrucoCommand = new SurrenderTrucoCommand(request.GameId, request.PlayerSeat);
                     result = await _gameStateMachine.ProcessCommandAsync(surrenderTrucoCommand);
                     break;
                     
                 case TrucoConstants.ButtonActions.SurrenderHand:
-                case "surrenderhand": // Legacy support
-                case "fold": // Common alias
+                case "fold": // Common alias - kept for usability
                     var foldCommand = new SurrenderHandCommand(request.GameId, request.PlayerSeat);
                     result = await _gameStateMachine.ProcessCommandAsync(foldCommand);
                     break;

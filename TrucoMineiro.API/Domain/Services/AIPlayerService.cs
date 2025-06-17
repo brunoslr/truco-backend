@@ -1,3 +1,4 @@
+using TrucoMineiro.API.Constants;
 using TrucoMineiro.API.Domain.Interfaces;
 using TrucoMineiro.API.Domain.Models;
 
@@ -280,8 +281,9 @@ namespace TrucoMineiro.API.Domain.Services
             return bestIndex;
         }        public bool ShouldCallTruco(Player player, GameState game)
         {
-            // Don't call if already at high stakes or if in "Mão de 10"
-            if (game.Stakes >= 8 || game.IsBothTeamsAt10)
+            // TODO: Inject TrucoRulesEngine for proper dynamic rule checking
+            // Don't call if already at high stakes or if both teams are at last hand
+            if (game.Stakes >= TrucoConstants.Stakes.Seis)
                 return false;
                 
             // Don't call if there's already a pending truco call
@@ -301,11 +303,11 @@ namespace TrucoMineiro.API.Domain.Services
         }        public bool ShouldRaise(Player player, GameState game)
         {
             // Can't raise if at max stakes or no truco call pending
-            if (game.Stakes >= 12 || game.TrucoCallState == TrucoCallState.None)
+            if (game.Stakes >= TrucoConstants.Stakes.Maximum || game.TrucoCallState == TrucoCallState.None)
                 return false;
                 
-            // Can't raise if at max truco level (Doze) or in "Mão de 10"
-            if (game.TrucoCallState == TrucoCallState.Doze || game.IsBothTeamsAt10)
+            // Can't raise if at max truco level (Doze)
+            if (game.TrucoCallState == TrucoCallState.Doze)
                 return false;
 
             var handStrength = AnalyzeHandStrength(player.Hand);
@@ -313,15 +315,16 @@ namespace TrucoMineiro.API.Domain.Services
         }public bool ShouldFold(Player player, GameState game)
         {
             // Only consider folding if there's a pending truco call to respond to
-            if (game.TrucoCallState == TrucoCallState.None) return false;
-
-            var handStrength = AnalyzeHandStrength(player.Hand);
+            if (game.TrucoCallState == TrucoCallState.None) return false;            var handStrength = AnalyzeHandStrength(player.Hand);
             var isPlayerTeam = GetPlayerTeam(player.Seat) == 1;
             var teamScore = isPlayerTeam ? game.Team1Score : game.Team2Score;
 
             // More likely to fold with weak hands or when ahead
             var foldProbability = (1 - handStrength) * 0.6;
-            if (teamScore >= 10) foldProbability += 0.2;
+            
+            // More likely to fold when at last hand (close to victory)
+            var lastHandThreshold = TrucoConstants.Game.WinningScore - TrucoConstants.Stakes.Initial;
+            if (teamScore >= lastHandThreshold) foldProbability += 0.2;
 
             return _random.NextDouble() < foldProbability;
         }

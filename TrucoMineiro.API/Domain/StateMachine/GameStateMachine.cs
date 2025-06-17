@@ -17,6 +17,7 @@ namespace TrucoMineiro.API.Domain.StateMachine
         private readonly IEventPublisher _eventPublisher;
         private readonly IAIPlayerService _aiPlayerService;
         private readonly IHandResolutionService _handResolutionService;
+        private readonly ITrucoRulesEngine _trucoRulesEngine;
         private readonly ILogger<GameStateMachine> _logger;
 
         public GameStateMachine(
@@ -24,14 +25,16 @@ namespace TrucoMineiro.API.Domain.StateMachine
             IEventPublisher eventPublisher,
             IAIPlayerService aiPlayerService,
             IHandResolutionService handResolutionService,
+            ITrucoRulesEngine trucoRulesEngine,
             ILogger<GameStateMachine> logger)
         {
             _gameRepository = gameRepository;
             _eventPublisher = eventPublisher;
             _aiPlayerService = aiPlayerService;
             _handResolutionService = handResolutionService;
+            _trucoRulesEngine = trucoRulesEngine;
             _logger = logger;
-        }        public async Task<CommandResult> ProcessCommandAsync(IGameCommand command)
+        }public async Task<CommandResult> ProcessCommandAsync(IGameCommand command)
         {
             try
             {
@@ -257,29 +260,29 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 }
 
                 // Determine call type and stakes progression
-                var previousStakes = game.Stakes;
-                var callType = game.TrucoCallState switch
+                var previousStakes = game.Stakes;                var callType = game.TrucoCallState switch
                 {
                     TrucoCallState.None => "Truco",
                     TrucoCallState.Truco => "Seis", 
-                    TrucoCallState.Seis => "Doze",
+                    TrucoCallState.Seis => "Nove",
+                    TrucoCallState.Nove => "Doze",
                     _ => throw new InvalidOperationException($"Cannot raise from state {game.TrucoCallState}")
-                };
-
-                var newStakes = game.TrucoCallState switch
+                };var newStakes = game.TrucoCallState switch
                 {
-                    TrucoCallState.None => 4,   // None -> Truco = 4 points
-                    TrucoCallState.Truco => 8,  // Truco -> Seis = 8 points
-                    TrucoCallState.Seis => 12,  // Seis -> Doze = 12 points
+                    TrucoCallState.None => TrucoConstants.Stakes.TrucoCall,   // None -> Truco = 4 points
+                    TrucoCallState.Truco => TrucoConstants.Stakes.Seis,      // Truco -> Seis = 8 points
+                    TrucoCallState.Seis => TrucoConstants.Stakes.Nove,       // Seis -> Nove = 10 points
+                    TrucoCallState.Nove => TrucoConstants.Stakes.Maximum,    // Nove -> Doze = 12 points
                     _ => throw new InvalidOperationException($"Cannot raise from state {game.TrucoCallState}")
                 };                // Update game state
                 game.TrucoCallState = game.TrucoCallState switch
                 {
                     TrucoCallState.None => TrucoCallState.Truco,
                     TrucoCallState.Truco => TrucoCallState.Seis,
-                    TrucoCallState.Seis => TrucoCallState.Doze,
+                    TrucoCallState.Seis => TrucoCallState.Nove,
+                    TrucoCallState.Nove => TrucoCallState.Doze,
                     _ => throw new InvalidOperationException($"Cannot raise from state {game.TrucoCallState}")
-                };                game.Stakes = newStakes; // Set the new stakes
+                };game.Stakes = newStakes; // Set the new stakes
 
                 game.LastTrucoCallerTeam = playerTeam;
                 
@@ -319,14 +322,13 @@ namespace TrucoMineiro.API.Domain.StateMachine
                 if (player == null)
                 {
                     return CommandResult.Failure($"Player with seat {command.PlayerSeat} not found");
-                }
-
-                // Update stakes to confirmed value
+                }                // Update stakes to confirmed value
                 var confirmedStakes = game.TrucoCallState switch
                 {
-                    TrucoCallState.Truco => 4,
-                    TrucoCallState.Seis => 8,
-                    TrucoCallState.Doze => 12,
+                    TrucoCallState.Truco => TrucoConstants.Stakes.TrucoCall,  // 4
+                    TrucoCallState.Seis => TrucoConstants.Stakes.Seis,       // 8
+                    TrucoCallState.Nove => TrucoConstants.Stakes.Nove,       // 10
+                    TrucoCallState.Doze => TrucoConstants.Stakes.Maximum,    // 12
                     _ => throw new InvalidOperationException($"Cannot accept from state {game.TrucoCallState}")
                 };
 
@@ -498,16 +500,20 @@ namespace TrucoMineiro.API.Domain.StateMachine
             if (game.GameStatus != "active")
             {
                 return CommandResult.Failure("Game is not active");
-            }
-
-            if (game.IsBothTeamsAt10)
+            }            if (!_trucoRulesEngine.CanCallTruco(game, command.PlayerSeat))
             {
-                return CommandResult.Failure("Truco calls are disabled when both teams have 10 points");
-            }
-
-            if (game.TrucoCallState == TrucoCallState.Doze)
-            {
-                return CommandResult.Failure("Maximum truco level reached");
+                // Get more specific error messages
+                if (_trucoRulesEngine.AreBothTeamsAtLastHand(game))
+                {
+                    return CommandResult.Failure("Truco calls are disabled when both teams are at the last hand");
+                }
+                
+                if (_trucoRulesEngine.IsMaximumStakes(game))
+                {
+                    return CommandResult.Failure("Maximum truco level reached");
+                }
+                
+                return CommandResult.Failure("Cannot call truco in current game state");
             }
 
             var player = game.Players.FirstOrDefault(p => p.Seat == command.PlayerSeat);

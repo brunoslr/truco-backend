@@ -36,12 +36,22 @@ namespace TrucoMineiro.API.Constants
           /// <summary>
         /// Default delay in milliseconds after a hand was resolved before starting next hand if not set in configuration
         /// </summary>
-        public const int DefaultHandResolutionDelayMs = 5000;
-
-        /// <summary>
+        public const int DefaultHandResolutionDelayMs = 5000;        /// <summary>
         /// Default delay in milliseconds after a round was resolved before starting next round if not set in configuration
         /// </summary>
         public const int DefaultRoundResolutionDelayMs = 2000;
+
+        /// <summary>
+        /// Default setting for Iron Hand feature (disabled by default)
+        /// When enabled, players cannot see their own cards during the last hand
+        /// </summary>
+        public const bool DefaultIronHandEnabled = false;
+
+        /// <summary>
+        /// Default setting for partner card visibility during last hand (enabled by default)
+        /// When enabled, teams at last hand can see their partner's cards
+        /// </summary>
+        public const bool DefaultPartnerCardVisibilityEnabled = true;
 
         /// <summary>
         /// Gets the first player seat based on the dealer seat.

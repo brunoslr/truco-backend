@@ -124,16 +124,20 @@ namespace TrucoMineiro.API.Services
         /// Map a GameState model to a GameStateDto
         /// </summary>
         public static GameStateDto MapGameStateToDto(GameState gameState)
-        {            return new GameStateDto
+        {            // TODO: LEGACY CLEANUP - This static method should be removed in favor of the instance method
+            // For now, create a temporary TrucoRulesEngine instance for dynamic calculation
+            var tempRulesEngine = new Domain.Services.TrucoRulesEngine();
+            
+            return new GameStateDto
             {
                 Players = gameState.Players.Select(p => MapPlayerToDto(p, gameState.FirstPlayerSeat)).ToList(),
-                PlayedCards = gameState.PlayedCards.Select(MapPlayedCardToDto).ToList(),
-                Stakes = gameState.Stakes,
+                PlayedCards = gameState.PlayedCards.Select(MapPlayedCardToDto).ToList(),                Stakes = gameState.Stakes,
                 TrucoCallState = gameState.TrucoCallState.ToString(),
                 CurrentStakes = gameState.CurrentStakes,
                 LastTrucoCallerTeam = gameState.LastTrucoCallerTeam,
                 CanRaiseTeam = gameState.CanRaiseTeam,
-                IsBothTeamsAt10 = gameState.IsBothTeamsAt10,
+                IronHandEnabled = gameState.IronHandEnabled,
+                PartnerCardVisibilityEnabled = gameState.PartnerCardVisibilityEnabled,
                 CurrentHand = gameState.CurrentHand,
                 RoundWinners = gameState.RoundWinners.ToList(),
                 TeamScores = gameState.TeamScores,
@@ -149,17 +153,16 @@ namespace TrucoMineiro.API.Services
         public GameStateDto MapGameStateToDto(GameState gameState, int requestingPlayerSeat, bool showAllHands = false)
         {
             var currentPlayer = gameState.Players.FirstOrDefault(p => p.Seat == requestingPlayerSeat);
-            
-            return new GameStateDto
+              return new GameStateDto
             {
-                Players = gameState.Players.Select(p => MapPlayerToDto(p, gameState.FirstPlayerSeat, requestingPlayerSeat, showAllHands)).ToList(),
-                PlayedCards = gameState.PlayedCards.Select(MapPlayedCardToDto).ToList(),
-                Stakes = gameState.Stakes,
+                Players = gameState.Players.Select(p => MapPlayerToDto(p, gameState, requestingPlayerSeat, showAllHands)).ToList(),
+                PlayedCards = gameState.PlayedCards.Select(MapPlayedCardToDto).ToList(),                Stakes = gameState.Stakes,
                 TrucoCallState = gameState.TrucoCallState.ToString(),
                 CurrentStakes = gameState.CurrentStakes,
                 LastTrucoCallerTeam = gameState.LastTrucoCallerTeam,
                 CanRaiseTeam = gameState.CanRaiseTeam,
-                IsBothTeamsAt10 = gameState.IsBothTeamsAt10,
+                IronHandEnabled = gameState.IronHandEnabled,
+                PartnerCardVisibilityEnabled = gameState.PartnerCardVisibilityEnabled,
                 CurrentHand = gameState.CurrentHand,
                 RoundWinners = gameState.RoundWinners.ToList(),
                 TeamScores = gameState.TeamScores,
@@ -168,18 +171,17 @@ namespace TrucoMineiro.API.Services
                 ActionLog = gameState.ActionLog.Select(MapActionLogEntryToDto).ToList(),
                 AvailableActions = currentPlayer != null ? GetAvailableActions(currentPlayer, gameState) : new List<string>()
             };
-        }
-
-        /// <summary>
-        /// Map a Player model to a PlayerDto with player-specific card visibility
+        }        /// <summary>
+        /// Map a Player model to a PlayerDto with advanced card visibility rules
         /// </summary>
         /// <param name="player">The player to map</param>
-        /// <param name="firstPlayerSeat">The seat of the first player</param>
+        /// <param name="gameState">The current game state (for special rule context)</param>
         /// <param name="requestingPlayerSeat">The seat of the player requesting the game state</param>
         /// <param name="showAllHands">Whether to reveal all player hands (DevMode)</param>
-        public static PlayerDto MapPlayerToDto(Player player, int firstPlayerSeat, int requestingPlayerSeat, bool showAllHands = false)
+        public PlayerDto MapPlayerToDto(Player player, GameState gameState, int requestingPlayerSeat, bool showAllHands = false)
         {
-            bool shouldHideCards = !showAllHands && player.Seat != requestingPlayerSeat;
+            // Determine card visibility based on game rules
+            bool shouldHideCards = ShouldHidePlayerCards(player, gameState, requestingPlayerSeat, showAllHands);
             
             return new PlayerDto
             {
@@ -291,27 +293,24 @@ namespace TrucoMineiro.API.Services
             // Check if there's a pending truco call (no card play allowed until resolved)
             var playerTeam = (int)player.Team;
             bool hasPendingTrucoCall = gameState.TrucoCallState != TrucoCallState.None;
-            bool isRespondingTeam = gameState.LastTrucoCallerTeam != playerTeam;
-
-            // Use TrucoRulesEngine for proper "Mão de 10" detection
-            bool isMaoDe10Active = _trucoRulesEngine.IsMaoDe10Active(gameState);
-            bool isOneTeamAt10 = _trucoRulesEngine.IsOneTeamAt10(gameState);
-            bool areBothTeamsAt10 = _trucoRulesEngine.AreBothTeamsAt10(gameState);
+            bool isRespondingTeam = gameState.LastTrucoCallerTeam != playerTeam;            // Use TrucoRulesEngine for dynamic last hand detection
+            bool isLastHandActive = _trucoRulesEngine.IsLastHand(gameState);
+            bool isOneTeamAtLastHand = _trucoRulesEngine.IsOneTeamAtLastHand(gameState);
+            bool areBothTeamsAtLastHand = _trucoRulesEngine.AreBothTeamsAtLastHand(gameState);
+            bool isMaximumStakes = _trucoRulesEngine.IsMaximumStakes(gameState);
 
             if (!hasPendingTrucoCall)
             {
                 // Normal game actions
-                actions.Add(TrucoConstants.PlayerActions.PlayCard);
-                  // Can call/raise truco if:
-                // - Not at max level (stakes not at 12 and not pending Doze call)
-                // - Not in "Mão de 10" situation where truco is disabled
+                actions.Add(TrucoConstants.PlayerActions.PlayCard);                // Can call/raise truco if:
+                // - Not at max level (stakes not at maximum and not pending max call)
+                // - Not in last hand situation where truco is disabled
                 // - This team didn't make the last call
-                if (gameState.Stakes < TrucoConstants.Stakes.Maximum && // Not already at max stakes (12)
-                    gameState.TrucoCallState != TrucoCallState.Doze && // No pending Doze call
-                    !areBothTeamsAt10 && // Truco completely disabled when both teams at 10
+                if (!isMaximumStakes && // Not already at max stakes
+                    !areBothTeamsAtLastHand && // Truco completely disabled when both teams at last hand
                     gameState.LastTrucoCallerTeam != playerTeam)
-                {                    // Special rule: if only one team is at 10, only that team can call truco
-                    if (!isOneTeamAt10 || (isOneTeamAt10 && (int)_trucoRulesEngine.GetTeamAt10(gameState)! == playerTeam))
+                {                    // Special rule: if only one team is at last hand, only that team can call truco
+                    if (!isOneTeamAtLastHand || (isOneTeamAtLastHand && (int)_trucoRulesEngine.GetTeamAtLastHand(gameState)! == playerTeam))
                     {
                         actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
                     }
@@ -325,13 +324,11 @@ namespace TrucoMineiro.API.Services
                 if (isRespondingTeam)
                 {
                     actions.Add(TrucoConstants.PlayerActions.AcceptTruco);
-                    actions.Add(TrucoConstants.PlayerActions.SurrenderTruco);
-                      // Can raise if not at max level and "Mão de 10" allows it
-                    if (gameState.Stakes < TrucoConstants.Stakes.Maximum && // Not already at max stakes (12)
-                        gameState.TrucoCallState != TrucoCallState.Doze && // No pending Doze call
-                        !areBothTeamsAt10) // Truco raising disabled when both teams at 10
-                    {                        // Special rule: if only one team is at 10, only that team can raise
-                        if (!isOneTeamAt10 || (isOneTeamAt10 && (int)_trucoRulesEngine.GetTeamAt10(gameState)! == playerTeam))
+                    actions.Add(TrucoConstants.PlayerActions.SurrenderTruco);                    // Can raise if not at max level and last hand rules allow it
+                    if (!isMaximumStakes && // Not already at max stakes
+                        !areBothTeamsAtLastHand) // Truco raising disabled when both teams at last hand
+                    {                        // Special rule: if only one team is at last hand, only that team can raise
+                        if (!isOneTeamAtLastHand || (isOneTeamAtLastHand && (int)_trucoRulesEngine.GetTeamAtLastHand(gameState)! == playerTeam))
                         {
                             actions.Add(TrucoConstants.PlayerActions.CallTrucoOrRaise);
                         }
@@ -341,6 +338,48 @@ namespace TrucoMineiro.API.Services
             }
 
             return actions;
+        }
+
+        /// <summary>
+        /// Determines whether to hide a player's cards based on game rules and special features
+        /// </summary>
+        /// <param name="player">The player whose cards are being shown</param>
+        /// <param name="gameState">The current game state</param>
+        /// <param name="requestingPlayerSeat">The seat of the player requesting the view</param>
+        /// <param name="showAllHands">DevMode flag to show all hands</param>
+        /// <returns>True if cards should be hidden, false if they should be visible</returns>
+        private bool ShouldHidePlayerCards(Player player, GameState gameState, int requestingPlayerSeat, bool showAllHands)
+        {
+            // DevMode: show all cards
+            if (showAllHands)
+                return false;
+
+            var requestingPlayer = gameState.Players.FirstOrDefault(p => p.Seat == requestingPlayerSeat);
+            if (requestingPlayer == null)
+                return true; // Hide if requesting player not found
+
+            // Iron Hand Rule: during last hand, players cannot see their own cards
+            bool isLastHand = _trucoRulesEngine.IsLastHand(gameState);
+            if (isLastHand && gameState.IronHandEnabled && player.Seat == requestingPlayerSeat)
+                return true;
+
+            // Partner Card Visibility: during last hand, show partner's cards if feature is enabled
+            if (isLastHand && gameState.PartnerCardVisibilityEnabled)
+            {
+                var requestingPlayerTeam = requestingPlayer.Team;
+                var playerTeam = player.Team;
+
+                // Show own cards (unless Iron Hand is active)
+                if (player.Seat == requestingPlayerSeat)
+                    return gameState.IronHandEnabled; // Hidden only if Iron Hand is active
+
+                // Show partner's cards if on same team
+                if (playerTeam == requestingPlayerTeam)
+                    return false; // Show partner's cards
+            }
+
+            // Standard rule: show only own cards
+            return player.Seat != requestingPlayerSeat;
         }
     }
 }

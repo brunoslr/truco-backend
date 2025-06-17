@@ -11,20 +11,20 @@ using Xunit;
 namespace TrucoMineiro.Tests.StateMachine;
 
 public class GameStateMachineTests
-{
-    private readonly Mock<IGameRepository> _mockGameRepository;
+{    private readonly Mock<IGameRepository> _mockGameRepository;
     private readonly Mock<IEventPublisher> _mockEventPublisher;
     private readonly Mock<IAIPlayerService> _mockAIPlayerService;
     private readonly Mock<IHandResolutionService> _mockHandResolutionService;
+    private readonly Mock<ITrucoRulesEngine> _mockTrucoRulesEngine;
     private readonly Mock<ILogger<GameStateMachine>> _mockLogger;
     private readonly GameStateMachine _gameStateMachine;
 
     public GameStateMachineTests()
     {
-        _mockGameRepository = new Mock<IGameRepository>();
-        _mockEventPublisher = new Mock<IEventPublisher>();
+        _mockGameRepository = new Mock<IGameRepository>();        _mockEventPublisher = new Mock<IEventPublisher>();
         _mockAIPlayerService = new Mock<IAIPlayerService>();
         _mockHandResolutionService = new Mock<IHandResolutionService>();
+        _mockTrucoRulesEngine = new Mock<ITrucoRulesEngine>();
         _mockLogger = new Mock<ILogger<GameStateMachine>>();
         
         _gameStateMachine = new GameStateMachine(
@@ -32,6 +32,7 @@ public class GameStateMachineTests
             _mockEventPublisher.Object,
             _mockAIPlayerService.Object,
             _mockHandResolutionService.Object,
+            _mockTrucoRulesEngine.Object,
             _mockLogger.Object);
     }
 
@@ -185,26 +186,33 @@ public class GameStateMachineTests
         {
             Id = playerId
         };
-          var gameState = new GameState
+        
+        var gameState = new GameState
         {
             Id = gameId,
             GameStatus = "active",
             Players = new List<Player> { player },
-            TrucoCallState = TrucoCallState.None // Can call truco
+            TrucoCallState = TrucoCallState.None, // Can call truco
+            Stakes = 2, // Initial stakes
+            CurrentPlayerIndex = 1 // Player's turn
         };
         
         _mockGameRepository.Setup(x => x.GetGameAsync(gameId))
             .ReturnsAsync(gameState);
+          // Mock the rules engine methods that might be called
+        _mockTrucoRulesEngine.Setup(x => x.CanCallTruco(It.IsAny<GameState>(), It.IsAny<int>()))
+            .Returns(true);
         
         // Act
         var result = await _gameStateMachine.ProcessCommandAsync(command);
-          // Assert
+        
+        // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal(TrucoCallState.Truco, gameState.TrucoCallState);
         Assert.Equal((int)player.Team, gameState.LastTrucoCallerTeam);
         
         _mockEventPublisher.Verify(x => x.PublishAsync(It.IsAny<TrucoOrRaiseCalledEvent>()), Times.Once);
-    }    [Fact]
+    }[Fact]
     public async Task ProcessCommandAsync_AcceptTrucoCommand_ShouldPublishTrucoAcceptedEvent()
     {
         // Arrange

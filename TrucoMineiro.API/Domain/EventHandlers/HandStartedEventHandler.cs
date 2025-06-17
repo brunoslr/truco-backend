@@ -6,9 +6,8 @@ using TrucoMineiro.API.Domain.Models;
 using TrucoMineiro.API.Constants;
 
 namespace TrucoMineiro.API.Domain.EventHandlers
-{
-    /// <summary>
-    /// Handles HandStartedEvent to apply "Mão de 10" rules and reset truco state
+{    /// <summary>
+    /// Handles HandStartedEvent to apply last hand rules and reset truco state
     /// </summary>
     public class HandStartedEventHandler : IEventHandler<HandStartedEvent>
     {
@@ -39,13 +38,11 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                     eventArgs.GameId, eventArgs.Hand);
 
                 // Reset truco state for new hand (in case it wasn't reset properly)
-                ResetTrucoState(game);
-
-                // Apply "Mão de 10" rules if applicable
-                if (_trucoRulesEngine.IsMaoDe10Active(game))
+                ResetTrucoState(game);                // Apply last hand rules if applicable
+                if (_trucoRulesEngine.IsLastHand(game))
                 {
-                    _logger.LogInformation("Applying Mão de 10 rules for game {GameId}", eventArgs.GameId);
-                    _trucoRulesEngine.ApplyMaoDe10Rule(game);
+                    _logger.LogInformation("Applying last hand rules for game {GameId}", eventArgs.GameId);
+                    _trucoRulesEngine.ApplyLastHandRule(game);
                 }
 
                 // Save the updated game state
@@ -58,21 +55,17 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 _logger.LogError(ex, "Error processing HandStartedEvent for game {GameId}", eventArgs.GameId);
                 throw;
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Reset truco-related state for the new hand
         /// </summary>
         private void ResetTrucoState(GameState game)
         {
-            // Only reset if not applying "Mão de 10" rules
-            if (!_trucoRulesEngine.IsMaoDe10Active(game))
-            {
+            // Only reset if not applying last hand rules
+            if (!_trucoRulesEngine.IsLastHand(game))            {
                 game.Stakes = TrucoConstants.Stakes.Initial; // 2 points
                 game.TrucoCallState = TrucoCallState.None;
                 game.LastTrucoCallerTeam = -1;
                 game.CanRaiseTeam = null;
-                game.IsBothTeamsAt10 = false;
             }
         }
     }

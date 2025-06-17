@@ -62,8 +62,9 @@ HTTP 400 Bad Request
   "trucoCallState": "None|Truco|Seis|Doze",  // Replaces trucoLevel
   "lastTrucoCallerTeam": 0,                  // Team that made last call
   "canRaiseTeam": 1,                         // Team that can raise (null if none)
-  "isBothTeamsAt10": false,                  // "Mão de 10" detection
   "currentStakes": 4,                        // Current points at stake
+  "ironHandEnabled": false,                  // Iron Hand feature for last hand
+  "partnerCardVisibilityEnabled": true,     // Partner card visibility for last hand
   "availableActions": [                      // NEW: Dynamic action list for current player
     "play-card",                             // Can play a card
     "call-truco-or-raise",                   // Can call truco or raise
@@ -82,7 +83,8 @@ HTTP 400 Bad Request
   "isRaiseEnabled": false,       // Use canRaiseTeam instead  
   "trucoLevel": 1,               // Use trucoCallState instead
   "trucoCalledBy": "guid",       // Use lastTrucoCallerTeam instead
-  "waitingForTrucoResponse": false // Use trucoCallState logic instead
+  "waitingForTrucoResponse": false, // Use trucoCallState logic instead
+  "isBothTeamsAt10": false       // Replaced with dynamic last hand calculation
 }
 ```
 
@@ -119,11 +121,8 @@ function surrenderTruco() {
 const canCallTruco = !gameState.isTrucoCalled && gameState.isRaiseEnabled;
 const waitingForResponse = gameState.waitingForTrucoResponse;
 
-// After (using new state model)
-const canCallTruco = gameState.trucoCallState !== "Doze" && 
-                     !gameState.isBothTeamsAt10 &&
-                     gameState.lastTrucoCallerTeam !== currentPlayerTeam;
-
+// After (using new state model and available actions)
+const canCallTruco = gameState.availableActions.includes("call-truco-or-raise");
 const hasPendingCall = gameState.trucoCallState !== "None" && 
                        gameState.lastTrucoCallerTeam !== currentPlayerTeam;
 ```
@@ -135,15 +134,15 @@ const showTrucoButton = !gameState.isTrucoCalled;
 const showRaiseButton = gameState.isTrucoCalled && gameState.isRaiseEnabled;
 const showResponseButtons = gameState.waitingForTrucoResponse;
 
-// After  
+// After (using dynamic available actions - RECOMMENDED)
+const showTrucoRaiseButton = gameState.availableActions.includes("call-truco-or-raise");
+const showAcceptButton = gameState.availableActions.includes("accept-truco");
+const showSurrenderButton = gameState.availableActions.includes("surrender-truco");
+
+// Alternative (manual checking - less reliable)
 const playerTeam = getCurrentPlayerTeam();
 const hasPendingCall = gameState.trucoCallState !== "None" && 
                        gameState.lastTrucoCallerTeam !== playerTeam;
-
-const showTrucoRaiseButton = !gameState.isBothTeamsAt10 && 
-                             gameState.trucoCallState !== "Doze" &&
-                             gameState.lastTrucoCallerTeam !== playerTeam;
-
 const showResponseButtons = hasPendingCall;
 ```
 
@@ -165,13 +164,42 @@ const potentialStakes = stakesMap[gameState.trucoCallState] || 2;
 
 ### Special Rules Implementation
 
-#### "Mão de 10" Detection
+#### Last Hand Detection (Dynamic)
 ```javascript
-// Check if truco is disabled due to "Mão de 10"
-if (gameState.isBothTeamsAt10) {
-  // Hide truco/raise buttons
-  // Show "Mão de 10" indicator
-  // Stakes automatically set to 4 points
+// Check if it's the last hand (replaces old "Mão de 10" property)
+function isLastHand(gameState) {
+  const winningScore = 12;
+  const minStakes = 2;
+  return gameState.team1Score >= (winningScore - minStakes) || 
+         gameState.team2Score >= (winningScore - minStakes);
+}
+
+// Usage
+if (isLastHand(gameState)) {
+  // Hide truco/raise buttons (or use availableActions to check)
+  // Show last hand indicator
+  // Stakes automatically set to 4 points for last hand
+}
+
+// RECOMMENDED: Use available actions instead
+const trucoDisabled = !gameState.availableActions.includes("call-truco-or-raise");
+```
+
+#### Iron Hand Feature
+```javascript
+// Check if Iron Hand is active
+if (gameState.ironHandEnabled && isLastHand(gameState)) {
+  // Hide player's own cards until played
+  // AI players still function normally
+}
+```
+
+#### Partner Card Visibility
+```javascript
+// Check if partner cards should be shown
+if (gameState.partnerCardVisibilityEnabled && isLastHand(gameState)) {
+  // Team at last hand can see partner's cards
+  // Show partner hand alongside player hand
 }
 ```
 

@@ -13,16 +13,19 @@ namespace TrucoMineiro.API.Domain.Models
         /// <summary>
         /// Truco called, waiting for response (stakes will be 4 if accepted)
         /// </summary>
-        Truco = 1,
-
-        /// <summary>
+        Truco = 1,        /// <summary>
         /// Seis called, waiting for response (stakes will be 8 if accepted)
         /// </summary>
         Seis = 2,
 
         /// <summary>
+        /// Nove called, waiting for response (stakes will be 10 if accepted)
+        /// </summary>
+        Nove = 3,
+
+        /// <summary>
         /// Doze called, waiting for response (stakes will be 12 if accepted)
         /// </summary>
-        Doze = 3
+        Doze = 4
     }
 }

@@ -8,20 +8,19 @@ namespace TrucoMineiro.API.Domain.Services
     /// Implementation of Truco rules and special game mechanics
     /// </summary>
     public class TrucoRulesEngine : ITrucoRulesEngine
-    {        
-        public bool CanCallTruco(GameState game, int playerSeat)
+    {          public bool CanCallTruco(GameState game, int playerSeat)
         {
             // Cannot call/raise if:
             // 1. Game is not active
             if (game.GameStatus != "active")
                 return false;
 
-            // 2. Both teams are at 10 points ("Mão de 10" - truco disabled)
-            if (game.IsBothTeamsAt10)
+            // 2. Both teams are at last hand (truco disabled)
+            if (AreBothTeamsAtLastHand(game))
                 return false;
 
             // 3. Already at maximum truco level
-            if (game.TrucoCallState == TrucoCallState.Doze)
+            if (IsMaximumStakes(game))
                 return false;
 
             var player = game.Players.FirstOrDefault(p => p.Seat == playerSeat);
@@ -55,48 +54,61 @@ namespace TrucoMineiro.API.Domain.Services
             // Cannot accept your own team's call
             var playerTeam = (int)player.Team;
             return game.LastTrucoCallerTeam != playerTeam;
-        }
-
-        public bool CanSurrenderTruco(GameState game, int playerSeat)
+        }        public bool CanSurrenderTruco(GameState game, int playerSeat)
         {
             // Same logic as accepting - must be able to respond to the call
             return CanAcceptTruco(game, playerSeat);
-        }        public bool IsMaoDe10Active(GameState game)
-        {
-            // "Mão de 10" is active when any team has exactly 10 points
-            return game.TeamScores.Values.Any(score => score == 10);
         }
 
-        public bool IsOneTeamAt10(GameState game)
+        // NEW DYNAMIC RULE METHODS
+
+        public bool IsLastHand(GameState game)
         {
-            // Check if exactly one team has 10 points
-            var teamsAt10 = game.TeamScores.Values.Count(score => score == 10);
-            return teamsAt10 == 1;
+            // Last hand is when any team has reached one victory away (10+ points)
+            return game.TeamScores.Values.Any(score => score >= TrucoConstants.Game.WinningScore - 2);
         }
 
-        public bool AreBothTeamsAt10(GameState game)
+        public bool IsOneTeamAtLastHand(GameState game)
         {
-            // Check if both teams have 10 points
-            var teamsAt10 = game.TeamScores.Values.Count(score => score == 10);
-            return teamsAt10 == 2;
-        }        public Team? GetTeamAt10(GameState game)
+            // Check if exactly one team is one victory away
+            var teamsAtLastHand = game.TeamScores.Values.Count(score => score >= TrucoConstants.Game.WinningScore - 2);
+            return teamsAtLastHand == 1;
+        }
+
+        public bool AreBothTeamsAtLastHand(GameState game)
         {
-            // Returns the team that has 10 points, or null if none/both have 10
-            if (AreBothTeamsAt10(game))
-                return null; // When both teams are at 10, return null
+            // Check if both teams are one victory away
+            var teamsAtLastHand = game.TeamScores.Values.Count(score => score >= TrucoConstants.Game.WinningScore - 2);
+            return teamsAtLastHand == 2;
+        }
+
+        public Team? GetTeamAtLastHand(GameState game)
+        {
+            // Returns the team that is one victory away, or null if none/both are
+            if (AreBothTeamsAtLastHand(game))
+                return null; // When both teams are at last hand, return null
                 
             foreach (var teamScore in game.TeamScores)
             {
-                if (teamScore.Value == 10)
+                if (teamScore.Value >= TrucoConstants.Game.WinningScore - 2)
                     return teamScore.Key;
             }
             return null;
-        }public void ApplyMaoDe10Rule(GameState game)
-        {           
-            if (AreBothTeamsAt10(game))
+        }
+
+        public bool IsMaximumStakes(GameState game)
+        {
+            return game.Stakes >= TrucoConstants.Stakes.Maximum;
+        }
+
+        public int GetNextStakes(int currentStakes)
+        {
+            return TrucoConstants.Stakes.GetNextStakesValue(currentStakes);
+        }        public void ApplyLastHandRule(GameState game)
+        {
+            if (AreBothTeamsAtLastHand(game))
             {
-                // Case 2: Both teams at 10 - normal hand, no truco allowed
-                game.IsBothTeamsAt10 = true;
+                // Case 2: Both teams at last hand - normal hand, no truco allowed
                 game.Stakes = TrucoConstants.Stakes.Initial; // Normal 2-point hand
                 game.TrucoCallState = TrucoCallState.None;
                 game.LastTrucoCallerTeam = -1;
@@ -104,39 +116,44 @@ namespace TrucoMineiro.API.Domain.Services
                 
                 game.ActionLog.Add(new ActionLogEntry("game-event")
                 {
-                    Action = "Both teams at 10 points - hand worth 2 points, truco disabled"
+                    Action = "Both teams at last hand - hand worth 2 points, truco disabled"
                 });
             }
-            else if (IsOneTeamAt10(game))
+            else if (IsOneTeamAtLastHand(game))
             {
-                // Case 1: One team at 10 - automatic truco state
-                var teamAt10 = GetTeamAt10(game);
-                if (teamAt10.HasValue)
+                // Case 1: One team at last hand - automatic truco state
+                var teamAtLastHand = GetTeamAtLastHand(game);
+                if (teamAtLastHand.HasValue)
                 {
                     game.Stakes = TrucoConstants.Stakes.TrucoCall; // 4 points
                     game.TrucoCallState = TrucoCallState.Truco;
-                    game.LastTrucoCallerTeam = (int)teamAt10.Value;
-                    game.CanRaiseTeam = null; // No raises allowed in "Mão de 10"
-                    game.IsBothTeamsAt10 = false; // Explicitly set for clarity
+                    game.LastTrucoCallerTeam = (int)teamAtLastHand.Value;
+                    game.CanRaiseTeam = null; // No raises allowed in last hand
                     
                     game.ActionLog.Add(new ActionLogEntry("game-event")
                     {
-                        Action = $"Mão de 10 activated - Team {teamAt10.Value} at 10 points, hand automatically worth 4 points"
-                    });
+                        Action = $"Last hand activated - Team {teamAtLastHand.Value} at {game.TeamScores[teamAtLastHand.Value]} points, hand automatically worth 4 points"});
                 }
             }
         }
 
+        // EXISTING METHODS (updated to use new logic)
+
         public int CalculateStakes(GameState game)
         {
-            // Check for "Mão de 10" first
-            if (IsMaoDe10Active(game))
+            // Check for last hand first (replaces legacy "Mão de 10" logic)
+            if (IsLastHand(game))
             {
-                return 4;
-            }            // Regular stakes calculation
+                if (AreBothTeamsAtLastHand(game))
+                    return TrucoConstants.Stakes.Initial; // 2 points
+                else if (IsOneTeamAtLastHand(game))
+                    return TrucoConstants.Stakes.TrucoCall; // 4 points
+            }
+
+            // Regular stakes calculation based on truco state
             if (game.TrucoCallState == TrucoCallState.None)
             {
-                return 2; // Base hand value (updated from 1 to 2 per new rules)
+                return TrucoConstants.Stakes.Initial; // 2 points
             }
 
             return game.Stakes;

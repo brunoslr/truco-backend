@@ -177,9 +177,7 @@ namespace TrucoMineiro.API.Domain.Models
         }/// <summary>
         /// Current state of Truco calls and raises
         /// </summary>
-        public TrucoCallState TrucoCallState { get; set; } = TrucoCallState.None;
-
-        /// <summary>
+        public TrucoCallState TrucoCallState { get; set; } = TrucoCallState.None;        /// <summary>
         /// Team ID of the last team that called Truco or raised (-1 = no previous caller)
         /// </summary>
         public int LastTrucoCallerTeam { get; set; } = -1;
@@ -190,9 +188,14 @@ namespace TrucoMineiro.API.Domain.Models
         public int? CanRaiseTeam { get; set; } = null;
 
         /// <summary>
-        /// Special case flag: both teams have 10 points, disable all truco actions
+        /// Iron Hand feature: when enabled, players cannot see their own cards during last hand
         /// </summary>
-        public bool IsBothTeamsAt10 { get; set; } = false;
+        public bool IronHandEnabled { get; set; } = GameConfiguration.DefaultIronHandEnabled;
+
+        /// <summary>
+        /// Partner card visibility: when enabled, teams at last hand can see their partner's cards
+        /// </summary>
+        public bool PartnerCardVisibilityEnabled { get; set; } = GameConfiguration.DefaultPartnerCardVisibilityEnabled;
 
         /// <summary>
         /// The current hand number in the match
@@ -371,11 +374,12 @@ namespace TrucoMineiro.API.Domain.Models
 
             // Deal cards to the players
             DealCards();            // Reset the stakes and truco status
-            Stakes = TrucoConstants.Stakes.Initial;            // Reset Truco state for new hand
+            Stakes = TrucoConstants.Stakes.Initial;
+
+            // Reset Truco state for new hand
             TrucoCallState = TrucoCallState.None;
             LastTrucoCallerTeam = -1;
             CanRaiseTeam = null;
-            IsBothTeamsAt10 = false;
             TurnWinner = null;
         }
 

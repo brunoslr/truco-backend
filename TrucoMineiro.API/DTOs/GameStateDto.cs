@@ -36,12 +36,18 @@ namespace TrucoMineiro.API.DTOs
         public int LastTrucoCallerTeam { get; set; } = -1;
 
         /// <summary>
-        /// Team that can raise next (null if either team can call truco)
+        /// Team that can raise next (null if either team can call truco)        /// </summary>
+        public int? CanRaiseTeam { get; set; } = null;
+
+        /// <summary>
+        /// Iron Hand feature: when enabled, players cannot see their own cards during last hand
         /// </summary>
-        public int? CanRaiseTeam { get; set; } = null;        /// <summary>
-        /// Special case: both teams have 10 points, truco disabled
+        public bool IronHandEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Partner card visibility: when enabled, teams at last hand can see their partner's cards
         /// </summary>
-        public bool IsBothTeamsAt10 { get; set; } = false;
+        public bool PartnerCardVisibilityEnabled { get; set; } = true;
 
         /// <summary>
         /// Available actions for the current player (helps frontend show correct buttons)
