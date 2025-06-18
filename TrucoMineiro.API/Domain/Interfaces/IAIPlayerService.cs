@@ -38,6 +38,16 @@ namespace TrucoMineiro.API.Domain.Interfaces
         bool ShouldFold(Player player, GameState game);
 
         /// <summary>
+        /// Determines how an AI player should respond to a truco call
+        /// </summary>
+        /// <param name="player">The AI player responding</param>
+        /// <param name="game">The current game state</param>
+        /// <param name="callType">The type of truco call ("Truco", "Seis", "Doze")</param>
+        /// <param name="newPotentialStakes">The stakes if accepted</param>
+        /// <returns>The AI's decision: Accept, Surrender, or Raise</returns>
+        TrucoDecision DecideTrucoResponse(Player player, GameState game, string callType, int newPotentialStakes);
+
+        /// <summary>
         /// Checks if a player is an AI player
         /// </summary>
         /// <param name="player">The player to check</param>

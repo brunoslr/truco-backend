@@ -221,6 +221,11 @@ namespace TrucoMineiro.Tests.Events
             return false; // Never fold in tests
         }
 
+        public TrucoDecision DecideTrucoResponse(Player player, GameState game, string callType, int newPotentialStakes)
+        {
+            return TrucoDecision.Accept; // Always accept in tests
+        }
+
         public bool IsAIPlayer(Player player)
         {
             return player.IsAI;

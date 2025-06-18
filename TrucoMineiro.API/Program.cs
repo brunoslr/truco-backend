@@ -42,6 +42,7 @@ builder.Services.AddSingleton<TrucoMineiro.API.Domain.Events.IEventPublisher, Tr
 
 // Register event handlers
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.PlayerTurnStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.AIPlayerEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.TrucoOrRaiseCalledEvent>, TrucoMineiro.API.Domain.EventHandlers.AITrucoResponseEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.RoundCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.RoundCleanupEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.HandCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.HandCompletionEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.HandStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.HandStartedEventHandler>();
@@ -52,6 +53,7 @@ builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMin
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.CardPlayedEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.PlayerTurnStartedEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.RoundCompletedEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
+builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.TrucoOrRaiseCalledEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.TrucoRaiseEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
 builder.Services.AddScoped<TrucoMineiro.API.Domain.Events.IEventHandler<TrucoMineiro.API.Domain.Events.GameEvents.SurrenderTrucoEvent>, TrucoMineiro.API.Domain.EventHandlers.ActionLogEventHandler>();
 

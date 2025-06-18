@@ -13,6 +13,7 @@ namespace TrucoMineiro.API.Domain.EventHandlers
         IEventHandler<CardPlayedEvent>,
         IEventHandler<PlayerTurnStartedEvent>,
         IEventHandler<RoundCompletedEvent>,
+        IEventHandler<TrucoOrRaiseCalledEvent>,
         IEventHandler<TrucoRaiseEvent>,
         IEventHandler<SurrenderTrucoEvent>
     {
@@ -106,10 +107,8 @@ namespace TrucoMineiro.API.Domain.EventHandlers
                 };
 
                 game.ActionLog.Add(actionLogEntry);
-                await _gameRepository.SaveGameAsync(game);
-
-                _logger.LogDebug("Added action log entry for round completed: Winner {Winner} in game {GameId}",
-                    gameEvent.RoundWinner.ToString(), gameEvent.GameId);
+                await _gameRepository.SaveGameAsync(game);                _logger.LogDebug("Added action log entry for round completed: Winner {Winner} in game {GameId}",
+                    gameEvent.RoundWinner?.ToString() ?? "None", gameEvent.GameId);
             }
             catch (Exception ex)
             {
@@ -181,6 +180,34 @@ namespace TrucoMineiro.API.Domain.EventHandlers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating action log entry for fold event in game {GameId}", gameEvent.GameId);
+            }
+        }
+
+        public async Task HandleAsync(TrucoOrRaiseCalledEvent gameEvent, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var game = await _gameRepository.GetGameAsync(gameEvent.GameId.ToString());
+                if (game == null)
+                {
+                    _logger.LogWarning("Game {GameId} not found for action log creation", gameEvent.GameId);
+                    return;
+                }                // Create action log entry for truco call
+                var actionLogEntry = new ActionLogEntry("truco-called")
+                {
+                    PlayerSeat = gameEvent.CallingPlayer.Seat,
+                    Action = $"{gameEvent.CallType} for {gameEvent.NewPotentialStakes} points"
+                };
+
+                game.ActionLog.Add(actionLogEntry);
+                await _gameRepository.SaveGameAsync(game);
+
+                _logger.LogDebug("Added action log entry for truco call: Player {PlayerSeat} called {CallType} in game {GameId}", 
+                    gameEvent.CallingPlayer.Seat, gameEvent.CallType, gameEvent.GameId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating action log entry for truco call event in game {GameId}", gameEvent.GameId);
             }
         }
     }

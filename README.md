@@ -158,6 +158,146 @@ stateDiagram-v2
 ### Exclusions
 - The game does not include Envido or Flor, as they are not used in the Truco Mineiro variant.
 
+## AI Player Behavior
+
+The AI players implement sophisticated decision-making logic that simulates realistic Truco playing behavior, including strategic aggression, bluffing, and victory-awareness.
+
+### AI Decision Framework
+
+AI players use a context-aware decision system that considers:
+- **Hand Strength**: Calculated based on card values and Truco rankings
+- **Game Context**: Current scores, stakes, round winners, and hand number
+- **Strategic Position**: Team position relative to victory/defeat
+- **Psychological Factors**: Bluffing opportunities and opponent psychology
+
+### Absolute Rules (Non-Negotiable Behavior)
+
+#### Critical Victory/Defeat Prevention
+1. **Never Surrender When Enemy Will Win**: If the opponent will achieve victory by winning the current stakes, AI will NEVER surrender
+   - Will attempt to raise (even as a bluff) if possible
+   - Will always accept if raise is not available
+   - Applies desperate strategy when facing imminent defeat
+
+2. **Never Raise When Own Victory is Assured**: If AI's team will win by accepting the current stakes, AI will NEVER raise
+   - Avoids unnecessary risk when victory is guaranteed
+   - Will only accept or surrender based on hand strength
+   - Prioritizes securing the win over maximizing points
+
+3. **Conservative Victory Protection**: When close to victory, AI becomes more conservative to avoid throwing away a winning position
+
+### Strategic Rules (Threshold-Based with Randomness)
+
+#### Aggression Modifiers
+- **Behind in Score**: +10% aggression when opponent team is ahead
+- **Won First Round**: +30% aggression bonus (doubled for psychological advantage)
+- **Random Variation**: ±5% random variation in aggression levels
+
+#### Dynamic Thresholds (with ±10% randomness)
+- **Base Accept Threshold**: 30% hand strength
+- **Base Raise Threshold**: 70% hand strength (85% at high stakes ≥8)
+- **Base Truco Call Threshold**: 60% hand strength
+- **Thresholds are lowered by aggression bonuses** (more aggressive = lower requirements)
+
+### Bluffing System
+
+The AI implements multiple bluffing scenarios to create unpredictable and realistic gameplay:
+
+#### Bluffing Scenarios
+1. **Prime Bluffing (Won First Round + Weak Hand)**: 40% base chance
+   - Triggered when AI won first round but has weak cards (< 20% strength)
+   - Exploits opponent's perception of strength from round win
+
+2. **Desperation Bluffing (Behind + Weak-Medium Hand)**: 25% base chance
+   - Activated when behind in score with 20-50% hand strength
+   - Increases to 35% if 3+ points behind
+
+3. **Positional Bluffing (Early Game + Medium Hand)**: 15% base chance
+   - Used in first 2 hands with 40-60% hand strength
+   - Establishes aggressive table image
+
+4. **Random Bluffing (Any Situation)**: 7.5% base chance
+   - Pure unpredictability factor
+   - Prevents AI from being too predictable
+
+#### Bluffing Applications
+- **Truco Calls**: 70% chance when bluffing conditions are met
+- **Raises**: 50% chance when bluffing conditions are met
+- **Responses**: Can lead to accepting or raising with weak hands
+
+### Hand Strength Calculation
+
+Hand strength is calculated as: `(Sum of Card Strengths) / (Number of Cards × 14)`
+
+Where card strengths follow Truco Mineiro rankings:
+- Zap (4♣): 14 points
+- Copas (7♥): 13 points  
+- Espadão (A♠): 12 points
+- Espadinha (7♦): 11 points
+- 3s: 10 points
+- 2s: 9 points
+- Aces: 8 points
+- Kings: 7 points
+- And so on...
+
+### Behavioral Constants
+
+All AI behavior is controlled by configurable constants in `AIBehaviorConstants`:
+
+```csharp
+// Base thresholds
+BASE_ACCEPT_THRESHOLD = 0.3
+BASE_RAISE_THRESHOLD = 0.7
+HIGH_STAKES_RAISE_THRESHOLD = 0.85
+BASE_TRUCO_CALL_THRESHOLD = 0.6
+
+// Aggression modifiers
+BEHIND_SCORE_AGGRESSION_BONUS = 0.1
+WON_FIRST_ROUND_AGGRESSION_BONUS = 0.3
+
+// Bluffing parameters
+BLUFF_BASE_CHANCE = 0.25
+WEAK_HAND_THRESHOLD = 0.2
+BLUFF_RANDOM_FACTOR = 0.3
+
+// Randomness factors
+THRESHOLD_RANDOM_VARIATION = 0.1
+AGGRESSION_RANDOM_FACTOR = 0.05
+```
+
+### Examples of AI Behavior
+
+#### Scenario 1: Enemy About to Win (11 points, stakes = 2)
+- AI will NEVER surrender (absolute rule)
+- Will attempt desperate raises even with weak hands
+- 60-80% chance of aggressive actions depending on game context
+
+#### Scenario 2: AI About to Win (11 points, stakes = 2)  
+- AI will NEVER raise (absolute rule)
+- Will only accept/surrender based on conservative hand strength threshold
+- Prioritizes securing victory over point maximization
+
+#### Scenario 3: Won First Round with Weak Hand
+- 40% base chance to bluff with truco calls/raises
+- Exploits psychological advantage from round win
+- May lead to surprising aggressive plays with poor cards
+
+#### Scenario 4: Behind in Score
+- Increased aggression across all decisions
+- More likely to call truco and make risky plays
+- Desperation bluffing with medium-strength hands
+
+### AI Card Selection Strategy
+
+Beyond truco decisions, AI also implements sophisticated card selection:
+
+1. **No Chance to Win**: Play weakest card to preserve stronger cards
+2. **Partner Has Strongest**: Support partner or save cards based on remaining opponents
+3. **Can Win Round**: Use smallest winning card to conserve strength
+4. **First to Play**: Aggressive with strong hands, conservative with weak hands
+5. **Positional Play**: Adapt strategy based on turn order and opponent actions
+
+This AI system creates challenging, unpredictable opponents that provide an engaging single-player experience while maintaining the strategic depth and psychological elements that make Truco compelling.
+
 ## API Data Transfer Objects (DTOs)
 
 The backend exposes the following DTOs (Data Transfer Objects) which define the contract between frontend and backend:
