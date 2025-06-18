@@ -8,12 +8,11 @@ namespace TrucoMineiro.API.Domain.Services
     /// AI behavior constants for decision making in Truco
     /// </summary>
     internal static class AIBehaviorConstants
-    {
-        // Base decision thresholds
+    {        // Base decision thresholds
         public const double BASE_ACCEPT_THRESHOLD = 0.3;
-        public const double BASE_RAISE_THRESHOLD = 0.7;
-        public const double HIGH_STAKES_RAISE_THRESHOLD = 0.85; // For stakes >= 8
-        public const double BASE_TRUCO_CALL_THRESHOLD = 0.6;
+        public const double BASE_RAISE_THRESHOLD = 0.6; // Reduced from 0.7 to make raises more likely
+        public const double HIGH_STAKES_RAISE_THRESHOLD = 0.75; // Reduced from 0.85
+        public const double BASE_TRUCO_CALL_THRESHOLD = 0.55; // Reduced from 0.6
         
         // Aggression modifiers
         public const double BEHIND_SCORE_AGGRESSION_BONUS = 0.1;
@@ -26,10 +25,9 @@ namespace TrucoMineiro.API.Domain.Services
         
         // Victory calculation
         public const int VICTORY_THRESHOLD = 12;
-        
-        // Probability modifiers
-        public const double RAISE_PROBABILITY_AT_HIGH_STAKES = 0.2; // 20% at high stakes
-        public const double RAISE_PROBABILITY_NORMAL = 0.3; // 30% normally
+          // Probability modifiers
+        public const double RAISE_PROBABILITY_AT_HIGH_STAKES = 0.3; // Increased from 0.2
+        public const double RAISE_PROBABILITY_NORMAL = 0.5; // Increased from 0.3
         
         // Randomness factors
         public const double THRESHOLD_RANDOM_VARIATION = 0.1; // ±10% variation in thresholds
@@ -68,12 +66,10 @@ namespace TrucoMineiro.API.Domain.Services
     public class AIPlayerService : IAIPlayerService
     {
         private readonly IHandResolutionService _handResolutionService;
-        private readonly Random _random;
-
-        public AIPlayerService(IHandResolutionService handResolutionService)
+        private readonly Random _random;        public AIPlayerService(IHandResolutionService handResolutionService)
         {
             _handResolutionService = handResolutionService;
-            _random = new Random();
+            _random = new Random(Environment.TickCount + Thread.CurrentThread.ManagedThreadId);
         }
         public int SelectCardToPlay(Player player, GameState game)
         {
@@ -350,26 +346,33 @@ namespace TrucoMineiro.API.Domain.Services
                 return _random.NextDouble() < desperationThreshold;
             }
 
-            // Calculate aggression bonus and apply randomness
+            // Calculate thresholds with aggression bonus and randomness
             var aggressionBonus = CalculateAggressionBonus(context);
-            var baseThreshold = ApplyRandomVariation(AIBehaviorConstants.BASE_TRUCO_CALL_THRESHOLD);
-            var callThreshold = Math.Max(0.1, baseThreshold - aggressionBonus); // More aggressive = lower threshold
+            var baseThreshold = ApplyRandomVariation(AIBehaviorConstants.BASE_TRUCO_CALL_THRESHOLD - aggressionBonus);
+            
+            // Ensure threshold stays in reasonable bounds
+            baseThreshold = Math.Max(0.1, Math.Min(0.9, baseThreshold));
 
-            // Consider bluffing opportunity
-            if (ShouldAttemptBluff(context, handStrength))
-            {
-                // Bluff calls are more likely with strong position (won first round)
-                return _random.NextDouble() < 0.7;
-            }
+            // Apply bluffing factor to reduce threshold for bluffing opportunities
+            var bluffFactor = GetBluffFactor(context, handStrength);
+            var callThreshold = baseThreshold - bluffFactor;
+
+            // Additional randomness in the final decision
+            var extraRandomness = (_random.NextDouble() - 0.5) * 0.1; // ±5% variation
+            callThreshold += extraRandomness;
+
+            // Final boundary check
+            callThreshold = Math.Max(0.05, Math.Min(0.95, callThreshold));
 
             // Standard truco call decision with enhanced logic
             return handStrength >= callThreshold;
-        }        public bool ShouldRaise(Player player, GameState game)
+        }
+        public bool ShouldRaise(Player player, GameState game)
         {
             // Can't raise if at max stakes or no truco call pending
             if (game.Stakes >= TrucoConstants.Stakes.Maximum || game.TrucoCallState == TrucoCallState.None)
                 return false;
-                
+
             // Can't raise if at max truco level (Doze)
             if (game.TrucoCallState == TrucoCallState.Doze)
                 return false;
@@ -407,15 +410,16 @@ namespace TrucoMineiro.API.Domain.Services
             // Standard raise decision with probability factor
             if (handStrength >= raiseThreshold)
             {
-                var raiseProb = game.Stakes >= 8 ? 
-                    AIBehaviorConstants.RAISE_PROBABILITY_AT_HIGH_STAKES : 
+                var raiseProb = game.Stakes >= 8 ?
+                    AIBehaviorConstants.RAISE_PROBABILITY_AT_HIGH_STAKES :
                     AIBehaviorConstants.RAISE_PROBABILITY_NORMAL;
-                
+
                 return _random.NextDouble() < raiseProb;
             }
 
             return false;
-        }public bool ShouldFold(Player player, GameState game)
+        }
+        public bool ShouldFold(Player player, GameState game)
         {
             // Only consider folding if there's a pending truco call to respond to
             if (game.TrucoCallState == TrucoCallState.None) return false;            var handStrength = AnalyzeHandStrength(player.Hand);
@@ -479,35 +483,43 @@ namespace TrucoMineiro.API.Domain.Services
                     return TrucoDecision.Raise;
                 }
                 return TrucoDecision.Accept; // Never surrender when enemy will win
-            }
-
-            // ABSOLUTE RULE 2: Conservative when close to victory - don't risk unnecessary points
-            if (context.TeamScore + GetNextStakeLevel(newPotentialStakes) >= AIBehaviorConstants.VICTORY_THRESHOLD)
+            }            // ABSOLUTE RULE 2: Conservative when close to victory - don't risk unnecessary points
+            if (context.TeamScore + newPotentialStakes >= AIBehaviorConstants.VICTORY_THRESHOLD)
             {
-                // Only accept or surrender, never raise when victory is assured
+                // Only accept or surrender, never raise when accepting the current call guarantees victory
                 var conservativeThreshold = ApplyRandomVariation(AIBehaviorConstants.BASE_ACCEPT_THRESHOLD);
                 return handStrength >= conservativeThreshold ? TrucoDecision.Accept : TrucoDecision.Surrender;
             }
 
-            // STRATEGIC DECISION MAKING with randomness
+            // Calculate base thresholds with aggression and randomness
             var aggressionBonus = CalculateAggressionBonus(context);
-            var acceptThreshold = ApplyRandomVariation(AIBehaviorConstants.BASE_ACCEPT_THRESHOLD + aggressionBonus);
+            var acceptThreshold = ApplyRandomVariation(AIBehaviorConstants.BASE_ACCEPT_THRESHOLD - aggressionBonus);
             var raiseThreshold = ApplyRandomVariation(
                 newPotentialStakes >= 8 ? AIBehaviorConstants.HIGH_STAKES_RAISE_THRESHOLD : AIBehaviorConstants.BASE_RAISE_THRESHOLD
-            ) + aggressionBonus;
+            ) - aggressionBonus;
 
-            // Consider bluffing opportunity
-            if (ShouldAttemptBluff(context, handStrength))
-            {
-                return CanRaise(newPotentialStakes) ? TrucoDecision.Raise : TrucoDecision.Accept;
-            }
+            // Ensure thresholds stay in reasonable bounds
+            acceptThreshold = Math.Max(0.1, Math.Min(0.9, acceptThreshold));
+            raiseThreshold = Math.Max(0.1, Math.Min(0.9, raiseThreshold));
 
-            // Standard decision making with enhanced thresholds
+            // Check for bluffing opportunity (modifies thresholds instead of overriding)
+            var bluffFactor = GetBluffFactor(context, handStrength);
+            acceptThreshold -= bluffFactor;
+            raiseThreshold -= bluffFactor;            // Standard decision making with enhanced thresholds
             if (handStrength >= raiseThreshold && CanRaise(newPotentialStakes))
             {
                 var raiseProb = newPotentialStakes >= 8 ? 
                     AIBehaviorConstants.RAISE_PROBABILITY_AT_HIGH_STAKES : 
                     AIBehaviorConstants.RAISE_PROBABILITY_NORMAL;
+                
+                // Increase raise probability based on aggression bonus
+                raiseProb += aggressionBonus * 0.5; // More aggression = higher raise chance
+                
+                // Add randomness to raise probability
+                raiseProb += (_random.NextDouble() - 0.5) * 0.3; // ±15% variation
+                
+                // Ensure reasonable bounds
+                raiseProb = Math.Max(0.1, Math.Min(0.8, raiseProb));
                 
                 if (random < raiseProb)
                 {
@@ -545,11 +557,19 @@ namespace TrucoMineiro.API.Domain.Services
             if (game.RoundWinners.Count == 0) return false;
             var firstRoundWinner = game.RoundWinners[0];
             
-            // Convert playerTeam (0 or 1) to Team enum value (1 or 2)
-            // playerTeam 0 = PlayerTeam (1), playerTeam 1 = OpponentTeam (2)
-            var teamEnumValue = playerTeam == 0 ? (int)Team.PlayerTeam : (int)Team.OpponentTeam;
-            
-            return firstRoundWinner == teamEnumValue;
+            // RoundWinners can contain either Team enum values (1,2) or team indices (0,1)
+            // Handle both cases for backwards compatibility
+            if (firstRoundWinner == 0 || firstRoundWinner == 1)
+            {
+                // Team indices: 0 = PlayerTeam, 1 = OpponentTeam
+                return firstRoundWinner == playerTeam;
+            }
+            else
+            {
+                // Team enum values: 1 = PlayerTeam, 2 = OpponentTeam
+                var teamEnumValue = playerTeam == 0 ? (int)Team.PlayerTeam : (int)Team.OpponentTeam;
+                return firstRoundWinner == teamEnumValue;
+            }
         }
 
         /// <summary>
@@ -582,38 +602,75 @@ namespace TrucoMineiro.API.Domain.Services
             var variation = (_random.NextDouble() - 0.5) * 2 * AIBehaviorConstants.THRESHOLD_RANDOM_VARIATION;
             return Math.Max(0.05, Math.Min(0.95, threshold + variation)); // Keep within reasonable bounds
         }        /// <summary>
+        /// Determines a bluff factor that reduces decision thresholds for bluffing opportunities
+        /// </summary>
+        private double GetBluffFactor(GameContext context, double handStrength)
+        {
+            double bluffFactor = 0.0;
+            
+            // Case A: Won first round but has weak cards - prime bluffing opportunity
+            if (context.HasWonFirstRound && handStrength < AIBehaviorConstants.WEAK_HAND_THRESHOLD)
+            {
+                var bluffChance = AIBehaviorConstants.BLUFF_BASE_CHANCE + 0.25; // 50% total
+                var randomFactor = _random.NextDouble() * AIBehaviorConstants.BLUFF_RANDOM_FACTOR;
+                if (_random.NextDouble() < (bluffChance + randomFactor))
+                {
+                    bluffFactor = 0.4; // Significant threshold reduction for bluffing
+                }
+            }
+            
+            // Case B: Behind in score with weak-to-medium hand - desperation bluff
+            else if (context.ScoreDifference > 0 && handStrength >= AIBehaviorConstants.WEAK_HAND_THRESHOLD && handStrength < 0.5)
+            {
+                var desperationBluffChance = AIBehaviorConstants.BLUFF_BASE_CHANCE + 0.1;
+                if (context.ScoreDifference >= 3) desperationBluffChance += 0.15;
+                if (_random.NextDouble() < desperationBluffChance)
+                {
+                    bluffFactor = 0.3; // Moderate threshold reduction
+                }
+            }
+            
+            // Case C: Early hand with medium hand - positional bluff
+            else if (context.CurrentHand <= 2 && handStrength >= 0.4 && handStrength < 0.6)
+            {
+                var earlyGameBluffChance = AIBehaviorConstants.BLUFF_BASE_CHANCE * 0.8; // 20%
+                if (_random.NextDouble() < earlyGameBluffChance)
+                {
+                    bluffFactor = 0.2; // Small threshold reduction
+                }
+            }
+            
+            // Case D: Won first round with medium hand - confidence bluff
+            else if (context.HasWonFirstRound && handStrength >= 0.4 && handStrength < 0.7)
+            {
+                var confidenceBluffChance = AIBehaviorConstants.BLUFF_BASE_CHANCE * 0.6; // 15%
+                if (_random.NextDouble() < confidenceBluffChance)
+                {
+                    bluffFactor = 0.25; // Moderate threshold reduction
+                }
+            }
+            
+            // Case E: Random bluff with any hand (pure unpredictability)
+            else
+            {
+                var pureRandomBluff = AIBehaviorConstants.BLUFF_BASE_CHANCE * 0.4; // 10%
+                if (_random.NextDouble() < pureRandomBluff)
+                {
+                    bluffFactor = 0.15; // Minor threshold reduction
+                }
+            }
+            
+            return bluffFactor;
+        }
+
+        /// <summary>
         /// Determines if the AI should attempt a bluff based on game context
         /// Enhanced with multiple bluffing scenarios for realistic behavior
         /// </summary>
         private bool ShouldAttemptBluff(GameContext context, double handStrength)
         {
-            // Case A: Won first round but has weak cards - prime bluffing opportunity
-            if (context.HasWonFirstRound && handStrength < AIBehaviorConstants.WEAK_HAND_THRESHOLD)
-            {
-                var bluffChance = AIBehaviorConstants.BLUFF_BASE_CHANCE + 0.15; // 40% total
-                var randomFactor = _random.NextDouble() * AIBehaviorConstants.BLUFF_RANDOM_FACTOR;
-                return _random.NextDouble() < (bluffChance + randomFactor);
-            }
-            
-            // Case B: Behind in score with weak-to-medium hand - desperation bluff
-            if (context.ScoreDifference > 0 && handStrength >= AIBehaviorConstants.WEAK_HAND_THRESHOLD && handStrength < 0.5)
-            {
-                var desperationBluffChance = AIBehaviorConstants.BLUFF_BASE_CHANCE;
-                // More desperate if further behind
-                if (context.ScoreDifference >= 3) desperationBluffChance += 0.1;
-                return _random.NextDouble() < desperationBluffChance;
-            }
-            
-            // Case C: Early hand with medium hand - positional bluff
-            if (context.CurrentHand <= 2 && handStrength >= 0.4 && handStrength < 0.6)
-            {
-                var earlyGameBluffChance = AIBehaviorConstants.BLUFF_BASE_CHANCE * 0.6; // 15%
-                return _random.NextDouble() < earlyGameBluffChance;
-            }
-            
-            // Case D: Random bluff with any hand (pure unpredictability)
-            var pureRandomBluff = AIBehaviorConstants.BLUFF_BASE_CHANCE * 0.3; // 7.5%
-            return _random.NextDouble() < pureRandomBluff;
+            // This method is now deprecated in favor of GetBluffFactor for better integration
+            return GetBluffFactor(context, handStrength) > 0;
         }
 
         /// <summary>

@@ -148,13 +148,11 @@ namespace TrucoMineiro.Tests.Events
             // Assert - Should show some bluffing (occasional raises with weak hand)
             Assert.True(raises > 5, $"Expected some bluff raises, got {raises} out of 100");
             Assert.True(accepts > 0, "Should accept sometimes");
-        }
-
-        [Fact]
+        }        [Fact]
         public void DecideTrucoResponse_Should_Be_More_Aggressive_When_Behind()
         {
             // Arrange - AI team is behind in score
-            var player = CreateTestPlayer(0, CreateMediumHand()); // Use seat 0 (PlayerTeam)
+            var player = CreateTestPlayer(0, CreateWeakHand()); // Use weak hand to show aggression differences
             var gameBehind = CreateTestGame(teamScore: 4, opponentScore: 8, stakes: 2);
             var gameAhead = CreateTestGame(teamScore: 8, opponentScore: 4, stakes: 2);
 
@@ -177,13 +175,11 @@ namespace TrucoMineiro.Tests.Events
             // Assert - Should be more aggressive when behind
             Assert.True(aggressiveWhenBehind > aggressiveWhenAhead, 
                 $"Expected more aggression when behind ({aggressiveWhenBehind}) than when ahead ({aggressiveWhenAhead})");
-        }
-
-        [Fact]
+        }        [Fact]
         public void DecideTrucoResponse_Should_Apply_Won_First_Round_Bonus()
         {
             // Arrange - Test with and without first round win
-            var player = CreateTestPlayer(0, CreateMediumHand()); // Use seat 0 (PlayerTeam)
+            var player = CreateTestPlayer(0, CreateWeakHand()); // Use weak hand to show aggression differences
             var gameWonFirst = CreateTestGame(teamScore: 6, opponentScore: 6, stakes: 2);
             gameWonFirst.RoundWinners = new List<int> { 0 }; // PlayerTeam (0) won first round
 
